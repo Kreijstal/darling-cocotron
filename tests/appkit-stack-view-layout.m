@@ -195,6 +195,23 @@ int main(void)
                @"a delegate may remove views it is told are detaching");
         flipped.delegate = nil;
 
+        NSStackView *archived = [[[NSStackView alloc] initWithFrame:NSMakeRect(0, 0, 200, 20)] autorelease];
+        NSView *first = box(20, 10), *second = box(30, 10);
+        [archived addArrangedSubview:first];
+        [archived addArrangedSubview:second];
+        NSStackView *decoded = [NSKeyedUnarchiver unarchiveObjectWithData:
+                [NSKeyedArchiver archivedDataWithRootObject:archived]];
+        expect([decoded.arrangedSubviews count] == 2 &&
+                       [decoded.arrangedSubviews isEqual:decoded.subviews],
+               @"decoded subviews are arranged views");
+        NSView *decodedSecond = [decoded.arrangedSubviews objectAtIndex:1];
+        [decoded setVisibilityPriority:NSStackViewVisibilityPriorityDetachOnlyIfNecessary
+                               forView:decodedSecond];
+        [decoded setCustomSpacing:4 afterView:[decoded.arrangedSubviews objectAtIndex:0]];
+        expect([decoded visibilityPriorityForView:decodedSecond] ==
+                       NSStackViewVisibilityPriorityDetachOnlyIfNecessary,
+               @"visibility priority applies to a decoded view");
+
         NSLog(@"PASS: NSStackView layout");
     }
     return 0;
