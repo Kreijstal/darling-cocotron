@@ -174,9 +174,16 @@ NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsD
         }
 
     } else {
-        [NSException raise: NSInvalidArgumentException
-                    format: @"%@ can not encodeWithCoder:%@", [self class],
-                            [coder class]];
+        uint8_t space = 1;
+        CGFloat r = 0, g = 0, b = 0, a = 1;
+        @try {
+            [self getRed: &r green: &g blue: &b alpha: &a];
+        } @catch (id ex) {
+            NSLog(@"NSColor encodeWithCoder: getRed:green:blue:alpha: failed for %@: %@", self, ex);
+        }
+        float fvalues[4] = {(float)r, (float)g, (float)b, (float)a};
+        [coder encodeValuesOfObjCTypes: "cffff", &space, &fvalues[0], &fvalues[1],
+                                        &fvalues[2], &fvalues[3]];
     }
 }
 
@@ -376,6 +383,11 @@ NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsD
 
 + (NSColor *) gridColor {
     return [NSColor colorWithCatalogName: @"System" colorName: @"gridColor"];
+}
+
+// macOS 10.14+; approximation: opaque gray instead of semitransparent
++ (NSColor *) separatorColor {
+    return [NSColor colorWithCalibratedWhite: 0.85 alpha: 1.0];
 }
 
 + (NSColor *) controlColor {

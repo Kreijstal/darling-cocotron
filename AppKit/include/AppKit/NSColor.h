@@ -83,6 +83,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property(class, strong, readonly) NSColor *selectedMenuItemTextColor;
 
 @property(class, strong, readonly) NSColor *gridColor;
+@property(class, strong, readonly) NSColor *separatorColor;
 @property(class, strong, readonly) NSColor *headerTextColor;
 @property(class, strong, readonly) NSArray<NSColor *> *alternatingContentBackgroundColors;
 
@@ -158,6 +159,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 + (NSColor *) highlightColor;
 + (NSColor *) shadowColor;
 + (NSColor *) gridColor;
++ (NSColor *) separatorColor;
 
 + (NSColor *) alternateSelectedControlColor;
 + (NSColor *) alternateSelectedControlTextColor;
