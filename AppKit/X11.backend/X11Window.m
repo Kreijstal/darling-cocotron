@@ -181,7 +181,7 @@ static NSData *makeWindowIcon() {
     X11Display* x11disp = (X11Display *) [NSDisplay currentDisplay];
     _display = [x11disp display];
 
-    _frame = [self transformFrame: [delegate frame]];
+    _frame = [delegate frame];
     BOOL isPanel = [delegate isKindOfClass: [NSPanel class]];
     if (isPanel && _styleMask & NSDocModalWindowMask)
         _styleMask = NSBorderlessWindowMask;
@@ -226,7 +226,7 @@ static NSData *makeWindowIcon() {
     xattr.colormap = cmap;
 
     // _frame is in logical points; X wants device pixels.
-    O2Rect deviceFrame = [self deviceRect: _frame];
+    O2Rect deviceFrame = [self deviceRect: [self transformFrame: _frame]];
     _window = XCreateWindow(
             _display, DefaultRootWindow(_display), deviceFrame.origin.x,
             deviceFrame.origin.y, deviceFrame.size.width,
@@ -612,9 +612,7 @@ static NSData *makeWindowIcon() {
     XMoveResizeWindow(_display, _window, deviceFrame.origin.x,
                       deviceFrame.origin.y, deviceFrame.size.width,
                       deviceFrame.size.height);
-    // -frame applies transformFrame:, so _frame is stored bottom-left origin. Storing
-    // the caller's frame unflipped made -frame mirror the position.
-    _frame = transformed;
+    _frame = frame;
     [self invalidateContextWithNewSize: frame.size];
     // A non-resizable window hints PMinSize == PMaxSize, and a window manager
     // refuses any resize that falls outside the pair, so the hints have to follow
@@ -937,7 +935,7 @@ static BOOL windowManagerIsRunning(Display *display) {
 }
 
 - (O2Rect) frame {
-    return [self transformFrame: _frame];
+    return _frame;
 }
 
 static int ignoreBadWindow(Display *display, XErrorEvent *errorEvent) {
