@@ -214,6 +214,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) postEvent: (NSEvent *) event atStart: (BOOL) atStart {
+    if (!atStart && [NSEvent isMouseCoalescingEnabled]) {
+        NSEventType type = [event type];
+        if (type == NSMouseMoved || type == NSLeftMouseDragged ||
+            type == NSRightMouseDragged || type == NSOtherMouseDragged) {
+            NSInteger count = [_eventQueue count];
+            if (count > 0) {
+                NSEvent *last = [_eventQueue objectAtIndex: count - 1];
+                if ([last type] == type && [last window] == [event window]) {
+                    [_eventQueue replaceObjectAtIndex: count - 1 withObject: event];
+                    return;
+                }
+            }
+        }
+    }
+
     if (atStart) {
         [_eventQueue insertObject: event atIndex: 0];
     } else {
