@@ -178,7 +178,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) unlockFocus {
     id context = [[_focusContexts lastObject] retain];
     if (context != nil) [_focusContexts removeLastObject];
-    if (context != [NSNull null]) CGLUnlockContext([context CGLContextObj]);
+    if (context != [NSNull null]) {
+        [context flushBuffer];
+        CGLUnlockContext([context CGLContextObj]);
+    }
     [context release];
     [super unlockFocus];
 }

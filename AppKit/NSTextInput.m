@@ -112,4 +112,19 @@ NSString *const NSTextInputReplacementRangeAttributeName = @"NSTextInputReplacem
 - (void)invalidateCharacterCoordinates {
 }
 
++ (NSString *)localizedNameForInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier {
+    return @"U.S.";
+}
+
+- (NSTextInputSourceIdentifier)selectedKeyboardInputSource {
+    return @"com.apple.keylayout.US";
+}
+
+- (void)setSelectedKeyboardInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier {
+}
+
+- (NSArray *)keyboardInputSources {
+    return [NSArray arrayWithObject: @"com.apple.keylayout.US"];
+}
+
 @end

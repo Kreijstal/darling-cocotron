@@ -1214,6 +1214,7 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
         _bounds.size = CGSizeApplyAffineTransform(frame.size, transform);
     }
     _frame = frame;
+    _needsLayout = YES;
 
     [_window invalidateCursorRectsForView: self]; // this also invalidates
                                                   // tracking areas
@@ -1228,6 +1229,7 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
         layerFrame = [_superview convertRect: layerFrame toView: nil];
 
     [_layerContext setFrame: layerFrame];
+    configureLayerGeometry(self);
 
     invalidateTransform(self);
 
@@ -2293,8 +2295,9 @@ static void clearNeedsDisplay(NSView *self) {
     // reasons
     clearInvalidRects(self);
 
-    if (_needsDisplay)
+    if (_needsDisplay) {
         [[self window] setViewsNeedDisplay: YES];
+    }
 }
 
 - (void) setNeedsDisplayInRect: (NSRect) rect {
@@ -2368,18 +2371,6 @@ static NSView *viewBeingPrinted = nil;
     if (context == nil) {
         if (viewBeingPrinted != nil) {
             context = [[NSPrintOperation currentOperation] context];
-        } else if (_layer != nil) {
-            CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-            CGFloat width = _frame.size.width;
-            CGFloat height = _frame.size.height;
-            CGContextRef graphicsPort = CGBitmapContextCreate(
-                    NULL, width, height, 8, 0, colorSpace,
-                    kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host);
-            context = [NSGraphicsContext
-                    graphicsContextWithGraphicsPort: graphicsPort
-                                            flipped: NO];
-            CGColorSpaceRelease(colorSpace);
-            CGContextRelease(graphicsPort); // we'll re-fetch it below
         } else {
             context = windowContext;
         }
@@ -2437,16 +2428,14 @@ static NSView *viewBeingPrinted = nil;
     NSGraphicsContext *graphicsContext = [NSGraphicsContext currentContext];
     CGContextRef context = [graphicsContext graphicsPort];
 
-    if (viewBeingPrinted == nil && _layer != nil) {
-        CGImageRef image = CGBitmapContextCreateImage(context);
-        [_layer setContents:(id)image];
-        CGImageRelease(image);
-    }
-
     CGContextRestoreGState(context);
 
     [[graphicsContext focusStack] removeLastObject];
     [NSGraphicsContext restoreGraphicsState];
+
+    if (_window != nil) {
+        [[_window platformWindow] flushBuffer];
+    }
 }
 
 - (BOOL) needsToDrawRect: (NSRect) rect {
@@ -3411,8 +3400,24 @@ static NSMutableArray *installedViewConstraints(NSView *view, BOOL create) {
     return [self constraints];
 }
 
+- (void) addConstraint: (NSLayoutConstraint *) constraint {
+    if (constraint != nil) {
+        [self addConstraints: [NSArray arrayWithObject: constraint]];
+    }
+}
+
 - (void) addConstraints: (NSArray *) constraints {
     [NSLayoutConstraint activateConstraints: constraints];
+}
+
+- (void) removeConstraint: (NSLayoutConstraint *) constraint {
+    if (constraint != nil) {
+        [self removeConstraints: [NSArray arrayWithObject: constraint]];
+    }
+}
+
+- (void) removeConstraints: (NSArray *) constraints {
+    [NSLayoutConstraint deactivateConstraints: constraints];
 }
 
 - (void) updateConstraints {
@@ -3455,10 +3460,14 @@ static NSMutableArray *installedViewConstraints(NSView *view, BOOL create) {
 }
 
 - (void) layoutSubtreeIfNeeded {
+    if (!_needsLayout && !_needsUpdateConstraints) {
+        return;
+    }
     // Finish the update phase for the whole subtree before laying out any view.
     [self updateConstraintsForSubtreeIfNeeded];
     DarlingLayoutSubtree(self);
     [self _layoutSubtreeAfterUpdatingConstraints];
+    _needsLayout = NO;
 }
 
 @end

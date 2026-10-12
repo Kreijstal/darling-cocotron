@@ -541,7 +541,10 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 - (NSArray *) constraints;
 
 // Activates the constraints.
+- (void) addConstraint: (NSLayoutConstraint *) constraint;
 - (void) addConstraints: (NSArray *) constraints;
+- (void) removeConstraint: (NSLayoutConstraint *) constraint;
+- (void) removeConstraints: (NSArray *) constraints;
 
 // Stored for callers and subclasses; with no constraint solver they do not
 // affect layout. Defaults are 250 (hugging) and 750 (compression resistance).

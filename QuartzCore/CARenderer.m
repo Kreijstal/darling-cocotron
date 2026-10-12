@@ -584,7 +584,13 @@ static void displayLayerTreeIfNeeded(CALayer *layer) {
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    glClearColor(0, 0, 0, 1);
+    CGColorRef bg = [_rootLayer backgroundColor];
+    if (bg != NULL && CGColorGetNumberOfComponents(bg) == 4) {
+        const CGFloat *c = CGColorGetComponents(bg);
+        glClearColor(c[0], c[1], c[2], c[3]);
+    } else {
+        glClearColor(0, 0, 0, 0);
+    }
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Painter's order instead of depth testing: every layer used to get z+1,

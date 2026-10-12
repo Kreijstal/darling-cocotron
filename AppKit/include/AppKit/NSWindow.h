@@ -131,6 +131,14 @@ typedef NS_OPTIONS(NSUInteger, NSWindowOcclusionState) {
     NSWindowOcclusionStateVisible = 1 << 1
 };
 
+typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
+    NSWindowAnimationBehaviorDefault = 0,
+    NSWindowAnimationBehaviorNone = 2,
+    NSWindowAnimationBehaviorDocumentWindow = 3,
+    NSWindowAnimationBehaviorUtilityWindow = 4,
+    NSWindowAnimationBehaviorAlertPanel = 5
+};
+
 typedef int NSSelectionDirection;
 
 APPKIT_EXPORT const NSNotificationName NSWindowDidBecomeKeyNotification
@@ -258,6 +266,7 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExposeNotification
     BOOL _showsToolbarButton;
     BOOL _ignoresMouseEvents;
     BOOL _isMovableByWindowBackground;
+    NSWindowAnimationBehavior _animationBehavior;
     BOOL _allowsToolTipsWhenApplicationIsInactive;
     BOOL _defaultButtonCellKeyEquivalentDisabled;
     BOOL _autorecalculatesKeyViewLoop;
@@ -496,6 +505,8 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExposeNotification
 - (BOOL) isOnActiveSpace;
 - (NSWindowSharingType) sharingType;
 - (void) setSharingType: (NSWindowSharingType) type;
+- (NSWindowAnimationBehavior) animationBehavior;
+- (void) setAnimationBehavior: (NSWindowAnimationBehavior) behavior;
 
 - (BOOL) isDocumentEdited;
 - (BOOL) isZoomed;

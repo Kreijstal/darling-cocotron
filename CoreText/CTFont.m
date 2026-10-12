@@ -337,7 +337,6 @@ CGFloat CTFontGetSize(CTFontRef self) {
 
 CGAffineTransform CTFontGetMatrix(CTFontRef font)
 {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
     return CGAffineTransformIdentity;
 }
 
@@ -685,17 +684,7 @@ void CTFontDrawGlyphs(CTFontRef font, const CGGlyph *glyphs, const CGPoint *posi
         return;
     CGContextSetFont(context, graphicsFont);
     CGContextSetFontSize(context, CTFontGetSize(font));
-    CGAffineTransform matrix = CTFontGetMatrix(font);
-    CGSize advance = CGSizeMake(0, 0);
-    for (size_t i = 0; i < count; i++) {
-        // CoreText positions are in user space; the CoreGraphics positioned
-        // helper instead interprets its offsets in text space. Set each origin
-        // directly so the font matrix does not transform the supplied position.
-        CGContextSetTextMatrix(context, matrix);
-        CGContextSetTextPosition(context, positions[i].x, positions[i].y);
-        CGContextShowGlyphsWithAdvances(context, glyphs + i, &advance, 1);
-    }
-    // The API leaves font, size and text matrix changes in the context.
+    CGContextShowGlyphsAtPositions(context, glyphs, positions, count);
     CGFontRelease(graphicsFont);
 }
 

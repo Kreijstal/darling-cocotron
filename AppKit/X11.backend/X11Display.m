@@ -26,6 +26,7 @@
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSScreen.h>
 #import <Foundation/NSDebug.h>
+#import <poll.h>
 
 #ifndef DARLING
 #import <Foundation/NSSelectInputSource.h>
@@ -1117,6 +1118,17 @@ static int compareFontPatterns(const void *a, const void *b) {
                                             inMode: mode
                                            dequeue: dequeue];
 
+#ifdef DARLING
+    if (result == nil && XPending(_display) == 0 && [_eventQueue count] == 0) {
+        NSTimeInterval timeout = [untilDate timeIntervalSinceNow];
+        if (timeout > 0.0) {
+            struct pollfd pfd = { .fd = _fileDescriptor, .events = POLLIN };
+            poll(&pfd, 1, 1);
+            [self processPendingEvents];
+        }
+    }
+#endif
+
 #ifndef DARLING
     [[NSRunLoop currentRunLoop] removeInputSource: _inputSource forMode: mode];
 #endif
@@ -1323,6 +1335,21 @@ enum {
     HorizontalScrollRightButton = 7,
 };
 
+static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWindow, int x, int y, int rootX, int rootY) {
+    if (dpy == NULL || window == nil) {
+        return NSZeroPoint;
+    }
+    Window winHandle = [window windowHandle];
+    if (eventWindow != winHandle && eventWindow != 0) {
+        int winX = x, winY = y;
+        Window child;
+        if (XTranslateCoordinates(dpy, RootWindow(dpy, DefaultScreen(dpy)), winHandle, rootX, rootY, &winX, &winY, &child)) {
+            return [window logicalPoint: NSMakePoint(winX, winY)];
+        }
+    }
+    return [window logicalPoint: NSMakePoint(x, y)];
+}
+
 - (void) postXEvent: (XEvent *) ev {
     id event = nil;
     NSEventType type;
@@ -1417,7 +1444,7 @@ enum {
                 X11KeySymIgnoringModifiers(&ev->xkey));
         strIg = [NSString stringWithCharacters: &shortcutCode length: 1];
 
-        NSPoint pos = [window logicalPoint: NSMakePoint(ev->xkey.x, ev->xkey.y)];
+        NSPoint pos = windowEventPoint(_display, window, ev->xkey.window, ev->xkey.x, ev->xkey.y, ev->xkey.x_root, ev->xkey.y_root);
         // If there's an app that uses constants from HIToolbox/Events.h (e.g.
         // kVK_ANSI_A), this gives it a chance to work. x11ToCarbon is 256 wide
         // and the protocol's keycode is 8 bits, but the field is a full word.
@@ -1451,8 +1478,7 @@ enum {
         break;
 
     case ButtonPress:;
-        pos = [window
-                logicalPoint: NSMakePoint(ev->xbutton.x, ev->xbutton.y)];
+        pos = windowEventPoint(_display, window, ev->xbutton.window, ev->xbutton.x, ev->xbutton.y, ev->xbutton.x_root, ev->xbutton.y_root);
 
         // A wheel notch arrives as a press/release pair and belongs to exactly
         // one of them, or the notch scrolls twice. The press carries it: a
@@ -1521,8 +1547,7 @@ enum {
             ev->xbutton.button <= HorizontalScrollRightButton)
             break;
 
-        pos = [window
-                logicalPoint: NSMakePoint(ev->xbutton.x, ev->xbutton.y)];
+        pos = windowEventPoint(_display, window, ev->xbutton.window, ev->xbutton.x, ev->xbutton.y, ev->xbutton.x_root, ev->xbutton.y_root);
 
         // The up of a click reports the count its down was given, so that a
         // double click's two downs are matched by their own ups. A release
@@ -1557,8 +1582,15 @@ enum {
         break;
 
     case MotionNotify:; {
-            CGPoint devicePos =
-                    NSMakePoint(ev->xmotion.x, ev->xmotion.y);
+            int winX = ev->xmotion.x;
+            int winY = ev->xmotion.y;
+            if (ev->xmotion.window != [window windowHandle] && ev->xmotion.window != 0) {
+                Window child;
+                XTranslateCoordinates(_display, RootWindow(_display, DefaultScreen(_display)),
+                                      [window windowHandle], ev->xmotion.x_root, ev->xmotion.y_root,
+                                      &winX, &winY, &child);
+            }
+            CGPoint devicePos = NSMakePoint(winX, winY);
 
             CGPoint lastDevicePos = [window lastKnownDeviceCursorPosition];
             pos = [window logicalPoint: devicePos];

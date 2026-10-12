@@ -31,11 +31,20 @@
                                   0 /* border_width, border, background */
     );
 
+    long mask = KeyPressMask | KeyReleaseMask | ExposureMask |
+                StructureNotifyMask | EnterWindowMask | LeaveWindowMask |
+                ButtonPressMask | ButtonReleaseMask | ButtonMotionMask |
+                VisibilityChangeMask | FocusChangeMask;
+    XSelectInput(_display, _window, mask);
+
+    [(X11Display *) [NSDisplay currentDisplay] setWindow: parent forID: _window];
+
     [self show];
     return self;
 }
 
 - (void) dealloc {
+    [(X11Display *) [NSDisplay currentDisplay] setWindow: nil forID: _window];
     XDestroyWindow(_display, _window);
     [super dealloc];
 }
@@ -50,6 +59,10 @@
 
 - (void) hide {
     XUnmapWindow(_display, _window);
+}
+
+- (void) flush {
+    XFlush(_display);
 }
 
 - (void) setFrame: (CGRect) frame {

@@ -1064,8 +1064,7 @@ static CGFloat X11ScaledExtent(CGFloat logical, CGFloat scale) {
 }
 
 - (X11SubWindow *) createSubWindowWithFrame: (CGRect) frame {
-    return [[[X11SubWindow alloc] initWithParentWindow: self
-                                                 frame: frame] autorelease];
+    return nil;
 }
 
 @end

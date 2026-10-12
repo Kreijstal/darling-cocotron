@@ -1611,6 +1611,14 @@ static BOOL _allowsAutomaticWindowTabbing;
     NSUnimplementedMethod();
 }
 
+- (NSWindowAnimationBehavior) animationBehavior {
+    return _animationBehavior;
+}
+
+- (void) setAnimationBehavior: (NSWindowAnimationBehavior) behavior {
+    _animationBehavior = behavior;
+}
+
 - (BOOL) isDocumentEdited {
     return _isDocumentEdited;
 }
@@ -2077,15 +2085,7 @@ static BOOL _allowsAutomaticWindowTabbing;
     }
 
     _flushNeeded = NO;
-    BOOL doFlush = YES;
-
-    if ([self isOpaque] && [_contentView isKindOfClass: [NSOpenGLView class]] &&
-        [_contentView isOpaque]) {
-        doFlush = NO;
-    }
-    if (doFlush) {
-        [[self platformWindow] flushBuffer];
-    }
+    [[self platformWindow] flushBuffer];
 }
 
 - (void) flushWindowIfNeeded {
@@ -2114,7 +2114,7 @@ static BOOL _allowsAutomaticWindowTabbing;
         [self disableFlushWindow];
         [_backgroundView displayIfNeeded];
         [self enableFlushWindow];
-        [self flushWindowIfNeeded];
+        [self flushWindow];
         [self setViewsNeedDisplay: NO];
     }
 }
@@ -3047,13 +3047,18 @@ static BOOL _allowsAutomaticWindowTabbing;
         newSize.height = 0;
     }
 
-    backSize.height += newSize.height - oldSize.height;
+    CGFloat delta = newSize.height - oldSize.height;
+    if (fabs(delta) < 0.001) {
+        return;
+    }
+
+    backSize.height += delta;
     [_backgroundView setAutoresizesSubviews: NO];
     [_backgroundView setFrameSize: backSize];
     [_backgroundView setAutoresizesSubviews: YES];
 
     NSRect frame = [self frame];
-    frame.size.height += newSize.height - oldSize.height;
+    frame.size.height += delta;
     // No display because setMenu: is called before awakeFromNib.
     [self setFrame: frame display: NO];
     // Do we even need this?
@@ -3076,7 +3081,7 @@ static BOOL _allowsAutomaticWindowTabbing;
 
 - (void) setMenu: (NSMenu *) menu {
     if (_menuView != nil) {
-        NSSize oldSize = [_menuView frame].size;
+        NSSize oldSize = [_menuView isHidden] ? NSZeroSize : [_menuView frame].size;
         [_menuView setMenu: menu];
         [self _resizeWithOldMenuViewSize: oldSize];
     }

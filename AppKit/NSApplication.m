@@ -835,8 +835,8 @@ NSApplication *NSApp = nil;
         NS_HANDLER [self reportException: localException];
         NS_ENDHANDLER
 
-                [self _checkForReleasedWindows];
-        [self _checkForTerminate];
+        [self _displayAllWindowsIfNeeded];
+        [self _checkForReleasedWindows];
 
         [pool release];
     } while (_isRunning);

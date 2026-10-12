@@ -81,6 +81,14 @@ CGColorSpaceRef CGColorSpaceCreatePattern(CGColorSpaceRef baseSpace) {
     return (CGColorSpaceRef)O2ColorSpaceCreatePattern((O2ColorSpaceRef)baseSpace);
 }
 
+CGColorSpaceRef CGColorSpaceCreateLab(const CGFloat *whitePoint, const CGFloat *blackPoint, const CGFloat *range) {
+    CGColorSpaceRef space = CGColorSpaceCreateWithName(CFSTR("kCGColorSpaceGenericLab"));
+    if (space == NULL) {
+        space = CGColorSpaceCreateDeviceRGB();
+    }
+    return space;
+}
+
 CGColorSpaceModel CGColorSpaceGetModel(CGColorSpaceRef self) {
     return (CGColorSpaceModel)O2ColorSpaceGetModel((O2ColorSpaceRef)self);
 }

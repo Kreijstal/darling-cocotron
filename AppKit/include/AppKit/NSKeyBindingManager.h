@@ -20,5 +20,10 @@
 #import <AppKit/AppKitExport.h>
 #import <Foundation/NSObject.h>
 
-@interface NSKeyBindingManager : NSObject
+@interface NSKeyBindingManager : NSObject {
+    NSDictionary *_dictionary;
+}
++ (NSKeyBindingManager *) sharedKeyBindingManager;
+- (NSDictionary *) dictionary;
+- (void) setDictionary: (NSDictionary *) dictionary;
 @end

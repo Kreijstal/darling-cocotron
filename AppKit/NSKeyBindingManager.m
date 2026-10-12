@@ -20,4 +20,30 @@
 #import <AppKit/NSKeyBindingManager.h>
 
 @implementation NSKeyBindingManager
+
++ (NSKeyBindingManager *) sharedKeyBindingManager {
+    static NSKeyBindingManager *shared = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        shared = [[NSKeyBindingManager alloc] init];
+    });
+    return shared;
+}
+
+- (NSDictionary *) dictionary {
+    return _dictionary;
+}
+
+- (void) setDictionary: (NSDictionary *) dictionary {
+    if (_dictionary != dictionary) {
+        [_dictionary release];
+        _dictionary = [dictionary retain];
+    }
+}
+
+- (void) dealloc {
+    [_dictionary release];
+    [super dealloc];
+}
+
 @end

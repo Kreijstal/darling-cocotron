@@ -394,6 +394,12 @@ static inline CGFloat calibratedWhiteFromRGB(CGFloat r, CGFloat g, CGFloat b) {
                                          green: green
                                           blue: blue
                                          alpha: alpha];
+
+        if ([otherSpaceName isEqualToString: NSCalibratedRGBColorSpace])
+            return [NSColor colorWithCalibratedRed: red
+                                             green: green
+                                              blue: blue
+                                             alpha: alpha];
     } else if ([_colorSpaceName isEqualToString: NSCustomColorSpace]) {
         CGFloat white = components[0], alpha = components[1];
 
@@ -402,6 +408,12 @@ static inline CGFloat calibratedWhiteFromRGB(CGFloat r, CGFloat g, CGFloat b) {
                                          green: white
                                           blue: white
                                          alpha: alpha];
+
+        if ([otherSpaceName isEqualToString: NSCalibratedRGBColorSpace])
+            return [NSColor colorWithCalibratedRed: white
+                                             green: white
+                                              blue: white
+                                             alpha: alpha];
 
         if ([otherSpaceName isEqualToString: NSPatternColorSpace]) {
             CGColorSpaceRef currentColorSpace = CGColorGetColorSpace(_colorRef);

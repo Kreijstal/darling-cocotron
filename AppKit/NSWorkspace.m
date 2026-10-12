@@ -140,8 +140,19 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 }
 
 - (BOOL) openFile: (NSString *) path withApplication: (NSString *) application {
-    NSInvalidAbstractInvocation();
-    return 0;
+    NSString *fullApp = [self fullPathForApplication: application];
+    if (!fullApp) fullApp = application;
+    NSBundle *bundle = [NSBundle bundleWithPath: fullApp];
+    NSString *execPath = [bundle executablePath];
+    if (!execPath) execPath = fullApp;
+    NSArray *args = path ? @[path] : @[];
+    @try {
+        NSTask *task = [NSTask launchedTaskWithLaunchPath: execPath arguments: args];
+        return task != nil;
+    } @catch (id ex) {
+        NSLog(@"NSWorkspace openFile:withApplication: failed: %@", ex);
+        return NO;
+    }
 }
 
 - (BOOL) openTempFile: (NSString *) path {
@@ -290,38 +301,41 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 }
 
 - (BOOL) launchApplication: (NSString *) application {
-    NSInvalidAbstractInvocation();
-    return 0;
+    return [self openFile: nil withApplication: application];
 }
 
 - (BOOL) launchApplication: (NSString *) application
                   showIcon: (BOOL) showIcon
                 autolaunch: (BOOL) autolaunch
 {
-    NSInvalidAbstractInvocation();
-    return 0;
+    return [self openFile: nil withApplication: application];
 }
 
 - (void) findApplications {
-    NSInvalidAbstractInvocation();
 }
 
 - (NSDictionary *) activeApplication {
-    NSInvalidAbstractInvocation();
-    return 0;
+    return nil;
 }
 
 - (void) hideOtherApplications {
-    NSInvalidAbstractInvocation();
 }
 
 - (NSInteger) extendPowerOffBy: (NSInteger) milliseconds {
-    NSInvalidAbstractInvocation();
     return 0;
 }
 
 - (NSString *) fullPathForApplication: (NSString *) appName {
-    NSInvalidAbstractInvocation();
+    if (!appName || [appName length] == 0)
+        return nil;
+    if ([appName hasSuffix: @".app"] && [[NSFileManager defaultManager] fileExistsAtPath: appName])
+        return appName;
+    NSString *candidate = [NSString stringWithFormat: @"/Applications/%@.app", appName];
+    if ([[NSFileManager defaultManager] fileExistsAtPath: candidate])
+        return candidate;
+    candidate = [NSString stringWithFormat: @"/Applications/%@", appName];
+    if ([[NSFileManager defaultManager] fileExistsAtPath: candidate])
+        return candidate;
     return nil;
 }
 
