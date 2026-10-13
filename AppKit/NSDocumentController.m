@@ -952,7 +952,7 @@ static NSDocumentController *shared = nil;
     while (--count >= 0) {
         NSDocument *document = [_documents objectAtIndex: count];
 
-        if ([document isDocumentEdited])
+        if ([document isDocumentEdited] || [document fileURL] == nil)
             [document saveDocument: sender];
     }
 }

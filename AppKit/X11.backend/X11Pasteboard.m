@@ -221,13 +221,17 @@ static size_t MaximumPropertyBytes(Display *display) {
 }
 
 + (NSArray<NSString *> *) targetsForType: (NSPasteboardType) type {
-    if ([type isEqual: NSStringPboardType]) {
+    if ([type isEqual: NSStringPboardType] ||
+        [type isEqual: @"public.utf8-plain-text"] ||
+        [type isEqual: @"public.plain-text"]) {
         return @[
             @"UTF8_STRING", @"STRING", @"TEXT", @"text/plain",
             @"text/plain;charset=utf-8"
         ];
     }
-    // TODO...
+    if ([type isEqual: NSRTFPboardType] || [type isEqual: @"public.rtf"]) {
+        return @[ @"text/rtf", @"application/rtf", @"text/richtext" ];
+    }
     return @[ type ];
 }
 
@@ -238,7 +242,10 @@ static size_t MaximumPropertyBytes(Display *display) {
         [target isEqual: @"UTF8_STRING"]) {
         return NSStringPboardType;
     }
-    // TODO...
+    if ([target isEqual: @"text/rtf"] || [target isEqual: @"application/rtf"] ||
+        [target isEqual: @"text/richtext"]) {
+        return NSRTFPboardType;
+    }
     return target;
 }
 
@@ -480,8 +487,21 @@ static size_t MaximumPropertyBytes(Display *display) {
     if (_typeToOwner != nil) {
         // We're the owner; just fetch the data directly.
         id<NSPasteboardTypeOwner> owner = _typeToOwner[type];
-        [owner pasteboard: self provideDataForType: type];
-        return _typeToData[type];
+        if (owner != nil)
+            [owner pasteboard: self provideDataForType: type];
+        NSData *data = _typeToData[type];
+        if (data == nil) {
+            if ([type isEqual: @"public.utf8-plain-text"] || [type isEqual: @"public.plain-text"])
+                data = _typeToData[NSStringPboardType];
+            else if ([type isEqual: NSStringPboardType]) {
+                data = _typeToData[@"public.utf8-plain-text"];
+                if (data == nil) data = _typeToData[@"public.plain-text"];
+            } else if ([type isEqual: @"public.rtf"])
+                data = _typeToData[NSRTFPboardType];
+            else if ([type isEqual: NSRTFPboardType])
+                data = _typeToData[@"public.rtf"];
+        }
+        return data;
     }
 
     [self observeSelectionOwner];
@@ -506,7 +526,9 @@ static size_t MaximumPropertyBytes(Display *display) {
     NSData *data = [self dataForType: type];
 
     NSStringEncoding encoding = NSUnicodeStringEncoding;
-    if ([type isEqual: NSStringPboardType]) {
+    if ([type isEqual: NSStringPboardType] ||
+        [type isEqual: @"public.utf8-plain-text"] ||
+        [type isEqual: @"public.plain-text"]) {
         encoding = NSUTF8StringEncoding;
     }
     return [[[NSString alloc] initWithData: data

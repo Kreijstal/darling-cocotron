@@ -255,7 +255,7 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
                         // If it's got a cascading menu then push that on the
                         // stack
                         // Do this with a delay to improve performance - this is what toolkits commonly do
-                        double delay = (count == 0) ? 0 : 0.5;
+                        double delay = (count == 0) ? 0 : 0.05;
                         delaySubmenu = [[NSTimer timerWithTimeInterval: delay repeats: NO block: ^(NSTimer* timer){
 
                             NSMenuView *branch;

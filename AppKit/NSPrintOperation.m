@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSPrintInfo.h>
 #import <AppKit/NSPrintOperation.h>
 #import <AppKit/NSPrintPanel.h>
+#import <AppKit/NSSavePanel.h>
 #import <AppKit/NSView.h>
 
 #import "NSPrintProgressPanelController.h"
@@ -348,12 +349,27 @@ static NSPrintOperation *_currentOperation = nil;
 
         CGDataConsumerRelease(consumer);
     } else if (_type == NSPrintOperationFile) {
+        NSString *title = [[_view window] title] ?: @"Document";
         NSDictionary *auxiliaryInfo = [NSDictionary
-                dictionaryWithObject: [[_view window] title]
+                dictionaryWithObject: title
                               forKey: (NSString *) kCGPDFContextTitle];
 
         NSString *filePath =
                 [_printInfo.dictionary objectForKey: NSPrintSavePath];
+        if (filePath == nil) {
+            NSURL *jobURL = [_printInfo.dictionary objectForKey: @"NSPrintJobSavingURL"];
+            filePath = [jobURL path];
+        }
+        if (filePath == nil) {
+            NSSavePanel *savePanel = [NSSavePanel savePanel];
+            [savePanel setRequiredFileType: @"pdf"];
+            [savePanel setNameFieldStringValue: [title stringByAppendingPathExtension: @"pdf"]];
+            if ([savePanel runModal] == NSOKButton) {
+                filePath = [savePanel filename];
+            } else {
+                return nil;
+            }
+        }
         CGDataConsumerRef consumer = CGDataConsumerCreateWithURL(
                 (CFURLRef) [NSURL fileURLWithPath: filePath]);
 
