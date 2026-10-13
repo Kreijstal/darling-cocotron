@@ -26,9 +26,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @property(class, strong, readonly) NSColorSpace *deviceRGBColorSpace;
 @property(class, strong, readonly) NSColorSpace *sRGBColorSpace;
+@property(class, strong, readonly) NSColorSpace *genericRGBColorSpace;
+@property(class, strong, readonly) NSColorSpace *genericGrayColorSpace;
 @property(class, strong, readonly) NSColorSpace *displayP3ColorSpace;
 
 + (NSColorSpace *) deviceRGBColorSpace;
++ (NSColorSpace *) sRGBColorSpace;
++ (NSColorSpace *) genericRGBColorSpace;
++ (NSColorSpace *) genericGrayColorSpace;
++ (NSColorSpace *) genericGamma22GrayColorSpace;
++ (NSColorSpace *) adobeRGB1998ColorSpace;
 
 - initWithCGColorSpace: (CGColorSpaceRef) cgColorSpace;
 

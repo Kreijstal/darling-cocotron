@@ -665,6 +665,10 @@ NSApplication *NSApp = nil;
     return opened;
 }
 
+- (BOOL) shouldRestoreStateOnNextLaunch {
+    return NO;
+}
+
 - (void) finishLaunching {
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
     BOOL needsUntitled = YES;

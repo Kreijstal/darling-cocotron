@@ -160,6 +160,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [_identifier release];
     [_actionImage release];
     [_toolTip release];
+    [_view release];
     [super dealloc];
 }
 
@@ -178,6 +179,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     copy->_representedObject = [_representedObject retain];
     copy->_actionImage = [_actionImage retain];
     copy->_toolTip = [_toolTip copyWithZone: zone];
+    copy->_view = [_view retain];
     return copy;
 }
 
@@ -190,6 +192,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     if (toolTip != _toolTip) {
         [_toolTip release];
         _toolTip = [toolTip copy];
+    }
+}
+
+- (NSView *) view {
+    return _view;
+}
+
+- (void) setView: (NSView *) view {
+    if (_view != view) {
+        [_view release];
+        _view = [view retain];
     }
 }
 

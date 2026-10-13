@@ -74,6 +74,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return self;
 }
 
+- initWithAttributedString: (NSAttributedString *) other {
+    self = [self initWithString: [other string] ?: @""];
+    if (self && other) {
+        [self setAttributedString: other];
+    }
+    return self;
+}
+
 - init {
     return [self initWithString: @""];
 }

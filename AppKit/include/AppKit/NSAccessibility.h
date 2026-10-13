@@ -27,4 +27,11 @@ APPKIT_EXPORT NSArray *NSAccessibilityUnignoredChildrenForOnlyChild(id originalC
 - (NSArray *) accessibilityAttributeNames;
 - accessibilityAttributeValue: (NSString *) attribute;
 - (BOOL) accessibilitySetOverrideValue: (id) value forAttribute: (NSString *) attribute;
+
+@property(getter=isAccessibilityElement) BOOL accessibilityElement;
+@property(copy) NSString *accessibilityLabel;
+@property(copy) NSString *accessibilityHelp;
+@property(copy) id accessibilityValue;
+@property(copy) NSString *accessibilityTitle;
+@property(copy) NSString *accessibilityIdentifier;
 @end

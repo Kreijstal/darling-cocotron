@@ -42,6 +42,7 @@ extern void CGSInitialize(void);
 extern CGError CGSNewConnection(_Nullable CGSDictionaryObj attribs, CGSConnectionID* connId);
 extern CGError CGSReleaseConnection(CGSConnectionID connId);
 extern CGSConnectionID _CGSDefaultConnection(void);
+extern CGSConnectionID CGSDefaultConnectionForThread(void);
 extern CGSConnectionID CGSMainConnectionID(void);
 // Pointer location in global display coordinates, origin at the top left.
 extern CGPoint CGSCurrentInputPointerPosition(void);

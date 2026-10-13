@@ -1246,4 +1246,11 @@ static void loadGlyphAndCharacterCacheForLocation(NSTypesetter_concrete *self,
         free(bidiLevels);
     }
 }
+
+- (CGFloat) baselineOffsetInLayoutManager: (NSLayoutManager *) layoutManager
+                               glyphIndex: (NSUInteger) glyphIndex
+{
+    return 0.0;
+}
+
 @end

@@ -60,6 +60,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setTitleWithMnemonic: (NSString *) value;
 
+@property BOOL allowsDefaultTighteningForTruncation;
+- (BOOL) allowsDefaultTighteningForTruncation;
+- (void) setAllowsDefaultTighteningForTruncation: (BOOL) flag;
+
 - (BOOL) textView: (NSTextView *) textView doCommandBySelector: (SEL) selector;
 
 @end

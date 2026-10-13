@@ -644,6 +644,48 @@ NSArray *NSAccessibilityUnignoredChildrenForOnlyChild(id originalChild) {
     return NO;
 }
 
+- (BOOL) isAccessibilityElement {
+    return NO;
+}
+
+- (void) setAccessibilityElement: (BOOL) flag {
+}
+
+- (NSString *) accessibilityLabel {
+    return nil;
+}
+
+- (void) setAccessibilityLabel: (NSString *) label {
+}
+
+- (NSString *) accessibilityHelp {
+    return nil;
+}
+
+- (void) setAccessibilityHelp: (NSString *) help {
+}
+
+- (id) accessibilityValue {
+    return nil;
+}
+
+- (void) setAccessibilityValue: (id) value {
+}
+
+- (NSString *) accessibilityTitle {
+    return nil;
+}
+
+- (void) setAccessibilityTitle: (NSString *) title {
+}
+
+- (NSString *) accessibilityIdentifier {
+    return nil;
+}
+
+- (void) setAccessibilityIdentifier: (NSString *) identifier {
+}
+
 @end
 
 void NSAccessibilityPostNotificationWithUserInfo(id element,

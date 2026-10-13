@@ -194,6 +194,14 @@ static inline NSGlyphFragment *fragmentAtGlyphIndex(NSLayoutManager *self,
     _usesDefaultHyphenation = flag;
 }
 
+- (float) hyphenationFactor {
+    return _hyphenationFactor;
+}
+
+- (void) setHyphenationFactor: (float) factor {
+    _hyphenationFactor = factor;
+}
+
 - (NSTextView *) firstTextView {
     for (NSTextContainer *container in _textContainers) {
         NSTextView *textView = [container textView];
@@ -1614,6 +1622,10 @@ static inline void _appendRectToCache(NSLayoutManager *self, NSRect rect) {
     // Validate glyphs;
 
     return glyphIndex;
+}
+
+- (NSUInteger) glyphIndexForCharacterAtIndex: (NSUInteger) charIndex {
+    return charIndex;
 }
 
 - (NSRange) characterRangeForGlyphRange: (NSRange) glyphRange

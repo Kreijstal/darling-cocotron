@@ -135,6 +135,7 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
     NSString *_name;
     id _layoutManager;
     NSArray *_constraints;
+    NSDictionary *_actions;
     BOOL _geometryFlipped;
 }
 
@@ -199,6 +200,7 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 @property BOOL allowsGroupOpacity;
 
 // Stored only; CARenderer does not yet antialias layer edges.
+@property(copy) NSDictionary *actions;
 @property BOOL allowsEdgeAntialiasing;
 @property CAEdgeAntialiasingMask edgeAntialiasingMask;
 

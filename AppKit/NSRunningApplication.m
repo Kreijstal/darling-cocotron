@@ -57,4 +57,34 @@
     return name ? name : [[NSProcessInfo processInfo] processName];
 }
 
+- (BOOL) isActive {
+    return YES;
+}
+
+- (BOOL) isHidden {
+    return NO;
+}
+
+- (BOOL) isTerminated {
+    return NO;
+}
+
+- (BOOL) activateWithOptions: (NSApplicationActivationOptions) options {
+    return YES;
+}
+
+- (BOOL) hide {
+    return YES;
+}
+
+- (BOOL) unhide {
+    return YES;
+}
+
+- (BOOL) terminate {
+    if (_processIdentifier > 0)
+        return kill(_processIdentifier, SIGTERM) == 0;
+    return YES;
+}
+
 @end

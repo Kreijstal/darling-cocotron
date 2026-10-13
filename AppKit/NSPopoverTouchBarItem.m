@@ -19,11 +19,27 @@
 
 #import <AppKit/NSPopoverTouchBarItem.h>
 
+static inline NSMethodSignature *stubTouchBarSignature(SEL aSelector) {
+    const char *selName = sel_getName(aSelector);
+    int colons = 0;
+    for (const char *p = selName; *p; p++) {
+        if (*p == ':') colons++;
+    }
+    char types[64] = "@@:";
+    if (strncmp(selName, "set", 3) == 0 && colons > 0) {
+        types[0] = 'v';
+    }
+    for (int i = 0; i < colons && i < 55; i++) {
+        strcat(types, "@");
+    }
+    return [NSMethodSignature signatureWithObjCTypes: types];
+}
+
 @implementation NSPopoverTouchBarItem
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
 {
-    return [NSMethodSignature signatureWithObjCTypes: "v@:"];
+    return stubTouchBarSignature(aSelector);
 }
 
 - (void)forwardInvocation:(NSInvocation *)anInvocation

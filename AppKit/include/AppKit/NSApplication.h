@@ -213,6 +213,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) updateWindowsItem: (NSWindow *) window;
 
 - (void) finishLaunching;
+- (BOOL) shouldRestoreStateOnNextLaunch;
 - (void) run;
 
 - (void) sendEvent: (NSEvent *) event;

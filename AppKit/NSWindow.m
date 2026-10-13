@@ -1542,6 +1542,13 @@ static BOOL _allowsAutomaticWindowTabbing;
     return [_sheetContext sheet];
 }
 
+- (NSArray *) sheets {
+    NSWindow *sheet = [self attachedSheet];
+    if (sheet != nil)
+        return [NSArray arrayWithObject: sheet];
+    return [NSArray array];
+}
+
 - (NSWindow *) sheetParent {
     for (NSWindow *window in [NSApp windows]) {
         if (window != self && [window attachedSheet] == self)
@@ -3904,6 +3911,14 @@ static inline NSRect scaleWindowRect(NSRect rect, CGFloat scale) {
 
 - (void) setTitlebarAppearsTransparent: (BOOL) transparent {
     _titlebarAppearsTransparent = transparent;
+}
+
+- (NSTitlebarSeparatorStyle) titlebarSeparatorStyle {
+    return _titlebarSeparatorStyle;
+}
+
+- (void) setTitlebarSeparatorStyle: (NSTitlebarSeparatorStyle) style {
+    _titlebarSeparatorStyle = style;
 }
 
 @end

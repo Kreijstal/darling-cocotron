@@ -26,6 +26,11 @@ typedef enum {
     NSApplicationActivationPolicyProhibited
 } NSApplicationActivationPolicy;
 
+typedef NS_OPTIONS(NSUInteger, NSApplicationActivationOptions) {
+    NSApplicationActivateAllWindows = 1 << 0,
+    NSApplicationActivateIgnoringOtherApps = 1 << 1
+};
+
 @interface NSRunningApplication : NSObject {
     pid_t _processIdentifier;
 }
@@ -40,5 +45,13 @@ typedef enum {
 @property(readonly) pid_t processIdentifier;
 @property(readonly, copy) NSString *bundleIdentifier;
 @property(readonly, copy) NSString *localizedName;
+@property(readonly, getter=isActive) BOOL active;
+@property(readonly, getter=isHidden) BOOL hidden;
+@property(readonly, getter=isTerminated) BOOL terminated;
+
+- (BOOL) activateWithOptions: (NSApplicationActivationOptions) options;
+- (BOOL) hide;
+- (BOOL) unhide;
+- (BOOL) terminate;
 
 @end

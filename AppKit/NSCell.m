@@ -1339,6 +1339,14 @@ static NSString *NSStringFromCellType(NSCellType type) {
     return [self menu];
 }
 
+- (BOOL) allowsDefaultTighteningForTruncation {
+    return _allowsDefaultTighteningForTruncation;
+}
+
+- (void) setAllowsDefaultTighteningForTruncation: (BOOL) flag {
+    _allowsDefaultTighteningForTruncation = flag;
+}
+
 @end
 
 void NSDrawThreePartImage(NSRect frame, NSImage *startCap, NSImage *centerFill,

@@ -145,6 +145,7 @@ APPKIT_EXPORT NSNotificationName NSControlTintDidChangeNotification;
     BOOL _usesSingleLineMode;
     BOOL _truncatesLastVisibleLine;
     BOOL _allowsUndo;
+    BOOL _allowsDefaultTighteningForTruncation;
     NSUserInterfaceLayoutDirection _userInterfaceLayoutDirection;
     NSMenu *_cellMenu;
 }
@@ -316,6 +317,8 @@ APPKIT_EXPORT NSNotificationName NSControlTintDidChangeNotification;
 
 - (void) setSendsActionOnEndEditing: (BOOL) flag;
 - (BOOL) sendsActionOnEndEditing;
+
+@property BOOL allowsDefaultTighteningForTruncation;
 
 // The cell's menu, whatever the event and position.
 - (NSMenu *) menuForEvent: (NSEvent *) event

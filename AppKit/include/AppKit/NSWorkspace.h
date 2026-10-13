@@ -129,6 +129,8 @@ typedef NSUInteger NSWorkspaceIconCreationOptions;
 - (NSString *) pathForApplication: (NSString *) application;
 - (NSArray *) launchedApplications;
 - (NSArray *) runningApplications;
+@property(readonly, retain) NSRunningApplication *frontmostApplication;
+- (NSRunningApplication *) frontmostApplication;
 - (BOOL) launchApplication: (NSString *) application;
 - (BOOL) launchApplication: (NSString *) application
                   showIcon: (BOOL) showIcon

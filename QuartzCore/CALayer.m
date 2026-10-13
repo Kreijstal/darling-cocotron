@@ -621,6 +621,7 @@ static char swiftUIViewTestPropertiesAssociationKey;
     [_name release];
     [_layoutManager release];
     [_constraints release];
+    [_actions release];
     [_animations release];
     [_minificationFilter release];
     [_magnificationFilter release];
@@ -1043,7 +1044,26 @@ static void replaceColor(CGColorRef *slot, CGColorRef value) {
     return [super valueForKey: key];
 }
 
+- (NSDictionary *) actions {
+    return _actions;
+}
+
+- (void) setActions: (NSDictionary *) actions {
+    if (_actions != actions) {
+        [_actions release];
+        _actions = [actions copy];
+    }
+}
+
 - (id<CAAction>) actionForKey: (NSString *) key {
+    if (_actions != nil) {
+        id customAction = [_actions objectForKey: key];
+        if (customAction != nil) {
+            if (customAction == (id)[NSNull null])
+                return nil;
+            return customAction;
+        }
+    }
     CABasicAnimation *basic = [CABasicAnimation animationWithKeyPath: key];
 
     [basic setFromValue: [self valueForKey: key]];

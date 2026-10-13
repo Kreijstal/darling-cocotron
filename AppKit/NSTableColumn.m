@@ -97,6 +97,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return _tableView;
 }
 
+- (NSString *) title {
+    return [_headerCell stringValue];
+}
+
 - (id) headerCell {
     return _headerCell;
 }
@@ -135,6 +139,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setTableView: (NSTableView *) tableView {
     _tableView = tableView;
+}
+
+- (void) setTitle: (NSString *) title {
+    [_headerCell setStringValue: title ?: @""];
 }
 
 - (void) setHeaderCell: (NSCell *) cell {

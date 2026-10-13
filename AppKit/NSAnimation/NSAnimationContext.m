@@ -26,6 +26,11 @@ static const NSTimeInterval NSAnimationContextDefaultDuration = 0.25;
 
 @implementation NSAnimationContext
 
+- (void) dealloc {
+    [_timingFunction release];
+    [super dealloc];
+}
+
 - (id) init {
     if ((self = [super init]))
         _duration = NSAnimationContextDefaultDuration;
@@ -85,6 +90,17 @@ static const NSTimeInterval NSAnimationContextDefaultDuration = 0.25;
 
 - (BOOL) allowsImplicitAnimation {
     return _allowsImplicitAnimation;
+}
+
+- (CAMediaTimingFunction *) timingFunction {
+    return _timingFunction;
+}
+
+- (void) setTimingFunction: (CAMediaTimingFunction *) function {
+    if (_timingFunction != function) {
+        [_timingFunction release];
+        _timingFunction = [function retain];
+    }
 }
 
 @end

@@ -20,11 +20,16 @@
 #import <Foundation/NSDate.h>
 #import <Foundation/NSObject.h>
 
+@class CAMediaTimingFunction;
+
 // Animations aren't run: changes made in a group take effect immediately.
 @interface NSAnimationContext : NSObject <NSCopying> {
     NSTimeInterval _duration;
     BOOL _allowsImplicitAnimation;
+    CAMediaTimingFunction *_timingFunction;
 }
+
+@property(retain) CAMediaTimingFunction *timingFunction;
 
 // Stored only, like -duration: nothing in this context animates, so the value
 // is never consulted. NO, AppKit's default, is what the context behaves as.
@@ -44,5 +49,8 @@
 
 - (void) setDuration: (NSTimeInterval) duration;
 - (NSTimeInterval) duration;
+
+- (CAMediaTimingFunction *) timingFunction;
+- (void) setTimingFunction: (CAMediaTimingFunction *) function;
 
 @end

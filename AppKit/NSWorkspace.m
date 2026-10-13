@@ -360,6 +360,10 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
     return @[];
 }
 
+- (NSRunningApplication *) frontmostApplication {
+    return [NSRunningApplication currentApplication];
+}
+
 - (BOOL) launchApplication: (NSString *) application {
     return [self openFile: nil withApplication: application];
 }

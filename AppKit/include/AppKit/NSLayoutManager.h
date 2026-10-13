@@ -64,7 +64,10 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
 
     NSImageScaling _defaultAttachmentScaling;
     BOOL _usesDefaultHyphenation;
+    float _hyphenationFactor;
 }
+
+@property float hyphenationFactor;
 
 - init;
 
@@ -202,6 +205,7 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
                           rectCount: (NSUInteger *) rectCount;
 
 - (NSUInteger) characterIndexForGlyphAtIndex: (NSUInteger) glyphIndex;
+- (NSUInteger) glyphIndexForCharacterAtIndex: (NSUInteger) charIndex;
 - (NSRange) characterRangeForGlyphRange: (NSRange) glyphRange
                        actualGlyphRange: (NSRange *) actualGlyphRange;
 - (NSRect *) rectArrayForCharacterRange: (NSRange) characterRange
@@ -294,6 +298,8 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
 - (void) setDefaultAttachmentScaling: (NSImageScaling) scaling;
 // Stored only (NO by default): the typesetter doesn't hyphenate.
 - (BOOL) usesDefaultHyphenation;
+- (float) hyphenationFactor;
+- (void) setHyphenationFactor: (float) factor;
 - (void) setUsesDefaultHyphenation: (BOOL) flag;
 @end
 

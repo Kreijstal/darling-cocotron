@@ -162,6 +162,11 @@
 
 - (void) renderLayer: (CALayer *) layer {
     _rendered = NO;
+    if (_cglWindow == NULL && [_subwindow nativeWindow] != NULL) {
+        _cglWindow = CGLGetWindowForContext(_glContext, [_subwindow nativeWindow]);
+    }
+    if (_cglWindow == NULL)
+        return;
     if ([_subwindow respondsToSelector: @selector(requiresMainThreadPresentation)] &&
         [_subwindow requiresMainThreadPresentation] && ![NSThread isMainThread]) {
         NSLog(@"This window backend requires OpenGL rendering on the main thread");

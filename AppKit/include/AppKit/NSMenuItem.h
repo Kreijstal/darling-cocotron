@@ -22,7 +22,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <Foundation/NSObject.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 
-@class NSMenu, NSImage, NSAttributedString;
+@class NSMenu, NSImage, NSAttributedString, NSView;
 
 @interface NSMenuItem : NSObject <NSCopying, NSValidatedUserInterfaceItem, NSUserInterfaceItemIdentification> {
     NSMenu *_menu;
@@ -51,8 +51,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     NSImage *_actionImage;
     BOOL _isSectionHeader;
     NSString *_toolTip;
+    NSView *_view;
 }
 
+@property(retain) NSView *view;
 @property(copy) NSString *toolTip;
 
 @property(getter=isAlternate) BOOL alternate;
@@ -82,6 +84,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSImage *) onStateImage;
 - (NSImage *) offStateImage;
 - (NSImage *) mixedStateImage;
+- (NSView *) view;
 
 - representedObject;
 
@@ -108,6 +111,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) setOnStateImage: (NSImage *) image;
 - (void) setOffStateImage: (NSImage *) image;
 - (void) setMixedStateImage: (NSImage *) image;
+- (void) setView: (NSView *) view;
 - (void) setRepresentedObject: object;
 - (void) setSubmenu: (NSMenu *) submenu;
 - (void) setEnabled: (BOOL) flag;

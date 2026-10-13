@@ -188,6 +188,11 @@ CGSConnectionID _CGSDefaultConnection(void)
 	return CGSMainConnectionID();
 }
 
+CGSConnectionID CGSDefaultConnectionForThread(void)
+{
+	return CGSMainConnectionID();
+}
+
 CGSConnectionID CGSMainConnectionID(void)
 {
 	if (g_defaultConnection == -1)

@@ -722,6 +722,17 @@ static Class _rulerViewClass = nil;
     [self tile];
 }
 
+- (NSScrollerStyle) scrollerStyle {
+    return _scrollerStyle;
+}
+
+- (void) setScrollerStyle: (NSScrollerStyle) newScrollerStyle {
+    _scrollerStyle = newScrollerStyle;
+    [_verticalScroller setScrollerStyle: newScrollerStyle];
+    [_horizontalScroller setScrollerStyle: newScrollerStyle];
+    [self tile];
+}
+
 - (void) setHorizontalScroller: (NSScroller *) scroller {
     scroller = [scroller retain];
     [_horizontalScroller removeFromSuperview];

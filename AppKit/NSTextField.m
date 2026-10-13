@@ -536,6 +536,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [self setStringValue: value];
 }
 
+- (BOOL) allowsDefaultTighteningForTruncation {
+    return [(NSTextFieldCell *) _cell allowsDefaultTighteningForTruncation];
+}
+
+- (void) setAllowsDefaultTighteningForTruncation: (BOOL) flag {
+    [(NSTextFieldCell *) _cell setAllowsDefaultTighteningForTruncation: flag];
+}
+
 @end
 
 @implementation NSTextField (Bindings)

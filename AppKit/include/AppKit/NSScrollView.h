@@ -64,8 +64,10 @@ typedef NS_ENUM(NSInteger, NSScrollElasticity) {
     CGFloat _maxMagnification;
     NSScrollElasticity _horizontalScrollElasticity;
     NSScrollElasticity _verticalScrollElasticity;
+    NSScrollerStyle _scrollerStyle;
 }
 
+@property NSScrollerStyle scrollerStyle;
 @property NSScrollElasticity horizontalScrollElasticity;
 @property NSScrollElasticity verticalScrollElasticity;
 
@@ -143,6 +145,8 @@ typedef NS_ENUM(NSInteger, NSScrollElasticity) {
 - (void) setBorderType: (NSBorderType) borderType;
 - (void) setVerticalScroller: (NSScroller *) scroller;
 - (void) setHorizontalScroller: (NSScroller *) scroller;
+- (NSScrollerStyle) scrollerStyle;
+- (void) setScrollerStyle: (NSScrollerStyle) scrollerStyle;
 - (void) setHasVerticalScroller: (BOOL) flag;
 - (void) setHasHorizontalScroller: (BOOL) flag;
 - (void) setHasVerticalRuler: (BOOL) flag;

@@ -97,6 +97,13 @@ typedef NS_ENUM(NSInteger, NSWindowToolbarStyle) {
     NSWindowToolbarStyleUnifiedCompact,
 };
 
+typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
+    NSTitlebarSeparatorStyleAutomatic = 0,
+    NSTitlebarSeparatorStyleNone = 1,
+    NSTitlebarSeparatorStyleLine = 2,
+    NSTitlebarSeparatorStyleShadow = 3
+};
+
 enum {
     NSNormalWindowLevel = kCGNormalWindowLevel,
     NSFloatingWindowLevel = kCGFloatingWindowLevel,
@@ -304,6 +311,7 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExposeNotification
 
     NSMutableArray *_titlebarAccessoryViewControllers;
     NSWindowToolbarStyle _toolbarStyle;
+    NSTitlebarSeparatorStyle _titlebarSeparatorStyle;
     BOOL _titlebarAppearsTransparent;
 }
 
@@ -383,6 +391,8 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExposeNotification
 - (BOOL) hidesOnDeactivate;
 - (BOOL) worksWhenModal;
 - (BOOL) isSheet;
+@property(readonly, copy) NSArray<NSWindow *> *sheets;
+- (NSArray *) sheets;
 - (BOOL) acceptsMouseMovedEvents;
 - (BOOL) isExcludedFromWindowsMenu;
 - (BOOL) isAutodisplay;
@@ -729,6 +739,7 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 - (void) addTitlebarAccessoryViewController:
         (NSTitlebarAccessoryViewController *) controller;
 @property NSWindowToolbarStyle toolbarStyle;
+@property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
 @property BOOL titlebarAppearsTransparent;
 @end
 
