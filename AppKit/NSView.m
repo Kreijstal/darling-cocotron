@@ -2371,6 +2371,14 @@ static void clearNeedsDisplay(NSView *self) {
     NSUnimplementedMethod();
 }
 
+// No mask by default; subclasses that draw one also report its bounds.
+- (NSRect) focusRingMaskBounds {
+    return NSZeroRect;
+}
+
+- (void) drawFocusRingMask {
+}
+
 - (void) translateRectsNeedingDisplayInRect: (NSRect) rect by: (NSSize) delta {
     NSUnimplementedMethod();
 }
