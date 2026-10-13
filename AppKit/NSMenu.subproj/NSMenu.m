@@ -469,15 +469,22 @@ BOOL itemIsEnabled(NSMenuItem *item) {
         if ([key length] > 0 && ![key isEqualToString: [key lowercaseString]])
             itemModifiers |= NSShiftKeyMask;
 
-        if (((modifiers & keyModifiers) == itemModifiers) && ([key length] != 0)) {
+        unsigned effectiveModifiers = modifiers & keyModifiers;
+        BOOL modifierMatch = (effectiveModifiers == itemModifiers);
+        if (!modifierMatch && (itemModifiers & NSCommandKeyMask) && !(itemModifiers & NSControlKeyMask)) {
+            // On Linux / PC keyboards, allow Control to satisfy Command requirement when Command (Super) is not pressed
+            unsigned ctrlMapped = (effectiveModifiers & ~NSControlKeyMask) | NSCommandKeyMask;
+            if (ctrlMapped == itemModifiers)
+                modifierMatch = YES;
+        }
+
+        if (modifierMatch && ([key length] != 0)) {
 
             // Explicit Shift on a lowercase equivalent also accepts its
             // uppercase event spelling. Keep the exact match for backends
             // that report an unshifted charactersIgnoringModifiers value.
-            BOOL matches = [key isEqualToString: characters];
-            if (!matches && (itemModifiers & NSShiftKeyMask))
-                matches = [[key lowercaseString]
-                        isEqualToString: [characters lowercaseString]];
+            BOOL matches = [key isEqualToString: characters] ||
+                           [[key lowercaseString] isEqualToString: [characters lowercaseString]];
             if (matches) {
                 /* This *must* accurately reflect menu validation when ignoring
                    or processing key equivalents. Relying on update to keep

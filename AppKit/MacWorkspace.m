@@ -229,6 +229,47 @@ static NSImage *ImageForGenericIcon(NSString *name) {
         return NO;
     if ([type isEqualToString: conformsToType])
         return YES;
+
+    // Check application document types declared in mainBundle Info.plist
+    NSArray *docTypes = [[[NSBundle mainBundle] infoDictionary] objectForKey: @"CFBundleDocumentTypes"];
+    for (NSDictionary *dict in docTypes) {
+        NSString *name = [dict objectForKey: @"CFBundleTypeName"];
+        NSArray *contentTypes = [dict objectForKey: @"LSItemContentTypes"];
+        if ([name isEqualToString: type]) {
+            for (NSString *ct in contentTypes) {
+                if ([ct isEqualToString: conformsToType])
+                    return YES;
+            }
+        }
+    }
+
+    // Standard Apple pasteboard type to UTI mappings
+    if (([type isEqualToString: @"NSRTFPboardType"] || [type isEqualToString: @"NeXT Rich Text Format v1.0 pasteboard type"]) &&
+        [conformsToType isEqualToString: @"public.rtf"])
+        return YES;
+    if ([type isEqualToString: @"public.rtf"] &&
+        ([conformsToType isEqualToString: @"NSRTFPboardType"] || [conformsToType isEqualToString: @"NeXT Rich Text Format v1.0 pasteboard type"]))
+        return YES;
+
+    if (([type isEqualToString: @"NSRTFDPboardType"] || [type isEqualToString: @"NeXT RTFD pasteboard type"]) &&
+        [conformsToType isEqualToString: @"com.apple.rtfd"])
+        return YES;
+    if ([type isEqualToString: @"com.apple.rtfd"] &&
+        ([conformsToType isEqualToString: @"NSRTFDPboardType"] || [conformsToType isEqualToString: @"NeXT RTFD pasteboard type"]))
+        return YES;
+
+    if (([type isEqualToString: @"NSStringPboardType"] || [type isEqualToString: @"NSString"]) &&
+        ([conformsToType isEqualToString: @"public.plain-text"] || [conformsToType isEqualToString: @"public.text"]))
+        return YES;
+    if (([type isEqualToString: @"public.plain-text"] || [type isEqualToString: @"public.utf8-plain-text"]) &&
+        ([conformsToType isEqualToString: @"NSStringPboardType"] || [conformsToType isEqualToString: @"public.text"]))
+        return YES;
+
+    if ([type isEqualToString: @"NSHTMLPboardType"] && [conformsToType isEqualToString: @"public.html"])
+        return YES;
+    if ([type isEqualToString: @"public.html"] && [conformsToType isEqualToString: @"NSHTMLPboardType"])
+        return YES;
+
     return [[UTType typeWithIdentifier: type]
             conformsToType: [UTType typeWithIdentifier: conformsToType]];
 }

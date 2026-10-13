@@ -225,6 +225,7 @@ NSString *const NSAllRomanInputSourcesLocaleIdentifier =
         _insertionPointColor = [[sharedData insertionColor] retain];
 
         _usesFontPanel = YES;
+        _usesFindPanel = YES;
 
         _isFieldEditor = NO;
         _maxSize = [self bounds].size;
@@ -297,6 +298,7 @@ NSString *const NSAllRomanInputSourcesLocaleIdentifier =
     _isSelectable = YES;
     _isRichText = YES;
     _usesFontPanel = YES;
+    _usesFindPanel = YES;
     _backgroundColor = [[NSColor whiteColor] copy];
     _drawsBackground = YES;
     _font = [[NSFont userFontOfSize: 0] retain];
@@ -501,6 +503,14 @@ NSString *const NSAllRomanInputSourcesLocaleIdentifier =
 
 - (BOOL) usesFontPanel {
     return _usesFontPanel;
+}
+
+- (void) setUsesFindPanel: (BOOL) flag {
+    _usesFindPanel = flag;
+}
+
+- (BOOL) usesFindPanel {
+    return _usesFindPanel;
 }
 
 - (void) setAllowsUndo: (BOOL) flag {

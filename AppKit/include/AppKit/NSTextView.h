@@ -99,6 +99,7 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
     BOOL _usesRuler;
     BOOL _rulerVisible;
     BOOL _usesFontPanel;
+    BOOL _usesFindPanel;
     BOOL _usesFindBar;
     BOOL _allowsUndo;
 
@@ -281,9 +282,11 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
 - (void) setSpellingState: (NSInteger) value range: (NSRange) characterRange;
 
 - (BOOL) isIncrementalSearchingEnabled;
+- (BOOL) usesFindPanel;
 - (BOOL) usesFindBar;
 - (BOOL) usesInspectorBar;
 - (void) setIncrementalSearchingEnabled: (BOOL) value;
+- (void) setUsesFindPanel: (BOOL) value;
 - (void) setUsesFindBar: (BOOL) value;
 - (void) setUsesInspectorBar: (BOOL) value;
 

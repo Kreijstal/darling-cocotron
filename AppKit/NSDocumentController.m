@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSOpenPanel.h>
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSWindowController.h>
+#import <AppKit/NSWorkspace.h>
 #import <objc/runtime.h>
 
 // UTType, when the application has loaded UniformTypeIdentifiers.
@@ -219,9 +220,21 @@ static NSDocumentController *shared = nil;
     int i, count = [_fileTypes count];
 
     for (i = 0; i < count; i++) {
-        NSArray *add = [(NSDictionary *) [_fileTypes objectAtIndex: i]
-                objectForKey: @"CFBundleTypeExtensions"];
+        NSDictionary *fileType = [_fileTypes objectAtIndex: i];
+        NSArray *add = [fileType objectForKey: @"CFBundleTypeExtensions"];
         [set addObjectsFromArray: add];
+
+        NSArray *contentTypes = [fileType objectForKey: @"LSItemContentTypes"];
+        for (NSString *uti in contentTypes) {
+            if ([uti isEqual: @"public.rtf"]) [set addObject: @"rtf"];
+            else if ([uti isEqual: @"com.apple.rtfd"]) [set addObject: @"rtfd"];
+            else if ([uti isEqual: @"public.plain-text"]) { [set addObject: @"txt"]; [set addObject: @"text"]; }
+            else if ([uti isEqual: @"public.html"]) { [set addObject: @"html"]; [set addObject: @"htm"]; }
+            else if ([uti isEqual: @"public.xml"]) [set addObject: @"xml"];
+            else if ([uti isEqual: @"com.microsoft.word.doc"]) [set addObject: @"doc"];
+            else if ([uti isEqual: @"org.openxmlformats.wordprocessingml.document"]) [set addObject: @"docx"];
+            else if ([uti isEqual: @"org.oasis-open.opendocument.text"]) [set addObject: @"odt"];
+        }
     }
 
     return [set allObjects];
@@ -241,17 +254,65 @@ static NSDocumentController *shared = nil;
     // extensions (including the legacy wildcard) ahead of registry lookup.
     if ([extension length] == 0)
         return nil;
-    Class contentType = NSClassFromString(@"UTType");
-    if (![contentType respondsToSelector: @selector(typeWithFilenameExtension:)])
-        return nil;
-    NSString *identifier = [[contentType typeWithFilenameExtension: extension] identifier];
-    if (identifier != nil) {
+
+    NSString *inferredUTI = nil;
+    if ([extension isEqual: @"rtf"]) inferredUTI = @"public.rtf";
+    else if ([extension isEqual: @"rtfd"]) inferredUTI = @"com.apple.rtfd";
+    else if ([extension isEqual: @"txt"] || [extension isEqual: @"text"]) inferredUTI = @"public.plain-text";
+    else if ([extension isEqual: @"html"] || [extension isEqual: @"htm"]) inferredUTI = @"public.html";
+    else if ([extension isEqual: @"xml"]) inferredUTI = @"public.xml";
+    else if ([extension isEqual: @"doc"]) inferredUTI = @"com.microsoft.word.doc";
+    else if ([extension isEqual: @"docx"]) inferredUTI = @"org.openxmlformats.wordprocessingml.document";
+    else if ([extension isEqual: @"odt"]) inferredUTI = @"org.oasis-open.opendocument.text";
+
+    if (inferredUTI != nil) {
         for (NSDictionary *fileType in _fileTypes) {
-            if ([[fileType objectForKey: @"LSItemContentTypes"] containsObject: identifier])
+            if ([[fileType objectForKey: @"LSItemContentTypes"] containsObject: inferredUTI])
                 return [fileType objectForKey: @"CFBundleTypeName"];
         }
     }
+
+    Class contentType = NSClassFromString(@"UTType");
+    if ([contentType respondsToSelector: @selector(typeWithFilenameExtension:)]) {
+        NSString *identifier = [[contentType typeWithFilenameExtension: extension] identifier];
+        if (identifier != nil) {
+            for (NSDictionary *fileType in _fileTypes) {
+                if ([[fileType objectForKey: @"LSItemContentTypes"] containsObject: identifier])
+                    return [fileType objectForKey: @"CFBundleTypeName"];
+            }
+        }
+    }
     return nil;
+}
+
+- (BOOL) type: (NSString *) type conformsToType: (NSString *) conformsToType {
+    if (type == nil || conformsToType == nil)
+        return NO;
+    if ([type isEqualToString: conformsToType])
+        return YES;
+
+    // Check application declared document types in _fileTypes
+    for (NSDictionary *fileType in _fileTypes) {
+        NSString *typeName = [fileType objectForKey: @"CFBundleTypeName"];
+        if ([typeName isEqualToString: type]) {
+            NSArray *contentTypes = [fileType objectForKey: @"LSItemContentTypes"];
+            for (NSString *contentType in contentTypes) {
+                if ([contentType isEqualToString: conformsToType])
+                    return YES;
+                if ([[NSWorkspace sharedWorkspace] respondsToSelector: @selector(type:conformsToType:)]) {
+                    if ([[NSWorkspace sharedWorkspace] type: contentType conformsToType: conformsToType])
+                        return YES;
+                }
+            }
+        }
+    }
+
+    if ([[NSWorkspace sharedWorkspace] respondsToSelector: @selector(type:conformsToType:)]) {
+        if ([[NSWorkspace sharedWorkspace] type: type conformsToType: conformsToType])
+            return YES;
+    }
+
+    return NO;
 }
 
 // Stored only: Cocotron doesn't autosave documents.

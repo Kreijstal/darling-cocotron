@@ -40,6 +40,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (Class) documentClassForType: (NSString *) type;
 - (NSArray *) fileExtensionsFromType: (NSString *) type;
 - (NSString *) typeFromFileExtension: (NSString *) extension;
+- (BOOL) type: (NSString *) type conformsToType: (NSString *) conformsToType;
 
 - (void) setAutosavingDelay: (NSTimeInterval) value;
 

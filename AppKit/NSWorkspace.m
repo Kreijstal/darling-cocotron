@@ -125,8 +125,68 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 }
 
 - (BOOL) type: (NSString *) type conformsToType: (NSString *) conformsToType {
-    NSInvalidAbstractInvocation();
-    return 0;
+    if (type == nil || conformsToType == nil)
+        return NO;
+    if ([type isEqualToString: conformsToType])
+        return YES;
+
+    // Check application document types declared in mainBundle Info.plist
+    NSArray *docTypes = [[[NSBundle mainBundle] infoDictionary] objectForKey: @"CFBundleDocumentTypes"];
+    for (NSDictionary *dict in docTypes) {
+        NSString *name = [dict objectForKey: @"CFBundleTypeName"];
+        NSArray *contentTypes = [dict objectForKey: @"LSItemContentTypes"];
+        if ([name isEqualToString: type]) {
+            for (NSString *ct in contentTypes) {
+                if ([ct isEqualToString: conformsToType])
+                    return YES;
+            }
+        }
+        if ([name isEqualToString: conformsToType]) {
+            for (NSString *ct in contentTypes) {
+                if ([ct isEqualToString: type])
+                    return YES;
+            }
+        }
+    }
+
+    // Standard Apple pasteboard type to UTI mappings
+    if (([type isEqualToString: @"NSRTFPboardType"] || [type isEqualToString: @"NeXT Rich Text Format v1.0 pasteboard type"]) &&
+        [conformsToType isEqualToString: @"public.rtf"])
+        return YES;
+    if ([type isEqualToString: @"public.rtf"] &&
+        ([conformsToType isEqualToString: @"NSRTFPboardType"] || [conformsToType isEqualToString: @"NeXT Rich Text Format v1.0 pasteboard type"]))
+        return YES;
+
+    if (([type isEqualToString: @"NSRTFDPboardType"] || [type isEqualToString: @"NeXT RTFD pasteboard type"]) &&
+        [conformsToType isEqualToString: @"com.apple.rtfd"])
+        return YES;
+    if ([type isEqualToString: @"com.apple.rtfd"] &&
+        ([conformsToType isEqualToString: @"NSRTFDPboardType"] || [conformsToType isEqualToString: @"NeXT RTFD pasteboard type"]))
+        return YES;
+
+    if (([type isEqualToString: @"NSStringPboardType"] || [type isEqualToString: @"NSString"]) &&
+        ([conformsToType isEqualToString: @"public.plain-text"] || [conformsToType isEqualToString: @"public.text"]))
+        return YES;
+    if (([type isEqualToString: @"public.plain-text"] || [type isEqualToString: @"public.utf8-plain-text"]) &&
+        ([conformsToType isEqualToString: @"NSStringPboardType"] || [conformsToType isEqualToString: @"public.text"]))
+        return YES;
+
+    if ([type isEqualToString: @"NSHTMLPboardType"] && [conformsToType isEqualToString: @"public.html"])
+        return YES;
+    if ([type isEqualToString: @"public.html"] && [conformsToType isEqualToString: @"NSHTMLPboardType"])
+        return YES;
+
+    Class utTypeClass = NSClassFromString(@"UTType");
+    if (utTypeClass != nil && [utTypeClass respondsToSelector: @selector(typeWithIdentifier:)]) {
+        id t1 = [utTypeClass typeWithIdentifier: type];
+        id t2 = [utTypeClass typeWithIdentifier: conformsToType];
+        if (t1 != nil && t2 != nil && [t1 respondsToSelector: @selector(conformsToType:)]) {
+            if ([t1 conformsToType: t2])
+                return YES;
+        }
+    }
+
+    return NO;
 }
 
 - (NSString *) typeOfFile: (NSString *) path error: (NSError **) error {

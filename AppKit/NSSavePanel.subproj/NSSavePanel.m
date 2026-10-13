@@ -162,6 +162,10 @@ static NSSavePanel *_newPanel = nil;
 
 - (NSString *) nameFieldStringValue {
     if (_nameField != nil) {
+        NSText *fieldEditor = [self fieldEditor: NO forObject: _nameField];
+        if (fieldEditor != nil && [self firstResponder] == fieldEditor) {
+            return [fieldEditor string];
+        }
         [_nameField validateEditing];
         return [_nameField stringValue];
     }
@@ -212,8 +216,31 @@ static NSSavePanel *_newPanel = nil;
 }
 
 - (IBAction) _selectFile: (id) sender {
+    [self endEditingFor: nil];
+    [self makeFirstResponder: nil];
+
     if (_nameField == nil) {
-        NSURL *url = [_outlineView itemAtRow: [_outlineView selectedRow]];
+        NSInteger row = [_outlineView selectedRow];
+        if (row < 0) {
+            NSBeep();
+            return;
+        }
+        NSURL *url = [_outlineView itemAtRow: row];
+        if (url == nil || [url path] == nil) {
+            NSBeep();
+            return;
+        }
+        BOOL isDir = NO;
+        if ([[NSFileManager defaultManager] fileExistsAtPath: [url path] isDirectory: &isDir] && isDir) {
+            BOOL canChooseDirs = [self isKindOfClass: [NSOpenPanel class]] && [(NSOpenPanel *)self canChooseDirectories];
+            if (!canChooseDirs) {
+                if ([_outlineView isItemExpanded: url])
+                    [_outlineView collapseItem: url];
+                else
+                    [_outlineView expandItem: url];
+                return;
+            }
+        }
         [self _setFilename: [url path]];
     } else {
         NSString *name = [self nameFieldStringValue];
@@ -309,6 +336,12 @@ static NSSavePanel *_newPanel = nil;
                                runModalForDirectory: [self directory]
                                                file: [self filename]];
     } else {
+        NSScrollView *browser = [_outlineView enclosingScrollView];
+        [browser setHasVerticalScroller: YES];
+        [browser setHasHorizontalScroller: YES];
+        [browser setAutohidesScrollers: NO];
+        [_outlineView reloadData];
+
         // Like macOS, show the panel centered rather than at the (screen-clamped) origin saved in its nib.
         [self center];
         [_nameField selectText: self];

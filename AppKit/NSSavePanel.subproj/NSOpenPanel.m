@@ -127,6 +127,15 @@ static NSOpenPanel *_newPanel = nil;
                                                file: [self filename]
                                               types: [self allowedFileTypes]];
     } else {
+        NSScrollView *browser = [_outlineView enclosingScrollView];
+        [browser setHasVerticalScroller: YES];
+        [browser setHasHorizontalScroller: YES];
+        [browser setAutohidesScrollers: NO];
+        [_outlineView reloadData];
+        NSString *docs = [NSHomeDirectory() stringByAppendingPathComponent: @"Documents"];
+        [_outlineView expandItem: [NSURL fileURLWithPath: docs]];
+        [self makeFirstResponder: _outlineView];
+
         // Like macOS, show the panel centered rather than at the (screen-clamped) origin saved in its nib.
         [self center];
         res = [NSApp runModalForWindow: self];
