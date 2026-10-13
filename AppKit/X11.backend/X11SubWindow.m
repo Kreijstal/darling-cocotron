@@ -38,6 +38,8 @@
     XSelectInput(_display, _window, mask);
 
     [(X11Display *) [NSDisplay currentDisplay] setWindow: parent forID: _window];
+    // Suppress X server background clear; app is responsible for all painting.
+    XSetWindowBackgroundPixmap(_display, _window, None);
 
     [self show];
     return self;

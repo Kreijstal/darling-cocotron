@@ -51,11 +51,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) drawRect: (NSRect) rect {
+    // Suppress redundant background fill that causes white flicker; views and compositors paint their own background.
     NSRect bounds = [self bounds];
     CGFloat cheatSheet = 0;
-
-    [[[self window] backgroundColor] setFill];
-    NSRectFill(bounds);
 
     switch (_borderType) {
     case NSNoBorder:
@@ -77,9 +75,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
     if ([[self window] isSheet])
         bounds.size.height += cheatSheet;
-
-    [[[self window] backgroundColor] setFill];
-    NSRectFill([[[self window] contentView] frame]);
 }
 
 - (void) resizeSubviewsWithOldSize: (NSSize) oldSize {

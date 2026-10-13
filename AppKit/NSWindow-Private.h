@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @interface NSWindow (NSWindow_private)
 - (CGWindow *) platformWindow;
+- (BOOL) titleChangedRecently;
 - (CGContextRef) cgContext;
 - (BOOL) _isActive;
 - (void) _setVisible: (BOOL) visible;

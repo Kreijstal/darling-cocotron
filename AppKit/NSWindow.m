@@ -1218,6 +1218,10 @@ static BOOL _allowsAutomaticWindowTabbing;
     [self _updatePlatformWindowTitle];
 }
 
+- (BOOL) titleChangedRecently {
+    return NO;
+}
+
 - (void) setBackgroundColor: (NSColor *) color {
     if (color == nil)
         color = [NSColor windowBackgroundColor];
