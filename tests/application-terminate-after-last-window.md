@@ -5,7 +5,7 @@ AppKit and Foundation using the Darling SDK, and run it in a Darling guest. It n
 connection. `DARLING_QUIT_ON_LAST_WINDOW` and the `NSQuitOnLastWindowClosed` default must be unset;
 the test refuses to run otherwise.
 
-`-_checkForTerminate` runs after every event. With no visible window it asks the delegate's
+The test calls `-_checkForTerminate` directly. With no visible window it asks the delegate's
 `-applicationShouldTerminateAfterLastWindowClosed:` and calls `-terminate:` only on YES when both
 `DARLING_QUIT_ON_LAST_WINDOW` and the `NSQuitOnLastWindowClosed` default are unset. A delegate that
 returns NO, lacks the method, or is nil leaves the app running. A visible window, or one hidden only
@@ -21,5 +21,7 @@ result is `terminate after last window checks=9 failures=0`.
 
 ## Limitations
 
-The test pins Darling's per-event polling (delegate YES with no windows terminates), whereas Apple asks
-the delegate when the last window closes. The NSPanel skip at NSApplication.m:772 is not covered.
+The test covers the helper's termination decision, including delegate YES with no windows. It does not
+close a real `NSWindow`, post a close notification, or exercise the delayed check scheduled by
+`-_windowWillClose:`.
+The NSPanel skip at NSApplication.m:772 is not covered.
