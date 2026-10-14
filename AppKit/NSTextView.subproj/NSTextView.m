@@ -1616,6 +1616,7 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveToBeginningOfDocumentAndModifySelection: sender {
     NSUInteger origin = MIN(_selectionOrigin, [_textStorage length]);
+    _selectionOrigin = origin;
     [self setSelectedRange: NSMakeRange(0, origin)
                   affinity: NSSelectionAffinityUpstream
             stillSelecting: NO];

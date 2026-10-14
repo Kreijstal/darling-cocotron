@@ -27,13 +27,24 @@ int main(void)
                     NSRange expected = extendToEnd ? NSMakeRange(remaining, 0) : NSMakeRange(0, remaining);
                     NSRange actual = [shrinking selectedRange];
                     if (!NSEqualRanges(actual, expected)) {
-                        fprintf(stderr, "FAIL: stale anchor at %s with length %lu: range=%lu,%lu\n",
+                        fprintf(stderr, "FAIL: document-edge selection at %s with length %lu: range=%lu,%lu\n",
                                 extendToEnd ? "end" : "start", (unsigned long)remaining,
                                 (unsigned long)actual.location, (unsigned long)actual.length);
                         clampFailed = YES;
                     }
+                    if (!extendToEnd && remaining == 1) {
+                        [[shrinking textStorage] replaceCharactersInRange:NSMakeRange(1, 0)
+                                                              withString:@"bcd"];
+                        [shrinking moveToEndOfDocumentAndModifySelection:nil];
+                        NSRange regrown = [shrinking selectedRange];
+                        if (!NSEqualRanges(regrown, NSMakeRange(1, 3))) {
+                            fprintf(stderr, "FAIL: clamped anchor after regrowth: range=%lu,%lu\n",
+                                    (unsigned long)regrown.location, (unsigned long)regrown.length);
+                            clampFailed = YES;
+                        }
+                    }
                 } @catch (NSException *exception) {
-                    fprintf(stderr, "FAIL: stale anchor at %s with length %lu raised %s\n",
+                    fprintf(stderr, "FAIL: document-edge selection at %s with length %lu raised %s\n",
                             extendToEnd ? "end" : "start", (unsigned long)remaining,
                             [[exception name] UTF8String]);
                     clampFailed = YES;
@@ -42,7 +53,7 @@ int main(void)
             }
         }
         if (clampFailed) return 1;
-        puts("PASS: document-edge selection clamps stale anchors in empty and nonempty storage");
+        puts("PASS: document-edge ranges stay valid and a clamped anchor survives storage regrowth");
         NSDictionary *bindings = @{@"shift,keypad,0xF703" : @"moveForwardAndModifySelection:"};
         NSKeyboardBindingManager *manager = [[NSKeyboardBindingManager alloc] initWithDictionary:bindings];
         NSUInteger flags[] = {NSShiftKeyMask, NSShiftKeyMask | 2,
