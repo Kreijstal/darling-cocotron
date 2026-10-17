@@ -2149,7 +2149,8 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
         return;
     [self suspendRelativeMouse];
 
-    int result = X11RelativeMouseGrab(_display, &_relativeMouse, win);
+    int result = X11RelativeMouseGrab(_display, &_relativeMouse, win,
+                                      [self warpsHonoured]);
     if (result == X11_RELATIVE_MOUSE_NOT_FOCUSED)
         return;
     if (result != GrabSuccess) {
@@ -2158,6 +2159,12 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
     }
     NSLog(@"XGrabPointer() succeeded for window %lu\n", win);
     _relativeWindow = win;
+    if (_relativeResumeValid) {
+        // The cursor stays where it froze, not where the pointer is now.
+        X11RelativeMouseRestoreCursor(&_relativeMouse, _relativeResumeX,
+                                      _relativeResumeY);
+        _relativeResumeValid = NO;
+    }
 
     // Absolute motion after the release is measured from where the cursor froze.
     Window child;
@@ -2216,6 +2223,9 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
 - (void) suspendRelativeMouse {
     if (!_relativeMouse.active)
         return;
+    _relativeResumeValid = YES;
+    _relativeResumeX = _relativeMouse.virtualX;
+    _relativeResumeY = _relativeMouse.virtualY;
     X11RelativeMouseRelease(_display, &_relativeMouse);
     _relativeWindow = None;
 }
@@ -2240,6 +2250,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
     } else {
         _relativeRequested = NO;
         [self suspendRelativeMouse];
+        _relativeResumeValid = NO;
         NSLog(@"XUngrabPointer()\n");
     }
     XSync(_display, False);
