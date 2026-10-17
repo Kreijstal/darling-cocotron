@@ -1933,7 +1933,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
 // hands its argument straight through, and on macOS that API is documented in points.
 // XWarpPointer wants device pixels, so the conversion belongs here rather than at every
 // caller. Invisible at 1x, off by the scale factor at 2x.
-- (void) warpMouse: (NSPoint) position {
+- (BOOL) warpMouse: (NSPoint) position {
     int height = DisplayHeight(_display, DefaultScreen(_display));
     CGFloat scale = [self backingScale];
     int root_x = (int) round(position.x * scale);
@@ -1962,6 +1962,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
             [xwin setLastKnownCursorPosition: devicePt];
         }
     }
+    return YES;
 }
 
 - (void) grabMouse: (BOOL) doGrab {
