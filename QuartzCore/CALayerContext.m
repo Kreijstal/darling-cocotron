@@ -160,7 +160,23 @@
         [self prepareMetalLayersInLayerTree: child];
 }
 
+// A pass runs app code (presented handlers, layout, delegates). If that code asks
+// for another pass, for example through -[CAMetalLayer nextDrawable] on the main
+// thread, a nested composite and buffer swap in the middle of this one would
+// corrupt the frame. Every entry point (timer, NSView display, nextDrawable) goes
+// through here, so the guard lives here.
 - (void) renderLayer: (CALayer *) layer {
+    if (_renderInProgress)
+        return;
+    _renderInProgress = YES;
+    @try {
+        [self renderLayerTree: layer];
+    } @finally {
+        _renderInProgress = NO;
+    }
+}
+
+- (void) renderLayerTree: (CALayer *) layer {
     _rendered = NO;
     if (_cglWindow == NULL && [_subwindow nativeWindow] != NULL) {
         _cglWindow = CGLGetWindowForContext(_glContext, [_subwindow nativeWindow]);
@@ -249,32 +265,22 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
     if (_renderInProgress || ![NSThread isMainThread])
         return NO;
 
-    _renderInProgress = YES;
-    @try {
-        [self render];
-        [self flush];
-    } @finally {
-        _renderInProgress = NO;
-    }
+    [self render];
+    [self flush];
     return YES;
 }
 
 - (void) timer: (NSTimer *) timer {
     // Consume requests for this frame before callbacks can request another.
     _renderRequested = NO;
-    _renderInProgress = YES;
-    @try {
-        [_renderer beginFrameAtTime: CACurrentMediaTime() timeStamp: NULL];
+    [_renderer beginFrameAtTime: CACurrentMediaTime() timeStamp: NULL];
 
-        [self render];
+    [self render];
 
-        [_renderer endFrame];
+    [_renderer endFrame];
 
-        // Animation frames aren't part of a view display pass, so present them here.
-        [self flush];
-    } @finally {
-        _renderInProgress = NO;
-    }
+    // Animation frames aren't part of a view display pass, so present them here.
+    [self flush];
 
     // beginFrameAtTime: drops finished animations. Once none are left, the frame
     // just drawn shows the final values: stop until an animation is added again,
