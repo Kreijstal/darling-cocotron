@@ -129,6 +129,17 @@ static void units(void) {
         CHECK(w.windowX == 400 && w.windowY == 0);
     }
 
+    // warpMouse: is the inverse of mouseLocation (frame origin plus the window point,
+    // y up): warping to the position read from a surface point puts the cursor back
+    // on that surface point, with and without the decoration offset.
+    for (int i = 0; i < 2; i++) {
+        double ox = offsets[i][0], oy = offsets[i][1];
+        double sx = 90 + ox, sy = 70 + oy, wx, wy;
+        transformPoint(sx, sy, 300, ox, oy, &wx, &wy);
+        WaylandWarp w = WaylandWarpTarget(1100 + wx, 500 + wy, 1100, 500, 400, 300, ox, oy);
+        CHECK(w.surfaceX == sx && w.surfaceY == sy);
+    }
+
     // relative_motion(utime_hi, utime_lo, dx, dy, dx_unaccel, dy_unaccel): the
     // deltas of an unlocked pointer have the acceleration applied, so these do too.
     union wl_argument args[6] = {{.u = 0}, {.u = 1}, {.f = wl_fixed_from_double(7)},
