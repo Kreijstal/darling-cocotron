@@ -2047,7 +2047,23 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
 // scaled and rounded to the nearest one (see CGDisplayGeometry.h), so reading the
 // pointer back returns round(p * scale) / scale. The conversion belongs here rather
 // than at every caller. Invisible at 1x, off by the scale factor at 2x.
+//
+// The relative-mode state and Xlib are only used from the main thread (the one that
+// pumps X events), and CGWarpMouseCursorPosition may be called from any thread, so a
+// call from another thread is handed over and reports YES once queued. The warp
+// produces no delta, so the caller need not wait.
 - (BOOL) warpMouse: (NSPoint) position {
+    if (![NSThread isMainThread]) {
+        [self performSelectorOnMainThread: @selector(warpMouseOnMainThread:)
+                               withObject: [NSValue valueWithPoint: position]
+                            waitUntilDone: NO];
+        return YES;
+    }
+    return [self warpMouseOnMainThread: [NSValue valueWithPoint: position]];
+}
+
+- (BOOL) warpMouseOnMainThread: (NSValue *) target {
+    NSPoint position = [target pointValue];
     NSRect primary = [self primaryRootFrame];
     CGFloat scale = [self backingScale];
     X11Point root = X11PointToRoot(
@@ -2155,6 +2171,18 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
 
 // CGAssociateMouseAndMouseCursorPosition(!doGrab).
 - (void) grabMouse: (BOOL) doGrab {
+    // Main thread only, like -warpMouse:.
+    if (![NSThread isMainThread]) {
+        [self performSelectorOnMainThread: @selector(grabMouseOnMainThread:)
+                               withObject: [NSNumber numberWithBool: doGrab]
+                            waitUntilDone: NO];
+        return;
+    }
+    [self grabMouseOnMainThread: [NSNumber numberWithBool: doGrab]];
+}
+
+- (void) grabMouseOnMainThread: (NSNumber *) wanted {
+    BOOL doGrab = [wanted boolValue];
     if (doGrab) {
         _relativeRequested = YES;
         [self beginRelativeMouse];
