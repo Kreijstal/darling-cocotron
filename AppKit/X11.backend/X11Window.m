@@ -35,9 +35,9 @@
 #import <QuartzCore/CAWindowOpenGLContext.h>
 
 #import "X11Display.h"
-#import "X11InputShape.h"
 #import "X11SubWindow.h"
 #import "X11Window.h"
+#import "X11InputShape.h"
 #import <X11/Xatom.h>
 #import <X11/Xutil.h>
 
