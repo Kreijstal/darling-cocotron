@@ -34,6 +34,7 @@ used.
 | Windows | xdg toplevels, redraw/resize, hide/show, popups and client/server decorations; [initial validation](tests/VALIDATION.md) |
 | Outputs | Atomic core updates, rotation, removal/reappearance, optional compositor logical topology; [core](tests/OUTPUT-VALIDATION.md) and [logical](tests/LOGICAL-OUTPUT-VALIDATION.md) validation |
 | Input | Pointer/click grouping, frame-coalesced scrolling, pinch magnify/rotate, text/repeat and independent physical modifiers; [input validation](tests/INPUT-VALIDATION.md), [scroll-frame validation](tests/SCROLL-FRAME-VALIDATION.md) and [pinch validation](tests/PINCH-GESTURE-VALIDATION.md) |
+| Fullscreen | `NSWindowStyleMaskFullScreen` and borderless windows as large as an output request `xdg_toplevel.set_fullscreen` (on the matching output when it is known); the size from before is restored on leaving |
 | Scale and cursors | Integer buffer scale, named/image cursors, scaled drag icons; [icon validation](tests/DRAG-ICON-VALIDATION.md) |
 | Clipboard and dragging | Clipboard ownership/transfer, incoming/outgoing COPY/MOVE, bounded immutable data; [outgoing](tests/OUTGOING-VALIDATION.md) and [actions](tests/DRAG-ACTIONS-VALIDATION.md) |
 | Filenames | Host-backed file URI conversion; [URI limits](tests/FILE-URI-VALIDATION.md) |
