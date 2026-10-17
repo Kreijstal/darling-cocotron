@@ -1259,11 +1259,14 @@ static NSString *stringWithCodepoint(uint32_t codepoint) {
 // Wayland clients can't move the pointer, but while it is locked the cursor is
 // the application's own and a warp only moves where it is. That position is
 // where mouseLocation reports it and where the pointer reappears on unlock.
-// Without a lock the call does nothing, and nothing pretends otherwise.
-- (void) warpMouse: (NSPoint) position {
+// position is in the space mouseLocation reports (points, y up), so a warp to
+// a position read from mouseLocation changes nothing. Without a lock nothing is
+// moved and NO is returned, so the caller does not report a warp that did not
+// happen.
+- (BOOL) warpMouse: (NSPoint) position {
     WaylandWindow *window = _lockWindow;
     if (!_pointerLocked || window == nil)
-        return;
+        return NO;
     NSRect frame = [window frame];
     NSPoint offset = [window contentOffset];
     WaylandWarp warp = WaylandWarpTarget(position.x, position.y, frame.origin.x, frame.origin.y,
@@ -1271,6 +1274,7 @@ static NSString *stringWithCodepoint(uint32_t codepoint) {
     _pointerSurfacePoint = CGPointMake(warp.surfaceX, warp.surfaceY);
     // Window coordinates, like every other writer of the last known position.
     [window setLastKnownCursorPosition: NSMakePoint(warp.windowX, warp.windowY)];
+    return YES;
 }
 
 - (void) grabMouse: (BOOL) doGrab {
