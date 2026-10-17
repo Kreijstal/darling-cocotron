@@ -2,7 +2,10 @@
 // CALayerContext.m. QuartzCore cannot be compiled on the host (it needs Vulkan, GL
 // and the Darling runtime), so this is a C state machine with the same rules, not the
 // Objective-C itself. It pins the design:
-//   1. A slot returns to the pool only inside a render pass (the presented handler).
+//   1. A slot returns to the pool only inside a render pass, and a pass releases the
+//      PREVIOUSLY presented drawable (-prepareRender, CAMetalLayer.mm: didPresent on
+//      _lastPresentedDrawable, then _lastPresentedDrawable = the one just taken), so the
+//      first pass after an empty _lastPresentedDrawable frees nothing.
 //   2. nextDrawable on the main thread runs a pass itself when presents are queued.
 //   3. Only the main thread reads the unretained context pointer.
 //   4. A pass never nests, whichever entry point asks for it.
@@ -18,7 +21,8 @@ static int failures;
 
 typedef struct {
     int usable;        // free slots
-    int queued;        // presented, waiting for a pass to hand them back
+    int queued;        // presented, waiting for a pass to composite them
+    bool hasLast;      // _lastPresentedDrawable is set
     bool context;      // the unretained layer->context pointer is valid
     bool hasWindow;    // renderLayer can attach (else it returns early)
     bool inProgress;   // CALayerContext._renderInProgress
@@ -42,9 +46,21 @@ static void renderLayer(Model *m) {
     m->depth++;
     if (m->depth > m->maxDepth)
         m->maxDepth = m->depth;
-    if (m->hasWindow && m->queued > 0) {
-        m->passes++;
-        m->queued--;
+    if (m->hasWindow) {
+        // -prepareRender: take the first queued present, release the previous one.
+        bool took = m->queued > 0;
+        if (took) {
+            m->passes++;
+            m->queued--;
+        }
+#ifdef MUT_FREE_TAKEN
+        if (took)
+            m->usable++;
+#else
+        if (m->hasLast)
+            m->usable++;
+        m->hasLast = took;
+#endif
         if (m->nestedFromHandler) { // app code inside the pass
             m->nestedFromHandler = false;
             nextDrawable(m, true);
@@ -53,7 +69,6 @@ static void renderLayer(Model *m) {
             m->nestedRender = false;
             renderLayer(m);
         }
-        m->usable++;
     }
     m->depth--;
     m->inProgress = false;
@@ -104,13 +119,21 @@ int main(void) {
     Model m = fresh();
     m.queued = POOL;
     CHECK(nextDrawable(&m, true) == 0, "main thread frees a slot by running a pass");
-    CHECK(m.passes == 1, "exactly one pass for one slot");
+    // The first pass only composites the oldest present: nothing was presented
+    // before it, so no slot is released. The second pass releases that one.
+    CHECK(m.passes == 2, "two passes for the first slot, as -prepareRender releases the previous drawable");
+    CHECK(m.queued == POOL - 2, "two presents composited");
 
-    // Each pass takes one present, so POOL calls drain POOL presents and no more.
+    // Each further call needs one more pass. After the last present is composited the
+    // slot it shows is released only by the next pass, which the main-thread timer
+    // runs; nextDrawable has nothing queued to run and waits for it.
     m = fresh(); m.queued = POOL;
-    for (int i = 0; i < POOL; i++)
-        CHECK(nextDrawable(&m, true) == 0, "drains the pool one pass per call");
-    CHECK(m.queued == 0 && m.usable == 0, "pool fully handed out");
+    CHECK(nextDrawable(&m, true) == 0, "first drawable");
+    CHECK(nextDrawable(&m, true) == 0, "second drawable, one pass");
+    CHECK(nextDrawable(&m, true) == -1, "third: nothing queued, the timer pass releases the last one");
+    CHECK(m.queued == 0 && m.usable == 0, "all presents composited");
+    renderLayer(&m); // the timer
+    CHECK(nextDrawable(&m, true) == 0, "after the timer pass the last slot is back");
 
     // 3: another thread does not touch the context, even if it has been freed.
     m = fresh(); m.queued = POOL; m.context = false;
