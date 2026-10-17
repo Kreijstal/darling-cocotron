@@ -3,6 +3,7 @@
 #ifndef WAYLAND_FULLSCREEN_H
 #define WAYLAND_FULLSCREEN_H
 
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -20,24 +21,54 @@ typedef struct {
     int32_t width, height; // logical size of the window content
 } WaylandFullscreenWindow;
 
-// Index of the first output whose logical size equals the window's, or -1.
-static inline int WaylandFullscreenOutputIndex(const WaylandFullscreenWindow *window,
-                                               const int32_t (*sizes)[2], size_t count)
-{
-    for (size_t i = 0; window->width > 0 && window->height > 0 && i < count; i++)
-        if (sizes[i][0] == window->width && sizes[i][1] == window->height)
-            return (int) i;
-    return -1;
+// Every size comparison and every saved size goes through this one rounding:
+// logical output sizes can be fractional (2560 / 1.5), compositor sizes are not.
+static inline int32_t WaylandFullscreenRound(double value) {
+    return (int32_t) lround(value);
 }
 
-static inline bool WaylandFullscreenWanted(const WaylandFullscreenWindow *window,
-                                           const int32_t (*sizes)[2], size_t count)
+// An output as the decision sees it: its logical size and whether the window's
+// surface has entered it (wl_surface.enter).
+typedef struct {
+    int32_t width, height;
+    bool entered;
+} WaylandFullscreenOutput;
+
+// Decides whether the window is fullscreen. *target is the index of the output to
+// name in set_fullscreen, or -1 to let the compositor choose.
+//
+// A window that has entered some outputs may only be fullscreened onto one of
+// them: matching the size of an output it is not on does not make it fullscreen
+// material. A window that has entered none (before its first commit) is matched
+// against all outputs, and an output is named only when exactly one has its size.
+static inline bool WaylandFullscreenDecide(const WaylandFullscreenWindow *window,
+                                           const WaylandFullscreenOutput *outputs, size_t count,
+                                           int *target)
 {
+    *target = -1;
     if (window->fullScreenStyle)
         return true;
-    if (window->titled || !window->canBecomeKey || window->popupOrMenu)
+    if (window->titled || !window->canBecomeKey || window->popupOrMenu ||
+        window->width <= 0 || window->height <= 0)
         return false;
-    return WaylandFullscreenOutputIndex(window, sizes, count) >= 0;
+    bool onOutput = false;
+    for (size_t i = 0; i < count; i++)
+        onOutput = onOutput || outputs[i].entered;
+    size_t matches = 0;
+    int first = -1;
+    for (size_t i = 0; i < count; i++) {
+        if (onOutput && !outputs[i].entered)
+            continue;
+        if (outputs[i].width != window->width || outputs[i].height != window->height)
+            continue;
+        if (matches++ == 0)
+            first = (int) i;
+    }
+    if (matches == 0)
+        return false;
+    if (onOutput || matches == 1)
+        *target = first;
+    return true;
 }
 
 // xdg_toplevel.set_fullscreen takes the wl_output to cover, or NULL to let the
@@ -63,13 +94,30 @@ static inline bool WaylandStatesContain(const struct wl_array *states, uint32_t 
 }
 
 // What the window size becomes at the end of a configure sequence. The
-// compositor sizes a fullscreen window itself and, after unset_fullscreen,
-// may send 0x0 ("choose your own size") instead of the old size, so the size
-// from before fullscreen is kept to restore. Sizes are the window content.
+// compositor sizes a fullscreen window itself. After unset_fullscreen it sends
+// either 0x0 ("choose your own size") or the size it remembered from before
+// fullscreen (sway). The size to go back to is the one from before fullscreen,
+// unless the application chose another with setFrame: while fullscreen: then
+// the application's size wins over whatever the compositor remembered. A size
+// the compositor sends for a window the application did not resize wins over
+// the saved one. Sizes are the window content.
 typedef struct {
     bool active;
+    bool applicationSized;
     int32_t savedWidth, savedHeight;
 } WaylandFullscreenTracker;
+
+// The application resized the window. While fullscreen, that is the size to
+// return to on leaving; otherwise there is nothing to remember.
+static inline void WaylandFullscreenApplicationResized(WaylandFullscreenTracker *tracker,
+                                                       int32_t width, int32_t height)
+{
+    if (!tracker->active)
+        return;
+    tracker->applicationSized = true;
+    tracker->savedWidth = width;
+    tracker->savedHeight = height;
+}
 
 static inline void WaylandFullscreenConfigure(WaylandFullscreenTracker *tracker,
                                               bool fullscreen,
@@ -82,14 +130,16 @@ static inline void WaylandFullscreenConfigure(WaylandFullscreenTracker *tracker,
     *height = configured ? configuredHeight : 0;
     if (fullscreen && !tracker->active) {
         tracker->active = true;
+        tracker->applicationSized = false;
         tracker->savedWidth = currentWidth;
         tracker->savedHeight = currentHeight;
     } else if (!fullscreen && tracker->active) {
         tracker->active = false;
-        if (!configured) {
+        if (!configured || tracker->applicationSized) {
             *width = tracker->savedWidth;
             *height = tracker->savedHeight;
         }
+        tracker->applicationSized = false;
     }
 }
 

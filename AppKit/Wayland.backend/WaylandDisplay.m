@@ -681,6 +681,8 @@ static NSString *stringWithCodepoint(uint32_t codepoint) {
             WL.wl_proxy_destroy(output->_proxy);
             [_outputs removeObject: output];
             [self invalidateScreens];
+            for (CFIndex i = 0; i < CFArrayGetCount(_windows); i++)
+                [(WaylandWindow *) CFArrayGetValueAtIndex(_windows, i) outputsChanged];
             break;
         }
     }
@@ -711,8 +713,11 @@ static NSString *stringWithCodepoint(uint32_t codepoint) {
     output->_modes = [output->_pendingModes copy];
     [self invalidateScreens];
     [_draggingManager outputsChanged];
-    for (CFIndex i = 0; i < CFArrayGetCount(_windows); i++)
-        [(WaylandWindow *) CFArrayGetValueAtIndex(_windows, i) scheduleScaleUpdate];
+    for (CFIndex i = 0; i < CFArrayGetCount(_windows); i++) {
+        WaylandWindow *window = (WaylandWindow *) CFArrayGetValueAtIndex(_windows, i);
+        [window scheduleScaleUpdate];
+        [window outputsChanged];
+    }
 }
 
 - (void) outputEvent: (uint32_t) opcode
@@ -1736,36 +1741,29 @@ static NSUInteger modifierDeviceMask(int code) {
     return [[_screens retain] autorelease];
 }
 
-- (NSArray *) outputLogicalSizes {
-    NSMutableArray *sizes = [NSMutableArray array];
-    // -screens invents a screen when no output has reported a mode yet.
-    if ([[self outputsWithModes] count] == 0)
-        return sizes;
-    for (NSScreen *screen in [self screens])
-        [sizes addObject: [NSValue valueWithSize: [screen frame].size]];
-    return sizes;
-}
-
 // -screens is built from -outputsWithModes in order, so the indexes agree.
-- (struct wl_proxy *) outputWithLogicalSize: (NSSize) size
-                                 preferring: (NSSet *) preferred
+- (size_t) fullscreenOutputs: (WaylandFullscreenOutput *) result
+                     proxies: (struct wl_proxy **) proxies
+                         max: (size_t) max
+                     entered: (NSSet *) entered
 {
     NSArray *outputs = [self outputsWithModes];
+    // -screens invents a screen when no output has reported a mode yet.
+    if ([outputs count] == 0)
+        return 0;
     NSArray *screens = [self screens];
-    struct wl_proxy *only = NULL;
-    NSUInteger matches = 0;
-    for (NSUInteger i = 0; i < [outputs count] && i < [screens count]; i++) {
-        NSSize candidate = [(NSScreen *) screens[i] frame].size;
-        if (lround(candidate.width) != lround(size.width) ||
-            lround(candidate.height) != lround(size.height))
-            continue;
+    size_t count = 0;
+    for (NSUInteger i = 0; i < [outputs count] && i < [screens count] && count < max; i++) {
         struct wl_proxy *proxy = ((WaylandOutput *) outputs[i])->_proxy;
-        if ([preferred containsObject: [NSValue valueWithPointer: proxy]])
-            return proxy;
-        only = proxy;
-        matches++;
+        NSSize size = [(NSScreen *) screens[i] frame].size;
+        result[count] = (WaylandFullscreenOutput) {
+            .width = WaylandFullscreenRound(size.width),
+            .height = WaylandFullscreenRound(size.height),
+            .entered = [entered containsObject: [NSValue valueWithPointer: proxy]],
+        };
+        proxies[count++] = proxy;
     }
-    return matches == 1 ? only : NULL;
+    return count;
 }
 
 - (CGRect) insetRect: (CGRect) frame

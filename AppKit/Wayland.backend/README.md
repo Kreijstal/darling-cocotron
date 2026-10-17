@@ -34,12 +34,12 @@ used.
 | Windows | xdg toplevels, redraw/resize, hide/show, popups and client/server decorations; [initial validation](tests/VALIDATION.md) |
 | Outputs | Atomic core updates, rotation, removal/reappearance, optional compositor logical topology; [core](tests/OUTPUT-VALIDATION.md) and [logical](tests/LOGICAL-OUTPUT-VALIDATION.md) validation |
 | Input | Pointer/click grouping, frame-coalesced scrolling, pinch magnify/rotate, text/repeat and independent physical modifiers; [input validation](tests/INPUT-VALIDATION.md), [scroll-frame validation](tests/SCROLL-FRAME-VALIDATION.md) and [pinch validation](tests/PINCH-GESTURE-VALIDATION.md) |
-| Fullscreen | `NSWindowStyleMaskFullScreen` and borderless windows as large as an output request `xdg_toplevel.set_fullscreen` (on the matching output when it is known); the size from before is restored on leaving; [host test](tests/wayland-fullscreen.sh) against a headless sway |
 | Scale and cursors | Integer buffer scale, named/image cursors, scaled drag icons; [icon validation](tests/DRAG-ICON-VALIDATION.md) |
 | Clipboard and dragging | Clipboard ownership/transfer, incoming/outgoing COPY/MOVE, bounded immutable data; [outgoing](tests/OUTGOING-VALIDATION.md) and [actions](tests/DRAG-ACTIONS-VALIDATION.md) |
 | Filenames | Host-backed file URI conversion; [URI limits](tests/FILE-URI-VALIDATION.md) |
 | Local-only dragging | Original Cocoa bytes stay in process, including guest-only paths; [privacy/lifecycle validation](tests/LOCAL-DRAG-VALIDATION.md) |
 | OpenGL/layers | Main-thread EGL subwindows, NSOpenGLView/layer presentation, integer scale and parent clipping; [combined interactions](tests/COMBINED-VALIDATION.md) |
+| Fullscreen | `NSWindowStyleMaskFullScreen` and borderless windows as large as an output they are on request `xdg_toplevel.set_fullscreen` (on that output); on leaving, the size the application set meanwhile with `setFrame:` is restored, else the compositor's size, else the size from before; re-decided when an output changes; [host test](tests/wayland-fullscreen.sh) against a headless sway |
 
 The [combined fixture](tests/integrationtest.m) exercises these components in the
 same application: input through GL children, modifier changes during a held mouse
