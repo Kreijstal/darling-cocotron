@@ -520,6 +520,35 @@ static size_t MaximumPropertyBytes(Display *display) {
         // No owner, no reply, and waiting for one would block the caller.
         return nil;
 
+    NSArray *available = [self remoteTypes];
+    BOOL hasType = [available containsObject: type];
+    if (!hasType) {
+        if ([type isEqual: NSStringPboardType] ||
+            [type isEqual: @"public.utf8-plain-text"] ||
+            [type isEqual: @"public.plain-text"]) {
+            if ([available containsObject: @"public.utf8-plain-text"]) {
+                type = @"public.utf8-plain-text";
+                hasType = YES;
+            } else if ([available containsObject: NSStringPboardType]) {
+                type = NSStringPboardType;
+                hasType = YES;
+            } else if ([available containsObject: @"public.plain-text"]) {
+                type = @"public.plain-text";
+                hasType = YES;
+            }
+        } else if ([type isEqual: NSRTFPboardType] || [type isEqual: @"public.rtf"]) {
+            if ([available containsObject: NSRTFPboardType]) {
+                type = NSRTFPboardType;
+                hasType = YES;
+            } else if ([available containsObject: @"public.rtf"]) {
+                type = @"public.rtf";
+                hasType = YES;
+            }
+        }
+    }
+    if (!hasType)
+        return nil;
+
     NSTimeInterval deadline = [NSDate timeIntervalSinceReferenceDate]
             + SelectionTimeout;
     for (NSString *target in [X11Pasteboard targetsForType: type]) {
@@ -693,7 +722,7 @@ static size_t MaximumPropertyBytes(Display *display) {
       re->target = event->target;
       re->property = success ? ((event->property == None) ? event->target : event->property) : None;
       re->time = event->time;
-      XSendEvent(_display, event->requestor, True, NoEventMask, &replyEvent);
+      XSendEvent(_display, event->requestor, False, NoEventMask, &replyEvent);
       XFlush(_display);
     };
 

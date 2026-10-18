@@ -3473,7 +3473,8 @@ static BOOL _allowsAutomaticWindowTabbing;
             NSToolTipWindow *toolTipWindow =
                     [NSToolTipWindow sharedToolTipWindow];
 
-            if (![self isKeyWindow] || [self _sheetContext] != nil) {
+            if ((![NSApp isActive] && ![self allowsToolTipsWhenApplicationIsInactive]) ||
+                [self _sheetContext] != nil) {
                 mouseIsInside = NO;
             }
 
@@ -3667,7 +3668,7 @@ static BOOL _allowsAutomaticWindowTabbing;
                 1000.;
 
         if (delay <= 0.) {
-            delay = 2.;
+            delay = 0.4;
         }
         [[NSToolTipWindow sharedToolTipWindow]
                 performSelector: @selector(orderFront:)

@@ -59,18 +59,22 @@ NSString *const NSToolTipHelpKey = @"NSToolTipHelp";
                              backing: (NSBackingStoreType) backing
                                defer: (BOOL) defer
 {
-    [super initWithContentRect: contentRect
-                     styleMask: styleMask
-                       backing: backing
-                         defer: defer];
+    self = [super initWithContentRect: contentRect
+                            styleMask: styleMask
+                              backing: backing
+                                defer: defer];
+    if (self == nil)
+        return nil;
 
     _textField = [[NSTextField alloc]
             initWithFrame: contentRect]; // Will be adjusted later.
     [_textField setFrameOrigin: NSMakePoint(2., -3.)]; // Should be (0., 0.).
     [_textField setFont: [NSFont toolTipsFontOfSize: 0.]];
     [_textField setEditable: NO];
+    [_textField setSelectable: NO];
     [_textField setBordered: NO];
     [_textField setBezeled: NO];
+    [self setIgnoresMouseEvents: YES];
     [self setBackgroundColor: [NSColor colorWithDeviceRed: 1.
                                                     green: 1.
                                                      blue: .88
@@ -100,42 +104,53 @@ NSString *const NSToolTipHelpKey = @"NSToolTipHelp";
 
 // NSWindow override.
 - (void) orderFront: (id) sender {
-    if (!_sizeAdjusted) {
-        NSSize messageSize = NSZeroSize;
-        NSRect windowFrame = [self frame];
+    NSSize messageSize = NSZeroSize;
+    NSRect windowFrame = [self frame];
 
-        messageSize = [[NSScreen mainScreen] visibleFrame].size;
-        if ([[NSUserDefaults standardUserDefaults]
-                    boolForKey: @"NSToolTipAutoWrappingDisabled"] == NO) {
-            messageSize.width /= 4.;
-        } else {
-            messageSize.width = NSStringDrawerLargeDimension;
-        }
-
-        NSStringDrawer *stringDrawer = [NSStringDrawer sharedStringDrawer];
-        messageSize = [stringDrawer
-                  sizeOfString: [_textField stringValue]
-                withAttributes: @{
-                    NSFontAttributeName : [NSFont toolTipsFontOfSize: 0.]
-                }
-                        inSize: messageSize];
-        messageSize.width += TEXTFIELD_MARGIN * 2;
-        messageSize.width += 2.; // Shouldn't be neccessary.
-        messageSize.height += TEXTFIELD_MARGIN * 2;
-
-        [_textField setFrameSize: messageSize];
-
-        windowFrame.origin = [NSEvent mouseLocation];
-        windowFrame.origin.x += 10.;
-        windowFrame.origin.y += 10.;
-        windowFrame.size = messageSize;
-        windowFrame.size.height -= 1.; // Shouldn't be neccessary.
-        [self setFrame: windowFrame display: YES];
-
-        _sizeAdjusted = YES;
+    messageSize = [[NSScreen mainScreen] visibleFrame].size;
+    if ([[NSUserDefaults standardUserDefaults]
+                boolForKey: @"NSToolTipAutoWrappingDisabled"] == NO) {
+        messageSize.width /= 4.;
+    } else {
+        messageSize.width = NSStringDrawerLargeDimension;
     }
 
+    NSStringDrawer *stringDrawer = [NSStringDrawer sharedStringDrawer];
+    NSSize textSize = [stringDrawer
+              sizeOfString: [_textField stringValue]
+            withAttributes: @{
+                NSFontAttributeName : [NSFont toolTipsFontOfSize: 0.]
+            }
+                    inSize: messageSize];
+    messageSize.width = textSize.width + TEXTFIELD_MARGIN * 2 + 4.;
+    messageSize.height = textSize.height + TEXTFIELD_MARGIN * 2;
+
+    [_textField setFrame: NSMakeRect(TEXTFIELD_MARGIN, TEXTFIELD_MARGIN, textSize.width + 4., textSize.height)];
+
+    NSPoint mouse = [NSEvent mouseLocation];
+    NSScreen *targetScreen = nil;
+    for (NSScreen *s in [NSScreen screens]) {
+        if (NSPointInRect(mouse, [s frame])) {
+            targetScreen = s;
+            break;
+        }
+    }
+    if (targetScreen == nil) {
+        targetScreen = [NSScreen mainScreen];
+    }
+    CGFloat screenHeight = [targetScreen frame].size.height;
+    CGFloat screenYOrigin = [targetScreen frame].origin.y;
+
+    windowFrame.origin.x = mouse.x + 12.;
+    windowFrame.origin.y = (screenYOrigin + screenHeight - mouse.y) - messageSize.height - 4.;
+    windowFrame.size = messageSize;
+    [self setFrame: windowFrame display: YES];
+
     [super orderFront: sender];
+}
+
+- (void) orderOut: (id) sender {
+    [super orderOut: sender];
 }
 
 @end

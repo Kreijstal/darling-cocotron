@@ -183,7 +183,8 @@ static NSData *makeWindowIcon() {
 
     _frame = [delegate frame];
     BOOL isPanel = [delegate isKindOfClass: [NSPanel class]];
-    if (isPanel && _styleMask & NSDocModalWindowMask)
+    BOOL isSheetPanel = isPanel && (_styleMask & NSDocModalWindowMask);
+    if (isSheetPanel)
         _styleMask = NSBorderlessWindowMask;
     // TODO: get rid of these glX calls
     GLint att[] = {GLX_RGBA,
@@ -221,7 +222,15 @@ static NSData *makeWindowIcon() {
     XSetWindowAttributes xattr;
     unsigned long xattr_mask;
     xattr.override_redirect =
-            _styleMask == NSBorderlessWindowMask ? True : False;
+            (_styleMask == NSBorderlessWindowMask && !isPanel &&
+             ([delegate isKindOfClass: [NSMenuWindow class]] ||
+              [delegate isKindOfClass: NSClassFromString(@"NSPopUpWindow")] ||
+              ![delegate canBecomeKeyWindow]))
+                    ? True
+                    : False;
+    if (isSheetPanel) {
+        xattr.override_redirect = True;
+    }
     xattr_mask = CWOverrideRedirect | CWColormap;
     xattr.colormap = cmap;
 
@@ -301,7 +310,7 @@ static NSData *makeWindowIcon() {
     [(X11Display *) [NSDisplay currentDisplay] setWindow: self forID: _window];
 
     // FIXME: Move this call into setStyleMaskInternal below!
-    if (_styleMask == NSBorderlessWindowMask) {
+    if (_styleMask == NSBorderlessWindowMask || isPanel) {
         [[self class] removeDecorationForWindow: _window onDisplay: _display];
     }
     [self setStyleMaskInternal: _styleMask force: YES];
@@ -400,20 +409,10 @@ static NSData *makeWindowIcon() {
 }
 
 + (void) removeDecorationForWindow: (Window) w onDisplay: (Display *) dpy {
-    return;
-    struct {
-        unsigned long flags;
-        unsigned long functions;
-        unsigned long decorations;
-        long input_mode;
-        unsigned long status;
-    } hints = {
-            2, 0, 0, 0, 0,
-    };
+    uint32_t hints[5] = { 2, 0, 0, 0, 0 };
     XChangeProperty(dpy, w, XInternAtom(dpy, "_MOTIF_WM_HINTS", False),
                     XInternAtom(dpy, "_MOTIF_WM_HINTS", False), 32,
-                    PropModeReplace, (const unsigned char *) &hints,
-                    sizeof(hints) / sizeof(long));
+                    PropModeReplace, (const unsigned char *) hints, 5);
 }
 
 - (void) ensureMapped {
@@ -445,12 +444,10 @@ static NSData *makeWindowIcon() {
     long mask = KeyPressMask | KeyReleaseMask | ExposureMask |
                 StructureNotifyMask | EnterWindowMask | LeaveWindowMask |
                 ButtonPressMask | ButtonReleaseMask | ButtonMotionMask |
+                PointerMotionMask | PointerMotionHintMask |
                 VisibilityChangeMask | FocusChangeMask |
                 SubstructureRedirectMask;
 
-    if ([_delegate acceptsMouseMovedEvents]) {
-        mask |= PointerMotionMask;
-    }
     XSelectInput(_display, _window, mask);
 
     // TODO: background color

@@ -52,6 +52,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return NO;
 }
 
+- (BOOL) canBecomeKeyWindow {
+    return YES;
+}
+
 - (void) becomeMainWindow {
     if ([self canBecomeMainWindow])
         [super becomeMainWindow];

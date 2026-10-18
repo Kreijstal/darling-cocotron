@@ -51,16 +51,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) drawRect: (NSRect) rect {
-    // Suppress redundant background fill that causes white flicker; views and compositors paint their own background.
     NSRect bounds = [self bounds];
     CGFloat cheatSheet = 0;
+
+    if ([[self window] backgroundColor] != nil &&
+        ([_window styleMask] == NSBorderlessWindowMask || _borderType == NSNoBorder || _borderType == NSWindowToolTipBorderType)) {
+        [[[self window] backgroundColor] setFill];
+        NSRectFill(bounds);
+    }
 
     switch (_borderType) {
     case NSNoBorder:
         break;
 
     case NSWindowToolTipBorderType:
-        [[NSColor blackColor] setStroke];
+        [[NSColor colorWithCalibratedWhite: 0.5 alpha: 1.0] setStroke];
         NSFrameRect(bounds);
         bounds = NSInsetRect(bounds, 1, 1);
         cheatSheet = 1;

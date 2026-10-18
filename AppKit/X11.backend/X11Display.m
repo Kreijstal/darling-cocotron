@@ -1582,6 +1582,17 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
         break;
 
     case MotionNotify:; {
+            // Coalesce rapid MotionNotify events to process only the latest position
+            XEvent nextEvent;
+            while (XPending(_display)) {
+                XPeekEvent(_display, &nextEvent);
+                if (nextEvent.type == MotionNotify && nextEvent.xmotion.window == ev->xmotion.window) {
+                    XNextEvent(_display, ev);
+                } else {
+                    break;
+                }
+            }
+
             int winX = ev->xmotion.x;
             int winY = ev->xmotion.y;
             if (ev->xmotion.window != [window windowHandle] && ev->xmotion.window != 0) {
@@ -1599,8 +1610,6 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
             CGFloat deltaX = (devicePos.x - lastDevicePos.x) / scale;
             CGFloat deltaY = (devicePos.y - lastDevicePos.y) / scale;
 
-            [window setLastKnownCursorPosition: devicePos];
-
             if (_cursorGrabbed) {
                 NSWindow *nswin = delegate;
                 NSRect winFrame = [nswin frame];
@@ -1611,8 +1620,11 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
                     NSPoint centerCocoa = NSMakePoint(winFrame.origin.x + w / 2.0,
                                                       winFrame.origin.y + h / 2.0);
                     [self warpMouse: centerCocoa];
+                    devicePos = [window transformPoint: centerCocoa];
                 }
             }
+
+            [window setLastKnownCursorPosition: devicePos];
 
             // Button2Mask is the middle button, not the right one, so reading
             // it as a right drag made a middle-button drag indistinguishable
@@ -1625,6 +1637,8 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
             } else if (ev->xmotion.state & Button3Mask) {
                 type = NSRightMouseDragged;
             }
+
+            [delegate platformWindowSetCursorEvent: window];
 
             if (type == NSMouseMoved && ![delegate acceptsMouseMovedEvents])
                 break;
@@ -1641,8 +1655,6 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
             [self postEvent: event atStart: NO];
             [self discardEventsMatchingMask: NSLeftMouseDraggedMask
                                 beforeEvent: event];
-
-            [delegate platformWindowSetCursorEvent: window];
             break;
         }
 
