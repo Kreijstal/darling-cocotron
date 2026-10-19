@@ -128,21 +128,8 @@ NSString *const NSToolTipHelpKey = @"NSToolTipHelp";
     [_textField setFrame: NSMakeRect(TEXTFIELD_MARGIN, TEXTFIELD_MARGIN, textSize.width + 4., textSize.height)];
 
     NSPoint mouse = [NSEvent mouseLocation];
-    NSScreen *targetScreen = nil;
-    for (NSScreen *s in [NSScreen screens]) {
-        if (NSPointInRect(mouse, [s frame])) {
-            targetScreen = s;
-            break;
-        }
-    }
-    if (targetScreen == nil) {
-        targetScreen = [NSScreen mainScreen];
-    }
-    CGFloat screenHeight = [targetScreen frame].size.height;
-    CGFloat screenYOrigin = [targetScreen frame].origin.y;
-
     windowFrame.origin.x = mouse.x + 12.;
-    windowFrame.origin.y = (screenYOrigin + screenHeight - mouse.y) - messageSize.height - 4.;
+    windowFrame.origin.y = mouse.y - messageSize.height - 4.;
     windowFrame.size = messageSize;
     [self setFrame: windowFrame display: YES];
 
