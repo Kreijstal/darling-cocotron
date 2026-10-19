@@ -129,6 +129,16 @@ int main(void)
     free(pixels);
     CGGradientRelease(hard);
 
+    // A first stop above 0 holds its own colour to the left of it instead of extrapolating.
+    const CGFloat lateStart[] = { 0.5, 0.5, 0.5, 1, 1, 1, 1, 1 };
+    const CGFloat lateStartLocations[] = { 0.25, 1 };
+    CGGradientRef late = makeGradient(lateStart, lateStartLocations, 2);
+    check(late != NULL, "first-stop-at-0.25 gradient is created");
+    drawLinear(late, 0, W, 0, &pixels);
+    checkPixel(pixels, 10, 128, 128, 128, 255, "first stop above 0: left of it is the first colour");
+    free(pixels);
+    CGGradientRelease(late);
+
     // Alpha is interpolated and the result is premultiplied.
     const CGFloat fadeColors[] = { 1, 1, 1, 1, 1, 1, 1, 0 };
     CGGradientRef fade = makeGradient(fadeColors, NULL, 2);
