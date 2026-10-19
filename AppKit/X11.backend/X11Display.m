@@ -2091,7 +2091,6 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
         XWarpPointer(_display, None, DefaultRootWindow(_display), 0, 0, 0, 0,
                      root_x, root_y);
         XFlush(_display);
-        _ignoreWarpMotionCount = 1;
     }
 
     // Update _lastMotionPos to the warp destination in device pixels
@@ -2247,6 +2246,10 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
     if (doGrab) {
         _relativeRequested = YES;
         [self beginRelativeMouse];
+        // A failed first grab (AlreadyGrabbed while a window manager holds the
+        // pointer) is retried for a while, like one after a reconfiguration.
+        if (!_relativeMouse.active)
+            [self scheduleRelativeMouseRetry];
     } else {
         _relativeRequested = NO;
         [self suspendRelativeMouse];

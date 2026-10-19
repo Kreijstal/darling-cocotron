@@ -51,7 +51,6 @@
     XID _lastClickWindow;
     NSPoint _lastClickPoint;   // Logical points, so the radius is scale-independent.
     X11Cursor *_blankCursor, *_defaultCursor;
-    int _ignoreWarpMotionCount;
     // Relative mouse mode (CGAssociateMouseAndMouseCursorPosition(false)).
     // _relativeRequested stays set while the application wants it;
     // _relativeMouse.active only while the pointer grab on _relativeWindow is
