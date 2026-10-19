@@ -133,9 +133,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) keyboardLayoutName: (NSString **) name
                    fullName: (NSString **) fullName;
 
-// position is in CoreGraphics' global space (origin at the main screen's top-left
-// corner, y down), as CGWarpMouseCursorPosition() takes it.
-- (void) warpMouse: (NSPoint) position;
+// Moves the pointer to position, in the space +mouseLocation reports (Cocoa's global
+// space), so warping to a position read back from mouseLocation changes nothing.
+// CGWarpMouseCursorPosition() converts from CoreGraphics' space and clips to the
+// desktop before calling this. Returns whether the pointer (or, where the window
+// system forbids moving it, the virtual cursor) was moved; NO when the backend can do
+// nothing, so the caller does not report success. The X11 backend returns YES once the
+// request is queued: XWarpPointer is asynchronous and reports no failure.
+- (BOOL) warpMouse: (NSPoint) position;
 - (void) grabMouse: (BOOL) doGrab;
 
 @end

@@ -245,15 +245,6 @@ static void socketCallback(CFSocketRef s, CFSocketCallBackType type,
                       NSWidth(primary) / scale, NSHeight(primary) / scale};
 }
 
-// Converts a global point between Cocoa's space (y up) and CoreGraphics' (y down):
-// they differ only in the direction of y, both measured from the main monitor, so
-// the flip is its own inverse.
-- (NSPoint) flipGlobalPoint: (NSPoint) point {
-    X11Point flipped = X11FlipY([self primaryFrameInPoints].height,
-                                (X11Point){point.x, point.y});
-    return NSMakePoint(flipped.x, flipped.y);
-}
-
 - (NSArray *) rootScreenFallback {
     CGFloat scale = [self backingScale];
     int width = DisplayWidth(_display, DefaultScreen(_display));
@@ -1653,7 +1644,7 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
                 if (pos.x < 50 || pos.x > w - 50 || pos.y < 50 || pos.y > h - 50) {
                     NSPoint centerCocoa = NSMakePoint(winFrame.origin.x + w / 2.0,
                                                       winFrame.origin.y + h / 2.0);
-                    [self warpMouse: [self flipGlobalPoint: centerCocoa]];
+                    [self warpMouse: centerCocoa];
                     devicePos = [window transformPoint: centerCocoa];
                 }
             }
@@ -1970,16 +1961,16 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
     return frame;
 }
 
-// Takes CoreGraphics global POINTS (origin at the main monitor's top-left corner,
-// y down): CGWarpMouseCursorPosition hands its argument straight through, and on
-// macOS that API is documented in points of that space. Internal callers that
-// hold a Cocoa point convert it with -flipGlobalPoint:.
-// XWarpPointer wants device pixels, so the conversion belongs here rather than at
-// every caller. Invisible at 1x, off by the scale factor at 2x.
-- (void) warpMouse: (NSPoint) position {
+// Takes a Cocoa global point in POINTS, the space -mouseLocation reports, so warping
+// to what mouseLocation returned changes nothing; CGWarpMouseCursorPosition converts
+// and clips before it gets here. XWarpPointer wants whole device pixels: the point is
+// scaled and rounded to the nearest one (see CGDisplayGeometry.h), so reading the
+// pointer back returns round(p * scale) / scale. The conversion belongs here rather
+// than at every caller. Invisible at 1x, off by the scale factor at 2x.
+- (BOOL) warpMouse: (NSPoint) position {
     NSRect primary = [self primaryRootFrame];
     CGFloat scale = [self backingScale];
-    X11Point root = X11CGPointToRoot(
+    X11Point root = X11PointToRoot(
             (X11Frame){NSMinX(primary), NSMinY(primary), NSWidth(primary),
                        NSHeight(primary)},
             (X11Point){position.x * scale, position.y * scale});
@@ -2000,9 +1991,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
     if (nswin) {
         X11Window *xwin = (X11Window *) [nswin platformWindow];
         if (xwin) {
-            // position is CoreGraphics' space; the window wants Cocoa's.
-            NSPoint ptLocal = [nswin
-                    convertScreenToBase: [self flipGlobalPoint: position]];
+            NSPoint ptLocal = [nswin convertScreenToBase: position];
             CGFloat s = [xwin backingScaleFactor];
             NSRect wf = [nswin frame];
             // Cocoa bottom-left logical → X11 top-left device pixels
@@ -2011,6 +2000,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
             [xwin setLastKnownCursorPosition: devicePt];
         }
     }
+    return YES;
 }
 
 - (void) grabMouse: (BOOL) doGrab {
@@ -2053,7 +2043,7 @@ void CGNativeBorderFrameWidthsForStyle(NSUInteger styleMask, CGFloat *top,
                 CGPoint deviceCenter = NSMakePoint(ptLocal.x * s,
                                                     (wf.size.height - ptLocal.y) * s);
                 [xwin setLastKnownCursorPosition: deviceCenter];
-                [self warpMouse: [self flipGlobalPoint: centerCocoa]];
+                [self warpMouse: centerCocoa];
             }
         } else {
             NSLog(@"XGrabPointer() failed with error %d for window %lu\n",
