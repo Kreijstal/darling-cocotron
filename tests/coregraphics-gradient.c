@@ -35,6 +35,8 @@ static const unsigned char *at(const unsigned char *pixels, int x)
 
 static int near(const unsigned char *p, int r, int g, int b, int a)
 {
+    // Onyx2D quantises the stops to about one sample per axis pixel and then to 8 bits,
+    // so an exact match is not expected; 8 units is well below any wrong rule's error.
     const int tolerance = 8;
     return abs(p[0] - r) <= tolerance && abs(p[1] - g) <= tolerance
         && abs(p[2] - b) <= tolerance && abs(p[3] - a) <= tolerance;
