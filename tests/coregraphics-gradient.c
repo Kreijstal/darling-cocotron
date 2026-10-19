@@ -150,6 +150,15 @@ int main(void)
     free(pixels);
     CGGradientRelease(unordered);
 
+    // Locations outside 0...1 are clamped, so {-1, 2} behaves like the default {0, 1}.
+    const CGFloat outsideLocations[] = { -1, 2 };
+    CGGradientRef outside = makeGradient(redBlue, outsideLocations, 2);
+    check(outside != NULL, "out-of-range-location gradient is created");
+    drawLinear(outside, 0, W, 0, &pixels);
+    checkPixel(pixels, W / 2, 128, 0, 128, 255, "out-of-range locations are clamped to 0...1");
+    free(pixels);
+    CGGradientRelease(outside);
+
     // Alpha is interpolated and the result is premultiplied.
     const CGFloat fadeColors[] = { 1, 1, 1, 1, 1, 1, 1, 0 };
     CGGradientRef fade = makeGradient(fadeColors, NULL, 2);
