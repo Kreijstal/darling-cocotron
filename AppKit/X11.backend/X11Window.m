@@ -35,6 +35,7 @@
 #import <QuartzCore/CAWindowOpenGLContext.h>
 
 #import "X11Display.h"
+#import "X11Fullscreen.h"
 #import "X11Monitors.h"
 #import "X11SubWindow.h"
 #import "X11Window.h"
@@ -223,6 +224,13 @@ static NSData *makeWindowIcon() {
 
     XSetWindowAttributes xattr;
     unsigned long xattr_mask;
+    // Only windows that must stay out of the window manager's hands are
+    // unmanaged: menus, popups, sheets and anything that cannot become key
+    // (NSWindow answers NO for a borderless window unless its class overrides
+    // -canBecomeKeyWindow, so only such windows change). A borderless
+    // window that can become key (a borderless fullscreen game, a custom-chrome
+    // app window) is a normal application window; left override-redirect it never
+    // receives keyboard focus from a compositor and cannot be made fullscreen.
     xattr.override_redirect =
             (_styleMask == NSBorderlessWindowMask && !isPanel &&
              ([delegate isKindOfClass: [NSMenuWindow class]] ||
@@ -230,6 +238,10 @@ static NSData *makeWindowIcon() {
               ![delegate canBecomeKeyWindow]))
                     ? True
                     : False;
+    if (isSheetPanel) {
+        xattr.override_redirect = True;
+    }
+    _overrideRedirect = xattr.override_redirect;
     xattr_mask = CWOverrideRedirect | CWColormap;
     xattr.colormap = cmap;
 
@@ -357,8 +369,64 @@ static NSData *makeWindowIcon() {
         sh->min_height = sh->max_height = device.height;
     }
 
+    // An untitled window that is managed (a borderless game or custom-chrome window)
+    // positions itself: say so, or a window manager may place it as it likes
+    // (ICCCM 4.1.2.3).
+    if (!_overrideRedirect && !(mask & NSWindowStyleMaskTitled))
+        sh->flags |= USPosition | PPosition;
+
     XSetWMSizeHints(_display, _window, sh, XA_WM_NORMAL_HINTS);
     XFree(sh);
+}
+
+// Whether the window manager should hold this window fullscreen: the
+// application asked for it, or it is a managed borderless window sitting exactly on
+// a monitor (see X11Fullscreen.h). `frame` is in logical points, like _frame.
+- (BOOL) wantsFullscreenWithStyleMask: (NSUInteger) mask frame: (O2Rect) frame {
+    BOOL styleFullScreen = (mask & NSWindowStyleMaskFullScreen) != 0;
+    BOOL titled = (mask & NSWindowStyleMaskTitled) != 0;
+    BOOL coversMonitor = NO;
+    // The monitor test is a server round trip; skip it when it cannot change the answer.
+    if (!_overrideRedirect && !styleFullScreen && !titled) {
+        O2Rect device = [self deviceRect: [self transformFrame: frame]];
+        X11FullscreenRect rect = {(int) device.origin.x, (int) device.origin.y,
+                                  (unsigned int) device.size.width,
+                                  (unsigned int) device.size.height};
+        coversMonitor = X11FullscreenRectIsMonitor(_display, rect);
+    }
+    return X11FullscreenWanted(_overrideRedirect, styleFullScreen, titled,
+                               coversMonitor);
+}
+
+- (void) requestFullscreen: (BOOL) fullscreen force: (BOOL) force {
+    if (!_mapped) {
+        long states[2];
+        int states_cnt = 0;
+        if (_isModal) {
+            states[states_cnt++] =
+                    (long) XInternAtom(_display, "_NET_WM_STATE_MODAL", False);
+        }
+        if (fullscreen) {
+            states[states_cnt++] = (long) XInternAtom(
+                    _display, "_NET_WM_STATE_FULLSCREEN", False);
+        }
+        XChangeProperty(_display, _window,
+                        XInternAtom(_display, "_NET_WM_STATE", False), XA_ATOM,
+                        32, PropModeReplace, (const unsigned char *) states,
+                        states_cnt);
+    } else if (force || fullscreen != _fullscreenRequested) {
+        X11FullscreenRequest(_display, _window, fullscreen);
+    }
+    _fullscreenRequested = fullscreen;
+}
+
+// The window manager changes _NET_WM_STATE on its own too (it leaves fullscreen
+// on a keybinding), so follow it: a later setFrame: onto the same monitor then
+// asks again instead of trusting the last request. While the window is unmapped
+// the property is ours.
+- (void) propertyNotify: (XPropertyEvent *) event {
+    if (_mapped && event->atom == XInternAtom(_display, "_NET_WM_STATE", False))
+        _fullscreenRequested = X11FullscreenIsSet(_display, _window);
 }
 
 - (void) setStyleMaskInternal: (NSUInteger) mask force: (BOOL) force {
@@ -367,36 +435,9 @@ static NSData *makeWindowIcon() {
         [self updateSizeHints: mask];
     }
 
-    if (!_mapped) {
-        long states[2];
-        int states_cnt = 0;
-        if (_isModal) {
-            states[states_cnt++] =
-                    (long) XInternAtom(_display, "_NET_WM_STATE_MODAL", False);
-        }
-        if (mask & NSWindowStyleMaskFullScreen) {
-            states[states_cnt++] = (long) XInternAtom(
-                    _display, "_NET_WM_STATE_FULLSCREEN", False);
-        }
-        XChangeProperty(_display, _window,
-                        XInternAtom(_display, "_NET_WM_STATE", False), XA_ATOM,
-                        32, PropModeReplace, (const unsigned char *) states,
-                        states_cnt);
-    } else if (force || ((mask & NSWindowStyleMaskFullScreen) !=
-                         (_styleMask & NSWindowStyleMaskFullScreen))) {
-        XClientMessageEvent event = {0};
-        event.type = ClientMessage;
-        event.window = _window;
-        event.message_type = XInternAtom(_display, "_NET_WM_STATE", False);
-        event.format = 32;
-        event.data.l[0] = (mask & NSWindowStyleMaskFullScreen) ? 1 : 2;
-        event.data.l[1] =
-                (long) XInternAtom(_display, "_NET_WM_STATE_FULLSCREEN", False);
-        event.data.l[3] = 1;
-        XSendEvent(_display, DefaultRootWindow(_display), False,
-                   SubstructureNotifyMask | SubstructureRedirectMask,
-                   (XEvent *) &event);
-    }
+    [self requestFullscreen: [self wantsFullscreenWithStyleMask: mask
+                                                          frame: _frame]
+                      force: force];
 }
 
 - (void) setStyleMask: (NSUInteger) mask {
@@ -416,6 +457,10 @@ static NSData *makeWindowIcon() {
 
 - (void) ensureMapped {
     if (!_mapped) {
+        // A withdrawn window loses _NET_WM_STATE (EWMH), so a window that covers a
+        // monitor has to say again, before it is mapped, that it is fullscreen.
+        if ([self wantsFullscreenWithStyleMask: _styleMask frame: _frame])
+            [self requestFullscreen: YES force: NO];
         XMapWindow(_display, _window);
         _mapped = YES;
         XFlush(_display);
@@ -444,7 +489,7 @@ static NSData *makeWindowIcon() {
                 StructureNotifyMask | EnterWindowMask | LeaveWindowMask |
                 ButtonPressMask | ButtonReleaseMask | ButtonMotionMask |
                 PointerMotionMask | PointerMotionHintMask |
-                VisibilityChangeMask | FocusChangeMask |
+                VisibilityChangeMask | FocusChangeMask | PropertyChangeMask |
                 SubstructureRedirectMask;
 
     XSelectInput(_display, _window, mask);
@@ -614,6 +659,17 @@ static NSData *makeWindowIcon() {
     O2Rect transformed = [self transformFrame: frame];
     O2Rect deviceFrame = [self deviceRect: transformed];
     NSSize previousDeviceSize = [self deviceSize: _frame.size];
+    // Leave fullscreen before moving to a frame that does not cover a monitor,
+    // or the manager keeps imposing its fullscreen size, and before moving a
+    // fullscreen window elsewhere, which the manager would ignore; enter it after
+    // moving onto a monitor.
+    BOOL fullscreen = [self wantsFullscreenWithStyleMask: _styleMask
+                                                   frame: frame];
+    O2Rect previousDeviceFrame = [self deviceRect: [self transformFrame: _frame]];
+    BOOL moved = previousDeviceFrame.origin.x != deviceFrame.origin.x ||
+                 previousDeviceFrame.origin.y != deviceFrame.origin.y;
+    if (X11FullscreenLeaveBeforeMove(fullscreen, _fullscreenRequested, moved))
+        [self requestFullscreen: NO force: NO];
     XMoveResizeWindow(_display, _window, deviceFrame.origin.x,
                       deviceFrame.origin.y, deviceFrame.size.width,
                       deviceFrame.size.height);
@@ -625,6 +681,8 @@ static NSData *makeWindowIcon() {
     // real change so a drag does not re-issue them per pixel.
     if (!NSEqualSizes(previousDeviceSize, deviceFrame.size))
         [self updateSizeHints: _styleMask];
+    if (fullscreen && !_fullscreenRequested)
+        [self requestFullscreen: YES force: NO];
 }
 
 - (void) setHasShadow: (BOOL) value {
@@ -661,6 +719,8 @@ static NSData *makeWindowIcon() {
 - (void) hideWindow {
     XUnmapWindow(_display, _window);
     _mapped = NO;
+    // The window manager drops the fullscreen state of a withdrawn window.
+    _fullscreenRequested = NO;
     // A focus request still waiting for MapNotify is void once the window is
     // ordered out; otherwise a later non-key orderFront would take focus.
     _wantsInputFocus = NO;
