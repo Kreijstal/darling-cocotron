@@ -228,9 +228,6 @@ static NSData *makeWindowIcon() {
               ![delegate canBecomeKeyWindow]))
                     ? True
                     : False;
-    if (isSheetPanel) {
-        xattr.override_redirect = True;
-    }
     xattr_mask = CWOverrideRedirect | CWColormap;
     xattr.colormap = cmap;
 
@@ -666,7 +663,7 @@ static NSData *makeWindowIcon() {
         XRaiseWindow(_display, _window);
     } else {
         Window w[2] = {_window, other->_window};
-        XRestackWindows(_display, w, 1);
+        XRestackWindows(_display, w, 2);
     }
 }
 
@@ -887,7 +884,7 @@ static BOOL windowManagerIsRunning(Display *display) {
     [_caContext prepareViewportWidth: width height: height];
     [_caContext renderSurface: surface];
 
-    glFlush();
+    glFinish();
     CGLFlushDrawable(_cglContext);
 
     CGLSetCurrentContext(prevContext);

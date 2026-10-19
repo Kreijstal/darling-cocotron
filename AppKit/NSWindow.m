@@ -3198,7 +3198,7 @@ static BOOL _allowsAutomaticWindowTabbing;
     [sheet display];
     [[sheet platformWindow] sheetOrderFrontFromFrame: sheetFrame
                                          aboveWindow: [self platformWindow]];
-    [self makeKeyWindow];
+    [sheet makeKeyWindow];
 }
 
 - (void) _setSheetContext: (NSSheetContext *) sheetContext {

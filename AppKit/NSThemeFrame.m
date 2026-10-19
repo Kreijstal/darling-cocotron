@@ -54,10 +54,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     NSRect bounds = [self bounds];
     CGFloat cheatSheet = 0;
 
-    if ([[self window] backgroundColor] != nil &&
-        ([_window styleMask] == NSBorderlessWindowMask || _borderType == NSNoBorder || _borderType == NSWindowToolTipBorderType)) {
+    if ([[self window] backgroundColor] != nil) {
         [[[self window] backgroundColor] setFill];
-        NSRectFill(bounds);
+        NSRectFill(rect);
     }
 
     switch (_borderType) {

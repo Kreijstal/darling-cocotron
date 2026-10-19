@@ -364,6 +364,12 @@ static NSImage *ImageForGenericIcon(NSString *name) {
 // Launch Services can't launch applications in the guest yet, so .app bundles take -openFile:'s launch path; it
 // reports anything else it can't open with an OSStatus.
 - (NSError *) _openURL: (NSURL *) url {
+    if ([[url scheme] isEqualToString: @"x-apple.systempreferences"]) {
+        NSRunInformationalAlertPanel(@"System Preferences",
+            @"Darling does not enforce macOS sandbox or TCC restrictions. Full Disk Access is already granted to all applications.",
+            @"OK", nil, nil);
+        return nil;
+    }
     if ([url isFileURL] && [[[url path] pathExtension] caseInsensitiveCompare: @"app"] == NSOrderedSame) {
         if ([self openFile: nil withApplication: [url path] andDeactivate: YES])
             return nil;
@@ -565,6 +571,18 @@ static NSImage *ImageForGenericIcon(NSString *name) {
     // [[NSWorkspace sharedWorkspace] URLForApplicationWithBundleIdentifier]
     // Call [self openFile:withApplication:]
     NSUnimplementedMethod();
+}
+
+- (NSURL *) URLForApplicationToOpenURL: (NSURL *) url {
+    if (url == nil)
+        return nil;
+    CFErrorRef error = NULL;
+    CFURLRef appURL = LSCopyDefaultApplicationURLForURL((CFURLRef) url, kLSRolesAll, &error);
+    if (error != NULL)
+        CFRelease(error);
+    if (appURL != NULL)
+        return [(NSURL *) appURL autorelease];
+    return nil;
 }
 
 - (NSURL *) URLForApplicationWithBundleIdentifier: (NSString *) bundleIdentifier

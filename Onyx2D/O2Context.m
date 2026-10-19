@@ -165,7 +165,7 @@ O2ColorRef O2ContextFillColor(O2ContextRef self) {
 }
 
 - (BOOL) supportsGlobalAlpha {
-    return NO;
+    return YES;
 }
 
 - (BOOL) isBitmapContext {

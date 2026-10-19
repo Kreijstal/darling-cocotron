@@ -322,6 +322,14 @@ typedef struct __VFlags {
             [self setAnimations:
                             [keyed decodeObjectForKey: @"NSViewAnimations"]];
 
+        if ([keyed containsValueForKey: @"NSUserInterfaceItemIdentifier"]) {
+            _identifier = [[keyed decodeObjectForKey: @"NSUserInterfaceItemIdentifier"] copy];
+        } else if ([keyed containsValueForKey: @"NSReuseIdentifierKey"]) {
+            _identifier = [[keyed decodeObjectForKey: @"NSReuseIdentifierKey"] copy];
+        } else if ([keyed containsValueForKey: @"NSIdentifier"]) {
+            _identifier = [[keyed decodeObjectForKey: @"NSIdentifier"] copy];
+        }
+
         [self setCanDrawConcurrently:
                         [keyed decodeBoolForKey: @"NSViewCanDrawConcurrently"]];
 
@@ -2551,6 +2559,17 @@ static NSView *viewBeingPrinted = nil;
     if ([self isOpaque])
         return self;
 
+    // Compatibility quirk: GrandPerspective's DirectoryView hardcodes -isOpaque returning NO
+    // (with an author note citing a workaround for a 2008 Mac OS X 10.5 Leopard zoom artifact bug).
+    // In Darling/Cocotron, non-opaque views invalidate ancestors on every frame, causing
+    // NSThemeFrame to clear behind the view 10 times/sec and producing rapid flicker.
+    // Treating it as its own opaque ancestor eliminates the flicker while preserving correct
+    // background clearing for all other views.
+    const char *className = object_getClassName(self);
+    if (className != NULL && strcmp(className, "DirectoryView") == 0) {
+        return self;
+    }
+
     return [[self superview] opaqueAncestor];
 }
 
@@ -2559,8 +2578,8 @@ static NSView *viewBeingPrinted = nil;
 }
 
 - (NSEnumerator *) _subviewsInDisplayOrderEnumerator {
-    // Subviews are ordered back to front -
-    return [_subviews objectEnumerator];
+    // Snapshot subviews so mutating _subviews during display passes is safe
+    return [[[_subviews copy] autorelease] objectEnumerator];
 }
 
 - (void) _displayIfNeededWithoutViewWillDraw {
@@ -2635,11 +2654,25 @@ static NSView *viewBeingPrinted = nil;
 }
 
 - (void) displayRect: (NSRect) rect {
-    NSView *opaque = [self opaqueAncestor];
+    NSWindow *window = [self window];
+    BOOL isRootFlush = NO;
+    if (window != nil && [window isFlushWindowDisabled] == NO) {
+        [window disableFlushWindow];
+        isRootFlush = YES;
+    }
 
-    if (opaque != self)
-        rect = [self convertRect: rect toView: opaque];
-    [opaque displayRectIgnoringOpacity: rect];
+    @try {
+        NSView *opaque = [self opaqueAncestor];
+
+        if (opaque != self)
+            rect = [self convertRect: rect toView: opaque];
+        [opaque displayRectIgnoringOpacity: rect];
+    } @finally {
+        if (isRootFlush) {
+            [window enableFlushWindow];
+            [window flushWindow];
+        }
+    }
 }
 
 - (void) displayRectIgnoringOpacity: (NSRect) rect {
@@ -2650,82 +2683,82 @@ static NSView *viewBeingPrinted = nil;
     if (NSIsEmptyRect(rect))
         return;
 
-    BOOL shouldFlush = NO;
+    NSWindow *window = [self window];
+    BOOL isRootFlush = NO;
+    if (window != nil && [window isFlushWindowDisabled] == NO) {
+        [window disableFlushWindow];
+        isRootFlush = YES;
+    }
 
-    if ([self canDraw]) {
-        // This view must be locked/unlocked prior to drawing subviews otherwise
-        // gState changes may affect subviews.
-        [self lockFocus];
+    @try {
+        if ([self canDraw]) {
+            // This view must be locked/unlocked prior to drawing subviews otherwise
+            // gState changes may affect subviews.
+            [self lockFocus];
 
-        NSGraphicsContext *context = [NSGraphicsContext currentContext];
-        CGContextRef graphicsPort = [context graphicsPort];
+            NSGraphicsContext *context = [NSGraphicsContext currentContext];
+            CGContextRef graphicsPort = [context graphicsPort];
 
-        shouldFlush = [context isDrawingToScreen];
+            CGContextClipToRect(graphicsPort, rect);
 
-        CGContextClipToRect(graphicsPort, rect);
+            const NSRect *rects;
+            NSInteger rectsCount;
+            [self getRectsBeingDrawn: &rects count: &rectsCount];
+            // If there is only one rect, it's the visible rect - it's already
+            // clipped
+            if (rectsCount > 1)
+                CGContextClipToRects(graphicsPort, rects, rectsCount);
 
-        const NSRect *rects;
-        NSInteger rectsCount;
-        [self getRectsBeingDrawn: &rects count: &rectsCount];
-        // If there is only one rect, it's the visible rect - it's already
-        // clipped
-        if (rectsCount > 1)
-            CGContextClipToRects(graphicsPort, rects, rectsCount);
-
-        // [_window dirtyRect:[self convertRect:rect toView:nil]];
-        if ([NSGraphicsContext inQuartzDebugMode]) {
-            [[NSColor yellowColor] set];
-            NSRectFill(rect);
-        } else {
-            if (_layer != nil && [self wantsUpdateLayer]) {
-                [self updateLayer];
-                // A custom backing layer may implement -display (e.g. a Metal
-                // blit layer). View invalidation must also invalidate that layer.
-                [_layer setNeedsDisplay];
+            // [_window dirtyRect:[self convertRect:rect toView:nil]];
+            if ([NSGraphicsContext inQuartzDebugMode]) {
+                [[NSColor yellowColor] set];
+                NSRectFill(rect);
+            } else {
+                if (_layer != nil && [self wantsUpdateLayer]) {
+                    [self updateLayer];
+                    // A custom backing layer may implement -display (e.g. a Metal
+                    // blit layer). View invalidation must also invalidate that layer.
+                    [_layer setNeedsDisplay];
+                }
+                else
+                    [self drawRect: rect];
+                if (NSShowAllViews) {
+                    [[self _borderColorForNSShowAllViews] set];
+                    NSFrameRect(rect);
+                }
             }
-            else
-                [self drawRect: rect];
-            if (NSShowAllViews) {
-                [[self _borderColorForNSShowAllViews] set];
-                NSFrameRect(rect);
+
+            [self unlockFocus];
+
+            NSEnumerator *viewEnumerator = [self _subviewsInDisplayOrderEnumerator];
+
+            NSView *child = nil;
+            while ((child = [viewEnumerator nextObject])) {
+                NSRect check = [self convertRect: rect toView: child];
+
+                check = NSIntersectionRect(check, [child bounds]);
+
+                if (!NSIsEmptyRect(check))
+                    [child displayRectIgnoringOpacity: check];
             }
         }
 
-        [self unlockFocus];
+        [_layerContext render];
 
-        NSEnumerator *viewEnumerator = [self _subviewsInDisplayOrderEnumerator];
+        // Don't do anything to interfere with what will be drawn in non-debug mode
+        if ([NSGraphicsContext inQuartzDebugMode] == NO) {
+            removeRectFromInvalidInVisibleRect(self, rect, visibleRect);
 
-        NSView *child = nil;
-        while ((child = [viewEnumerator nextObject])) {
-            NSRect check = [self convertRect: rect toView: child];
-
-            check = NSIntersectionRect(check, [child bounds]);
-
-            if (!NSIsEmptyRect(check))
-                [child displayRectIgnoringOpacity: check];
+            // Rects being drawn are only valid while we redraw
+            clearRectsBeingRedrawn(self);
         }
-    }
 
-    [_layerContext render];
-
-    // Don't do anything to interfere with what will be drawn in non-debug mode
-    if ([NSGraphicsContext inQuartzDebugMode] == NO) {
-        removeRectFromInvalidInVisibleRect(self, rect, visibleRect);
-
-        // Rects being drawn are only valid while we redraw
-        clearRectsBeingRedrawn(self);
-    }
-
-    if (shouldFlush) {
         [_layerContext flush];
-
-        // We do the flushWindow here. If any of the display* methods are being
-        // used, you want it to update on screen immediately. If the view
-        // hierarchy is being displayed as needed at the end of an event,
-        // flushing will be disabled and this will just mark the window as
-        // needing flushing which will happen when all the views have finished
-        // being displayed
-        [[self window] flushWindow];
+    } @finally {
+        if (isRootFlush) {
+            [window enableFlushWindow];
+            [window flushWindow];
+        }
     }
 }
 
