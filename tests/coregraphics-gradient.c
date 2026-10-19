@@ -127,6 +127,12 @@ int main(void)
     checkPixel(pixels, 25, 255, 0, 0, 255, "hard stop: red before the edge");
     checkPixel(pixels, 75, 0, 0, 255, 255, "hard stop: blue after the edge");
     free(pixels);
+
+    // The axis is 101 wide so one colour sample lands exactly on the coincident stops at .5
+    // (x = 51); the later stop's colour must win there. Probes at 25 and 75 never reach the tie.
+    drawLinear(hard, 0, W + 1, 0, &pixels);
+    checkPixel(pixels, 51, 0, 0, 255, 255, "hard stop: the later colour wins at the coincident location");
+    free(pixels);
     CGGradientRelease(hard);
 
     // A first stop above 0 holds its own colour to the left of it instead of extrapolating.
