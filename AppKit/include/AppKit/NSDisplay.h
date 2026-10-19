@@ -127,7 +127,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // CGWarpMouseCursorPosition() converts from CoreGraphics' space and clips to the
 // desktop before calling this. Returns whether the pointer (or, where the window
 // system forbids moving it, the virtual cursor) was moved; NO when the backend can do
-// nothing, so the caller does not report success.
+// nothing, so the caller does not report success. The X11 backend returns YES once the
+// request is queued: XWarpPointer is asynchronous and reports no failure.
 - (BOOL) warpMouse: (NSPoint) position;
 - (void) grabMouse: (BOOL) doGrab;
 
