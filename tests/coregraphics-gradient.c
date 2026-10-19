@@ -139,6 +139,17 @@ int main(void)
     free(pixels);
     CGGradientRelease(late);
 
+    // Locations {0, .8, .3, 1} never decrease: .3 becomes .8, so past .8 the ramp runs blue to white.
+    const CGFloat unorderedColors[] = { 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1 };
+    const CGFloat unorderedLocations[] = { 0, 0.8, 0.3, 1 };
+    CGGradientRef unordered = makeGradient(unorderedColors, unorderedLocations, 4);
+    check(unordered != NULL, "unordered-location gradient is created");
+    drawLinear(unordered, 0, W, 0, &pixels);
+    checkPixel(pixels, 70, 33, 222, 0, 255, "unordered locations: red to green below .8");
+    checkPixel(pixels, 90, 126, 126, 255, 255, "unordered locations: blue to white past .8");
+    free(pixels);
+    CGGradientRelease(unordered);
+
     // Alpha is interpolated and the result is premultiplied.
     const CGFloat fadeColors[] = { 1, 1, 1, 1, 1, 1, 1, 0 };
     CGGradientRef fade = makeGradient(fadeColors, NULL, 2);
