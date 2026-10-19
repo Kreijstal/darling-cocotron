@@ -165,6 +165,9 @@ enum {
 
 @interface NSAttributedString (NSAttributedString_AppKit)
 
+- (NSRange) superscriptRange: (NSRange) range;
+- (NSRange) subscriptRange: (NSRange) range;
+
 #pragma mark -
 #pragma mark Creating an NSAttributedString
 

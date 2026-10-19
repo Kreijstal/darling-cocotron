@@ -141,3 +141,15 @@ void CGRectDivide(CGRect rect, CGRect *slice, CGRect *remainder, CGFloat amount,
     if (slice) *slice = s;
     if (remainder) *remainder = r;
 }
+
+void *CGStyleCreateShadow(void *parameters, void *unused) {
+    return calloc(1, 8);
+}
+
+void CGContextSetStyle(void *context, void *style) {
+}
+
+void CGStyleRelease(void *style) {
+    if (style != NULL)
+        free(style);
+}

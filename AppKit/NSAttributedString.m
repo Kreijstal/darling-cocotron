@@ -126,6 +126,26 @@ NSUInteger NSUnderlineByWordMask = 0x8000;
 
 @implementation NSAttributedString (NSAttributedString_AppKit)
 
+- (NSRange) superscriptRange: (NSRange) range {
+    if (range.length == 0 || range.location >= [self length])
+        return NSMakeRange(NSNotFound, 0);
+    NSRange effectiveRange;
+    id val = [self attribute: NSSuperscriptAttributeName atIndex: range.location longestEffectiveRange: &effectiveRange inRange: range];
+    if (val != nil && [val intValue] > 0)
+        return effectiveRange;
+    return NSMakeRange(NSNotFound, 0);
+}
+
+- (NSRange) subscriptRange: (NSRange) range {
+    if (range.length == 0 || range.location >= [self length])
+        return NSMakeRange(NSNotFound, 0);
+    NSRange effectiveRange;
+    id val = [self attribute: NSSuperscriptAttributeName atIndex: range.location longestEffectiveRange: &effectiveRange inRange: range];
+    if (val != nil && [val intValue] < 0)
+        return effectiveRange;
+    return NSMakeRange(NSNotFound, 0);
+}
+
 #pragma mark -
 #pragma mark Creating an NSAttributedString
 

@@ -285,18 +285,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event {
-    NSString *characters = [event charactersIgnoringModifiers];
-    unsigned modifiers = [event modifierFlags];
-
     if (![self isEnabled])
         return NO;
+
+    NSString *key = [self keyEquivalent];
+    if ([key length] == 0)
+        return NO;
+
+    // For buttons with no modifier mask (e.g. calculator buttons like '+', '*', '1'),
+    // match directly against the produced character (e.g. Shift+'=' produces '+').
+    if ([self keyEquivalentModifierMask] == 0 && [key isEqualToString: [event characters]]) {
+        [self performClick: nil];
+        return YES;
+    }
+
+    NSString *characters = [event charactersIgnoringModifiers];
+    unsigned modifiers = [event modifierFlags];
 
     const unsigned keyModifiers = NSCommandKeyMask | NSAlternateKeyMask |
                                   NSShiftKeyMask | NSControlKeyMask;
     if ((modifiers & keyModifiers) ==
         ([self keyEquivalentModifierMask] & keyModifiers)) {
-        NSString *key = [self keyEquivalent];
-
         if ([key isEqualToString: characters]) {
             [self performClick: nil];
             return YES;
