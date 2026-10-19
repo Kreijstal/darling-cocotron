@@ -286,7 +286,7 @@ CGError CGDisplayHideCursor(CGDirectDisplayID displayIndex) {
     if (!display)
         return kCGErrorInvalidConnection;
 
-    [display hideCursor];
+    [display hideCursorCounted];
     return kCGErrorSuccess;
 }
 
@@ -295,7 +295,7 @@ CGError CGDisplayShowCursor(CGDirectDisplayID displayIndex) {
     if (!display)
         return kCGErrorInvalidConnection;
 
-    [display unhideCursor];
+    [display unhideCursorCounted];
     return kCGErrorSuccess;
 }
 

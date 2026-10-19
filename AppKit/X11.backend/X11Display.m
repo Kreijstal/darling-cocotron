@@ -1674,6 +1674,10 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
 
             [delegate platformWindowSetCursorEvent: window];
 
+            // The pointer moved: a cursor hidden until then comes back, even
+            // when the application does not want the mouse-moved event.
+            [self pointerMoved];
+
             if (type == NSMouseMoved && ![delegate acceptsMouseMovedEvents])
                 break;
 
