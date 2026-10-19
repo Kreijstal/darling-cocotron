@@ -1650,9 +1650,12 @@ static BOOL relativeEventPoint(Display *dpy, X11Window *window, const X11Relativ
         break;
 
     case MotionNotify:; {
-            // Coalesce rapid MotionNotify events to process only the latest position
+            // Coalesce rapid MotionNotify events to process only the latest position.
+            // Not while relative mode is active: every motion carries a delta and a
+            // queued warp echo must be seen to be recognised (deltas are summed at the
+            // NSEvent queue instead).
             XEvent nextEvent;
-            while (XPending(_display)) {
+            while (!_relativeMouse.active && XPending(_display)) {
                 XPeekEvent(_display, &nextEvent);
                 if (nextEvent.type == MotionNotify && nextEvent.xmotion.window == ev->xmotion.window) {
                     XNextEvent(_display, ev);
