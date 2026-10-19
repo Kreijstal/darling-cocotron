@@ -285,6 +285,8 @@ static BOOL _allowsAutomaticWindowTabbing;
     if ([self hasMainMenuForStyleMask: styleMask])
         result.size.height += [NSMainMenuView menuHeight];
 
+    result.size.height += [NSThemeFrame titleBarHeightForStyleMask: styleMask];
+
     return result;
 }
 
@@ -296,6 +298,8 @@ static BOOL _allowsAutomaticWindowTabbing;
 
     if ([self hasMainMenuForStyleMask: styleMask])
         result.size.height -= [NSMainMenuView menuHeight];
+
+    result.size.height -= [NSThemeFrame titleBarHeightForStyleMask: styleMask];
 
     return result;
 }
@@ -1739,6 +1743,8 @@ static BOOL _allowsAutomaticWindowTabbing;
         result.size.height += [[_toolbar _view] frame].size.height;
     }
 
+    result.size.height += [NSThemeFrame titleBarHeightForStyleMask: [self styleMask]];
+
     return result;
 }
 
@@ -1753,6 +1759,8 @@ static BOOL _allowsAutomaticWindowTabbing;
     if ([_toolbar _view] != nil && ![[_toolbar _view] isHidden]) {
         result.size.height -= [[_toolbar _view] frame].size.height;
     }
+
+    result.size.height -= [NSThemeFrame titleBarHeightForStyleMask: [self styleMask]];
 
     return result;
 }

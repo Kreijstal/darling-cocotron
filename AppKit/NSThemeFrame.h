@@ -28,6 +28,8 @@ typedef enum {
 @interface NSThemeFrame : NSView {
     NSWindowBorderType _borderType;
 }
+/* Height of the title bar this style mask asks for (0 when untitled). */
++ (CGFloat) titleBarHeightForStyleMask: (NSUInteger) styleMask;
 - (NSWindowBorderType) windowBorderType;
 - (void) setWindowBorderType: (NSWindowBorderType) borderType;
 

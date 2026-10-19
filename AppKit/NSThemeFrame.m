@@ -16,7 +16,10 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
+#import <AppKit/NSBezierPath.h>
 #import <AppKit/NSColor.h>
+#import <AppKit/NSFont.h>
+#import <AppKit/NSStringDrawing.h>
 #import <AppKit/NSGraphics.h>
 #import <AppKit/NSImage.h>
 #import <AppKit/NSMainMenuView.h>
@@ -31,7 +34,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 + (BOOL) hasMainMenuForStyleMask: (NSUInteger) styleMask;
 @end
 
+static const CGFloat kTitleBarHeight = 28.0;
+
 @implementation NSThemeFrame
+
++ (CGFloat) titleBarHeightForStyleMask: (NSUInteger) styleMask {
+    if (styleMask & NSWindowStyleMaskTitled)
+        return kTitleBarHeight;
+    return 0.0;
+}
 
 - (BOOL) isOpaque {
     return YES;
@@ -79,6 +90,106 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
     if ([[self window] isSheet])
         bounds.size.height += cheatSheet;
+
+    if ([self _themedStyleMask] & NSWindowStyleMaskTitled) {
+        NSRect bar = [self _titleBarRect];
+        if (!NSIsEmptyRect(bar) && NSIntersectsRect(bar, rect))
+            [self _drawTitleBar: bar];
+    }
+}
+
+
+/* Title-bar geometry.  AppKit reserves the space above the content view for
+ * the frame, so the bar is whatever is left between the highest subview and
+ * the top of the frame. */
+- (NSRect) _titleBarRect {
+    NSRect bounds = [self bounds];
+    CGFloat top = NSMinY(bounds);
+    BOOL sawSubview = NO;
+
+    for (NSView *view in _subviews) {
+        if ([view isHidden])
+            continue;
+        NSRect frame = [view frame];
+        if (!sawSubview || NSMaxY(frame) > top)
+            top = NSMaxY(frame);
+        sawSubview = YES;
+    }
+
+    if (!sawSubview || top >= NSMaxY(bounds))
+        return NSZeroRect;
+
+    return NSMakeRect(NSMinX(bounds), top, NSWidth(bounds),
+                      NSMaxY(bounds) - top);
+}
+
+- (NSWindowStyleMask) _themedStyleMask {
+    return [[self window] styleMask] &
+           (NSWindowStyleMaskTitled | NSWindowStyleMaskFullSizeContentView);
+}
+
+- (NSRect) _trafficLightRectAtIndex: (NSInteger) index
+                         inTitleBar: (NSRect) bar {
+    static const CGFloat diameter = 12.0;
+    static const CGFloat spacing = 20.0;
+    CGFloat x = NSMinX(bar) + 21.0 + index * spacing;
+    return NSMakeRect(x, NSMidY(bar) - diameter / 2.0, diameter, diameter);
+}
+
+- (NSInteger) _trafficLightIndexAtPoint: (NSPoint) point {
+    NSRect bar = [self _titleBarRect];
+    if (NSIsEmptyRect(bar) ||
+        !([self _themedStyleMask] & NSWindowStyleMaskTitled))
+        return -1;
+
+    for (NSInteger i = 0; i < 3; i++) {
+        if (NSPointInRect(point, NSInsetRect(
+                                  [self _trafficLightRectAtIndex: i
+                                                      inTitleBar: bar],
+                                  -4, -4)))
+            return i;
+    }
+    return -1;
+}
+
+- (void) _drawTitleBar: (NSRect) bar {
+    /* macOS 11+ style: light bar, a hairline, and the three traffic lights,
+     * with the title centred unless it would overlap them. */
+    [[NSColor colorWithCalibratedWhite: 0.93 alpha: 1.0] setFill];
+    NSRectFill(bar);
+    [[NSColor colorWithCalibratedWhite: 0.78 alpha: 1.0] setFill];
+    NSRectFill(NSMakeRect(NSMinX(bar), NSMinY(bar), NSWidth(bar), 1.0));
+
+    NSColor *colors[3] = {
+        [NSColor colorWithCalibratedRed: 1.00 green: 0.37 blue: 0.34 alpha: 1.0],
+        [NSColor colorWithCalibratedRed: 0.99 green: 0.74 blue: 0.18 alpha: 1.0],
+        [NSColor colorWithCalibratedRed: 0.16 green: 0.78 blue: 0.25 alpha: 1.0],
+    };
+    for (NSInteger i = 0; i < 3; i++) {
+        [colors[i] setFill];
+        [[NSBezierPath bezierPathWithOvalInRect:
+                                [self _trafficLightRectAtIndex: i
+                                                    inTitleBar: bar]] fill];
+    }
+
+    NSString *title = [[self window] title];
+    if ([title length] == 0)
+        return;
+
+    NSDictionary *attributes = @{
+        NSFontAttributeName: [NSFont systemFontOfSize: 13.0],
+        NSForegroundColorAttributeName:
+                [NSColor colorWithCalibratedWhite: 0.25 alpha: 1.0],
+    };
+    NSSize size = [title sizeWithAttributes: attributes];
+    CGFloat left = NSMaxX([self _trafficLightRectAtIndex: 2 inTitleBar: bar]) + 10.0;
+    CGFloat x = NSMidX(bar) - size.width / 2.0;
+    if (x < left)
+        x = left;
+    if (x + size.width > NSMaxX(bar) - 10.0)
+        return;
+    [title drawAtPoint: NSMakePoint(x, NSMidY(bar) - size.height / 2.0)
+        withAttributes: attributes];
 }
 
 - (void) resizeSubviewsWithOldSize: (NSSize) oldSize {
@@ -128,10 +239,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [toolbarView layoutViews];
 
     contentFrame.size.height -= toolbarFrame.size.height;
+
+    /* The title bar lives above the content; the window's frame conversion
+     * reserves the extra height, so take it out of the content view here. */
+    CGFloat titleHeight = [NSThemeFrame titleBarHeightForStyleMask:
+                                            [[self window] styleMask]];
+    if (titleHeight > 0.0 && contentFrame.size.height > titleHeight) {
+        contentFrame.size.height -= titleHeight;
+        contentFrame.origin.y += titleHeight;
+    }
+
     [contentView setFrame: contentFrame];
 }
 
 - (void) mouseDown: (NSEvent *) event {
+    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+    NSInteger light = [self _trafficLightIndexAtPoint: point];
+    if (light == 0) {
+        [[self window] performClose: self];
+        return;
+    } else if (light == 1) {
+        [[self window] miniaturize: self];
+        return;
+    } else if (light == 2) {
+        [[self window] zoom: self];
+        return;
+    }
+
     if (![[self window] isMovableByWindowBackground])
         return;
 
