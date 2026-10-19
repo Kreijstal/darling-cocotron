@@ -1092,30 +1092,32 @@ static int compareFontPatterns(const void *a, const void *b) {
 }
 
 - (NSPoint) mouseLocation {
-    if (_relativeMouse.active) {
-        // The cursor is disassociated: report the frozen (virtual) position, as macOS does.
-        CGFloat scale = [self backingScale];
-        return NSMakePoint(_relativeMouse.virtualX / scale,
-                           _relativeMouse.virtualY / scale);
-    }
-
     Window child, root = DefaultRootWindow(_display);
     int root_x, root_y;
     int win_x, win_y;
     unsigned int mask;
+    double rootX, rootY;
 
-    XQueryPointer(_display, root, &root, &child, &root_x, &root_y, &win_x,
-                  &win_y, &mask);
+    if (_relativeMouse.active) {
+        // The cursor is disassociated: report the frozen (virtual) position, as macOS does.
+        rootX = _relativeMouse.virtualX;
+        rootY = _relativeMouse.virtualY;
+    } else {
+        XQueryPointer(_display, root, &root, &child, &root_x, &root_y, &win_x,
+                      &win_y, &mask);
+        rootX = root_x;
+        rootY = root_y;
+    }
     // Cocoa's global space, as +[NSEvent mouseLocation] reports on macOS: points,
     // origin at the main monitor's bottom-left corner, y up, so the result can be
     // compared with window and screen frames. CGEventGetLocation() reports the same
     // point in CoreGraphics' y-down space (see CGSConnectionX11).
     // -[X11Window mouseLocationOutsideOfEventStream] is window-local.
     //
-    // XQueryPointer reports device pixels, so divide by the scale to get points.
+    // XQueryPointer and the virtual cursor are device pixels, so divide by the scale to get points.
     CGFloat scale = [self backingScale];
     X11Point point = X11PointFromRoot([self primaryFrameInPoints],
-                                      (X11Point){root_x / scale, root_y / scale});
+                                      (X11Point){rootX / scale, rootY / scale});
     return NSMakePoint(point.x, point.y);
 }
 
