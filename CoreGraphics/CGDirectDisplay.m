@@ -17,6 +17,7 @@
  along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#import "CGDisplayGeometry.h"
 #import <AppKit/NSDisplay.h>
 #import <AppKit/NSScreen.h>
 #import <CoreGraphics/CGDirectDisplay.h>
@@ -62,6 +63,32 @@ static NSDisplay *currentDisplay(void) {
 }
 
 
+// A display's ID belongs to the screen (the backend ties it to the output it
+// drives), and [NSScreen screens] lists the main screen first, so an array
+// position is not an ID.
+static NSScreen *screenForDisplayID(NSArray<NSScreen *> *screens,
+                                    CGDirectDisplayID displayID)
+{
+    for (NSScreen *screen in screens) {
+        if ([screen cgDirectDisplayID] == displayID)
+            return screen;
+    }
+    return nil;
+}
+
+// NSScreen frames are in Cocoa's global space (origin at the main screen's
+// bottom-left corner, y up, like window frames); CoreGraphics' global space has its
+// origin at the main screen's top-left corner and y down, so a display above the main
+// one has a negative y, as on macOS. [NSScreen screens] lists the main screen first.
+static CGRect globalRectForFrame(NSArray<NSScreen *> *screens, NSRect frame) {
+    if (NSIsEmptyRect(frame) || [screens count] == 0)
+        return frame;
+    CGFloat mainHeight = NSHeight([[screens objectAtIndex: 0] frame]);
+    return CGRectMake(frame.origin.x,
+                      mainHeight - frame.origin.y - frame.size.height,
+                      frame.size.width, frame.size.height);
+}
+
 CGDirectDisplayID CGMainDisplayID(void) {
     NSDisplay *display = currentDisplay();
     if (!display)
@@ -71,9 +98,9 @@ CGDirectDisplayID CGMainDisplayID(void) {
     if ([screens count] == 0)
         return 1;
 
-    for (int i = 0; i < [screens count]; i++) {
-        if (!NSIsEmptyRect([[screens objectAtIndex: i] frame])) {
-            return i + 1;
+    for (NSScreen *screen in screens) {
+        if (!NSIsEmptyRect([screen frame])) {
+            return [screen cgDirectDisplayID];
         }
     }
 
@@ -104,10 +131,11 @@ CGError CGGetOnlineDisplayList(uint32_t maxDisplays,
             onlineDisplays[0] = mainDisplay;
     }
 
-    for (int i = 0; i < [screens count]; i++) {
-        if ((i + 1) != mainDisplay) {
+    for (NSScreen *screen in screens) {
+        CGDirectDisplayID displayID = [screen cgDirectDisplayID];
+        if (displayID != mainDisplay) {
             if (*displayCount < maxDisplays && onlineDisplays)
-                onlineDisplays[*displayCount] = i + 1;
+                onlineDisplays[*displayCount] = displayID;
             (*displayCount)++;
         }
     }
@@ -120,15 +148,14 @@ size_t CGDisplayPixelsHigh(CGDirectDisplayID displayIndex) {
     if (!display || [[display screens] count] == 0)
         return (displayIndex == 1) ? 1080 : 0;
 
-    NSArray<NSScreen *> *screens = [display screens];
-    if (displayIndex > [screens count] || displayIndex <= 0)
+    NSScreen *screen = screenForDisplayID([display screens], displayIndex);
+    if (!screen)
         return 0;
 
     // Device pixels, not points. NSScreen.frame is in points, and CGDisplayBounds
     // reports points, so returning the frame size here halved the value on a 2x
     // display and any caller sizing a bitmap from CGDisplayPixelsWide got half the
     // pixels it asked for.
-    NSScreen *screen = [screens objectAtIndex: displayIndex - 1];
     CGFloat scale = [screen backingScaleFactor];
     return (size_t) lround(NSHeight([screen frame]) * scale);
 }
@@ -138,12 +165,11 @@ size_t CGDisplayPixelsWide(CGDirectDisplayID displayIndex) {
     if (!display || [[display screens] count] == 0)
         return (displayIndex == 1) ? 1920 : 0;
 
-    NSArray<NSScreen *> *screens = [display screens];
-    if (displayIndex > [screens count] || displayIndex <= 0)
+    NSScreen *screen = screenForDisplayID([display screens], displayIndex);
+    if (!screen)
         return 0;
 
     // Device pixels, not points; see CGDisplayPixelsHigh.
-    NSScreen *screen = [screens objectAtIndex: displayIndex - 1];
     CGFloat scale = [screen backingScaleFactor];
     return (size_t) lround(NSWidth([screen frame]) * scale);
 }
@@ -163,10 +189,10 @@ CGError CGGetActiveDisplayList(uint32_t maxDisplays,
     NSArray<NSScreen *> *screens = [display screens];
 
     *displayCount = 0;
-    for (int i = 0; i < [screens count]; i++) {
-        if (!NSIsEmptyRect([[screens objectAtIndex: i] frame])) {
+    for (NSScreen *screen in screens) {
+        if (!NSIsEmptyRect([screen frame])) {
             if (*displayCount < maxDisplays && activeDisplays)
-                activeDisplays[*displayCount] = i + 1;
+                activeDisplays[*displayCount] = [screen cgDirectDisplayID];
             (*displayCount)++;
         }
     }
@@ -197,11 +223,11 @@ CGError CGGetDisplaysWithPoint(CGPoint point, uint32_t maxDisplays,
     NSArray<NSScreen *> *screens = [display screens];
     *matchingDisplayCount = 0;
 
-    for (int i = 0; i < [screens count]; i++) {
-        NSRect rect = [[screens objectAtIndex: i] frame];
+    for (NSScreen *screen in screens) {
+        NSRect rect = globalRectForFrame(screens, [screen frame]);
         if (NSPointInRect(point, rect)) {
             if (*matchingDisplayCount < maxDisplays)
-                displays[*matchingDisplayCount] = i + 1;
+                displays[*matchingDisplayCount] = [screen cgDirectDisplayID];
             (*matchingDisplayCount)++;
         }
     }
@@ -220,11 +246,11 @@ CGError CGGetDisplaysWithRect(CGRect rect, uint32_t maxDisplays,
     NSArray<NSScreen *> *screens = [display screens];
     *matchingDisplayCount = 0;
 
-    for (int i = 0; i < [screens count]; i++) {
-        NSRect screenRect = [[screens objectAtIndex: i] frame];
+    for (NSScreen *screen in screens) {
+        NSRect screenRect = globalRectForFrame(screens, [screen frame]);
         if (NSIntersectsRect(rect, screenRect)) {
             if (*matchingDisplayCount < maxDisplays)
-                displays[*matchingDisplayCount] = i + 1;
+                displays[*matchingDisplayCount] = [screen cgDirectDisplayID];
             (*matchingDisplayCount)++;
         }
     }
@@ -249,10 +275,11 @@ CGRect CGDisplayBounds(CGDirectDisplayID displayIndex) {
     }
 
     NSArray<NSScreen *> *screens = [display screens];
-    if (displayIndex > [screens count] || displayIndex <= 0)
+    NSScreen *screen = screenForDisplayID(screens, displayIndex);
+    if (!screen)
         return CGRectZero;
 
-    return [[screens objectAtIndex: displayIndex - 1] frame];
+    return globalRectForFrame(screens, [screen frame]);
 }
 
 CGError CGDisplayHideCursor(CGDirectDisplayID displayIndex) {
@@ -287,7 +314,7 @@ boolean_t CGDisplayIsInMirrorSet(CGDirectDisplayID display) {
 }
 
 Boolean CGDisplayIsMain(CGDirectDisplayID display) {
-    return display == 1;
+    return display != kCGNullDirectDisplay && display == CGMainDisplayID();
 }
 
 uint32_t CGDisplayUnitNumber(CGDirectDisplayID display) {
@@ -438,11 +465,10 @@ static NSData *edidForDisplay(CGDirectDisplayID displayId) {
     if (!display)
         return nil;
 
-    NSArray<NSScreen *> *screens = [display screens];
-    if (displayId <= 0 || displayId > [screens count])
+    NSScreen *screen = screenForDisplayID([display screens], displayId);
+    if (!screen)
         return nil;
 
-    NSScreen *screen = [screens objectAtIndex: displayId - 1];
     NSData *edid = [screen edid];
     if (edid && [edid length] >= 16)
         return edid;
@@ -556,16 +582,74 @@ io_service_t CGDisplayIOServicePort(CGDirectDisplayID displayID) {
     return servicePort;
 }
 
+// The union of the active displays in CoreGraphics' global space.
+static CGDisplayGeometryRect desktopBounds(NSArray<NSScreen *> *screens) {
+    CGDisplayGeometryRect desktop = {0, 0, 0, 0};
+    for (NSScreen *screen in screens) {
+        if (NSIsEmptyRect([screen frame]))
+            continue;
+        CGRect rect = globalRectForFrame(screens, [screen frame]);
+        desktop = CGDisplayGeometryUnion(
+                desktop, (CGDisplayGeometryRect){rect.origin.x, rect.origin.y,
+                                                 rect.size.width, rect.size.height});
+    }
+    return desktop;
+}
+
+// The one place CoreGraphics' global point meets the backend's: clip it to the
+// desktop, flip it into Cocoa's space against the main display's height (the inverse
+// of how the pointer is reported: -[NSDisplay mouseLocation] is Cocoa's space,
+// CGEventGetLocation() the same point flipped), and hand it to -warpMouse:. The rules
+// are written down in CGDisplayGeometry.h.
+static CGError warpToGlobalPoint(NSDisplay *display, CGPoint point) {
+    if (!isfinite(point.x) || !isfinite(point.y))
+        return kCGErrorIllegalArgument;
+
+    NSArray<NSScreen *> *screens = [display screens];
+    if ([screens count] == 0)
+        return kCGErrorCannotComplete;
+
+    NSScreen *main = [screens objectAtIndex: 0];
+    CGFloat scale = [main backingScaleFactor];
+    if (!(scale >= 1))
+        scale = 1;
+
+    CGDisplayGeometryPoint clipped = CGDisplayGeometryClamp(
+            desktopBounds(screens), scale,
+            (CGDisplayGeometryPoint){point.x, point.y});
+    CGDisplayGeometryPoint cocoa =
+            CGDisplayGeometryFlip(NSHeight([main frame]), clipped);
+
+    // A backend that cannot move the pointer says so instead of reporting success.
+    return [display warpMouse: NSMakePoint(cocoa.x, cocoa.y)]
+                   ? kCGErrorSuccess
+                   : kCGErrorCannotComplete;
+}
+
 CGError CGWarpMouseCursorPosition(CGPoint newCursorPosition) {
     NSDisplay *display = currentDisplay();
     if (!display)
         return kCGErrorInvalidConnection;
-    [display warpMouse: newCursorPosition];
-    return kCGErrorSuccess;
+    return warpToGlobalPoint(display, newCursorPosition);
 }
 
 CGError CGDisplayMoveCursorToPoint(CGDirectDisplayID displayID, CGPoint newCursorPosition) {
-    return CGWarpMouseCursorPosition(newCursorPosition);
+    NSDisplay *display = currentDisplay();
+    if (!display)
+        return kCGErrorInvalidConnection;
+
+    // The point is relative to the upper-left corner of that display.
+    NSArray<NSScreen *> *screens = [display screens];
+    NSScreen *screen = screenForDisplayID(screens, displayID);
+    if (!screen || NSIsEmptyRect([screen frame]))
+        return kCGErrorIllegalArgument;
+
+    CGRect bounds = globalRectForFrame(screens, [screen frame]);
+    CGDisplayGeometryPoint global = CGDisplayGeometryDisplayToGlobal(
+            (CGDisplayGeometryRect){bounds.origin.x, bounds.origin.y,
+                                    bounds.size.width, bounds.size.height},
+            (CGDisplayGeometryPoint){newCursorPosition.x, newCursorPosition.y});
+    return warpToGlobalPoint(display, CGPointMake(global.x, global.y));
 }
 
 CGError CGAssociateMouseAndMouseCursorPosition(boolean_t connected) {
