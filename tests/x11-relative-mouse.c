@@ -223,23 +223,23 @@ static void confinedWarpAndApplicationReanchor(void) {
 
 static void warpsAreClampedByTheModel(void) {
     X11RelativeMouse m = {0};
-    /* The pointer can only be at x >= 0; the server clamps a warp to x = -10 to x = 0. */
-    X11RelativeMouseBegin(&m, 500, 400, 0, (X11RelativeMouseBounds){0, 0, 1279, 719});
-    X11RelativeMouseWarp(&m, -10, 400, 1, 7, true);
-    assert(m.virtualX == 0 && m.echoCount == 1 && m.echoes[0].x == 0);
-    X11RelativeMouseMotion r = X11RelativeMouseHandleMotion(&m, 0, 400, true, 7);
-    assert(r.echo && !r.post && m.physicalX == 0);
+    /* The pointer can only be at x >= 100; the server clamps a warp to x = 50 to x = 100. */
+    X11RelativeMouseBegin(&m, 500, 400, 0, (X11RelativeMouseBounds){100, 0, 1379, 719});
+    X11RelativeMouseWarp(&m, 50, 400, 1, 7, true);
+    assert(m.virtualX == 100 && m.echoCount == 1 && m.echoes[0].x == 100);
+    X11RelativeMouseMotion r = X11RelativeMouseHandleMotion(&m, 100, 400, true, 7);
+    assert(r.echo && !r.post && m.physicalX == 100);
     /* Real motion afterwards is not cancelled by a mismatched echo. */
     int sum = 0;
     for (int i = 1; i <= 5; ++i) {
-        r = X11RelativeMouseHandleMotion(&m, 3 * i, 400, true, 20 + i);
+        r = X11RelativeMouseHandleMotion(&m, 100 + 3 * i, 400, true, 20 + i);
         assert(r.post);
         sum += (int) r.deltaX;
     }
     assert(sum == 15);
     /* Also when warps are not honoured: the echo is where the server put the pointer. */
     X11RelativeMouseWarp(&m, 5000, 5000, 1, 40, false);
-    assert(m.echoes[m.echoCount - 1].x == 1279 && m.echoes[m.echoCount - 1].y == 719);
+    assert(m.echoes[m.echoCount - 1].x == 1379 && m.echoes[m.echoCount - 1].y == 719);
     X11RelativeMouseEnd(&m);
     puts("PASS: the model clamps warp targets to the reachable bounds");
 }
@@ -276,7 +276,57 @@ static void nonFiniteWarpsAreRefused(void) {
     puts("PASS: non-finite warp targets are refused");
 }
 
+static void echoExpiryAndMotionAging(void) {
+    X11RelativeMouse m = {0};
+    /* An echo expected within 2 events survives one unrelated motion and expires on the second. */
+    X11RelativeMouseBegin(&m, 500, 400, 0, anywhere);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 2, 5);
+    X11RelativeMouseMotion r = X11RelativeMouseHandleMotion(&m, 510, 400, true, 1);
+    assert(r.post && !r.echo && m.echoCount == 1 && m.echoes[0].remaining == 1);
+    r = X11RelativeMouseHandleMotion(&m, 520, 400, true, 2);
+    assert(r.post && !r.echo && m.echoCount == 0);
+    /* Merging an identical echo keeps the larger remaining count, whichever order they arrive in. */
+    X11RelativeMouseBegin(&m, 500, 400, 0, anywhere);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 2, 5);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 1, 5);
+    assert(m.echoCount == 1 && m.echoes[0].remaining == 2);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 3, 5);
+    assert(m.echoCount == 1 && m.echoes[0].remaining == 3);
+    /* Consuming an echo ages the ones behind it. */
+    X11RelativeMouseBegin(&m, 500, 400, 0, anywhere);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 3, 7);
+    X11RelativeMouseExpectEcho(&m, 520, 400, 3, 8);
+    r = X11RelativeMouseHandleMotion(&m, 500, 400, true, 7);
+    assert(r.echo && m.echoCount == 1 && m.echoes[0].x == 520 && m.echoes[0].remaining == 2);
+    /* Motion predating the grab snapshot is ignored but still ages echoes. */
+    X11RelativeMouseBegin(&m, 500, 400, 100, anywhere);
+    X11RelativeMouseExpectEcho(&m, 500, 400, 2, 110);
+    r = X11RelativeMouseHandleMotion(&m, 0, 0, true, 99);
+    assert(!r.post && m.echoCount == 1 && m.echoes[0].remaining == 1);
+    r = X11RelativeMouseHandleMotion(&m, 0, 0, true, 98);
+    assert(!r.post && m.echoCount == 0);
+    X11RelativeMouseEnd(&m);
+    puts("PASS: expected echoes age on every handled event and expire");
+}
+
+static void zeroDeltaAndRewarpAxes(void) {
+    X11RelativeMouse m = {0};
+    X11RelativeMouseBegin(&m, 500, 400, 0, anywhere);
+    X11RelativeMouseMotion r = motion(&m, 500, 400, true);
+    assert(!r.post && !r.echo && !r.rewarp && r.deltaX == 0 && r.deltaY == 0);
+    /* The pointer differs from the frozen cursor in one axis only: still rewarped. */
+    r = motion(&m, 500, 405, true);
+    assert(r.post && r.rewarp && r.warpX == 500 && r.warpY == 400);
+    X11RelativeMouseBegin(&m, 500, 400, 0, anywhere);
+    r = motion(&m, 507, 400, true);
+    assert(r.post && r.rewarp && r.warpX == 500 && r.warpY == 400);
+    X11RelativeMouseEnd(&m);
+    puts("PASS: zero-delta motion is not posted and a one-axis offset is rewarped");
+}
+
 int main(void) {
+    echoExpiryAndMotionAging();
+    zeroDeltaAndRewarpAxes();
     nonFiniteWarpsAreRefused();
     warpsAreClampedByTheModel();
     serialsWrap();
