@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Ancillary test adapted from darling-lol tools/test-x11-relative-mouse.c (GPL-3.0); the patched cocotron sources keep their own licence.
 #ifndef X11_RELATIVE_MOUSE_HEADER
 #define X11_RELATIVE_MOUSE_HEADER "../AppKit/X11.backend/X11RelativeMouse.h"
 #endif

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+# Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
 # Runs the real warp glue of CoreGraphics/CGDirectDisplay.m against mock screens (no display, no network).
 # The function text is extracted from the .m at test time; only the Objective-C message sends are rewritten
 # to struct accesses. CG_SRC_DIR points at another copy of CoreGraphics/ (used to mutation-check the test).
