@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/NSButton.h>
 #import <AppKit/NSView.h>
 
 typedef enum {
@@ -25,11 +26,17 @@ typedef enum {
     NSWindowToolTipBorderType,
 } NSWindowBorderType;
 
+/* Title-bar control: close (tag 0), miniaturize (1) or zoom (2); dimmed while
+ * the window is not key. */
+@interface NSThemeFrameButton : NSButton
+@end
+
 @interface NSThemeFrame : NSView {
     NSWindowBorderType _borderType;
 }
 /* Height of the title bar this style mask asks for (0 when untitled). */
 + (CGFloat) titleBarHeightForStyleMask: (NSUInteger) styleMask;
+- (void) layoutTrafficLights;
 - (NSWindowBorderType) windowBorderType;
 - (void) setWindowBorderType: (NSWindowBorderType) borderType;
 

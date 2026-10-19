@@ -36,6 +36,30 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 static const CGFloat kTitleBarHeight = 28.0;
 
+
+@implementation NSThemeFrameButton
+
+- (BOOL) isOpaque { return NO; }
+
+- (void) drawRect: (NSRect) rect {
+    NSColor *fill;
+
+    if (![[self window] isKeyWindow]) {
+        fill = [NSColor colorWithCalibratedWhite: 0.86 alpha: 1.0];
+    } else if ([self tag] == 0) {
+        fill = [NSColor colorWithCalibratedRed: 1.00 green: 0.37 blue: 0.34 alpha: 1.0];
+    } else if ([self tag] == 1) {
+        fill = [NSColor colorWithCalibratedRed: 0.99 green: 0.74 blue: 0.18 alpha: 1.0];
+    } else {
+        fill = [NSColor colorWithCalibratedRed: 0.16 green: 0.78 blue: 0.25 alpha: 1.0];
+    }
+
+    [fill setFill];
+    [[NSBezierPath bezierPathWithOvalInRect: [self bounds]] fill];
+}
+
+@end
+
 @implementation NSThemeFrame
 
 + (CGFloat) titleBarHeightForStyleMask: (NSUInteger) styleMask {
@@ -46,6 +70,53 @@ static const CGFloat kTitleBarHeight = 28.0;
 
 - (BOOL) isOpaque {
     return YES;
+}
+
+- (void) addSubview: (NSView *) view {
+    [super addSubview: view];
+    if (![view isKindOfClass: [NSThemeFrameButton class]] &&
+        ![view isKindOfClass: [NSMenuView class]] &&
+        ![view isKindOfClass: [NSToolbarView class]])
+        [self layoutTrafficLights];
+}
+
+- (void) layoutTrafficLights {
+    static BOOL layingOut = NO;
+    if (layingOut)
+        return;
+
+    NSRect bar = [self _titleBarRect];
+    if (NSIsEmptyRect(bar))
+        return;
+
+    layingOut = YES;
+    for (NSInteger i = 0; i < 3; i++) {
+        NSButton *button = [[self window] standardWindowButton: i];
+        if (button == nil)
+            continue;
+        if ([button superview] != self)
+            [self addSubview: button];
+        [button setFrame: [self _trafficLightRectAtIndex: i inTitleBar: bar]];
+    }
+    layingOut = NO;
+}
+
+- (void) _keyStateChanged: (NSNotification *) note {
+    [self setNeedsDisplay: YES];
+    for (NSView *view in _subviews)
+        [view setNeedsDisplay: YES];
+}
+
+- (void) viewDidMoveToWindow {
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+    [center removeObserver: self];
+    if ([self window] != nil) {
+        [center addObserver: self selector: @selector(_keyStateChanged:)
+                       name: NSWindowDidBecomeKeyNotification object: [self window]];
+        [center addObserver: self selector: @selector(_keyStateChanged:)
+                       name: NSWindowDidResignKeyNotification object: [self window]];
+    }
+    [super viewDidMoveToWindow];
 }
 
 - (NSWindowBorderType) windowBorderType {
@@ -160,18 +231,6 @@ static const CGFloat kTitleBarHeight = 28.0;
     [[NSColor colorWithCalibratedWhite: 0.78 alpha: 1.0] setFill];
     NSRectFill(NSMakeRect(NSMinX(bar), NSMinY(bar), NSWidth(bar), 1.0));
 
-    NSColor *colors[3] = {
-        [NSColor colorWithCalibratedRed: 1.00 green: 0.37 blue: 0.34 alpha: 1.0],
-        [NSColor colorWithCalibratedRed: 0.99 green: 0.74 blue: 0.18 alpha: 1.0],
-        [NSColor colorWithCalibratedRed: 0.16 green: 0.78 blue: 0.25 alpha: 1.0],
-    };
-    for (NSInteger i = 0; i < 3; i++) {
-        [colors[i] setFill];
-        [[NSBezierPath bezierPathWithOvalInRect:
-                                [self _trafficLightRectAtIndex: i
-                                                    inTitleBar: bar]] fill];
-    }
-
     NSString *title = [[self window] title];
     if ([title length] == 0)
         return;
@@ -179,7 +238,9 @@ static const CGFloat kTitleBarHeight = 28.0;
     NSDictionary *attributes = @{
         NSFontAttributeName: [NSFont systemFontOfSize: 13.0],
         NSForegroundColorAttributeName:
-                [NSColor colorWithCalibratedWhite: 0.25 alpha: 1.0],
+                [NSColor colorWithCalibratedWhite:
+                                 ([[self window] isKeyWindow] ? 0.25 : 0.55)
+                                           alpha: 1.0],
     };
     NSSize size = [title sizeWithAttributes: attributes];
     CGFloat left = NSMaxX([self _trafficLightRectAtIndex: 2 inTitleBar: bar]) + 10.0;
@@ -199,6 +260,8 @@ static const CGFloat kTitleBarHeight = 28.0;
 
     // tile the subviews, when/if we add titlebars and such do it here
     for (NSView *view in _subviews) {
+        if ([view isKindOfClass: [NSThemeFrameButton class]])
+            continue;
         if ([view isKindOfClass: [NSMenuView class]])
             menuView = view;
         else if ([view isKindOfClass: [NSToolbarView class]])
