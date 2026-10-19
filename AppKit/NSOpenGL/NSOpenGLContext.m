@@ -295,6 +295,10 @@ static inline void _clearCurrentContext() {
             NSLog(@"This window backend requires OpenGL presentation on the main thread");
         return;
     }
+    // Older subwindow implementations lack refreshMillihertz.
+    CGLSetDrawableRefreshRate(_glContext,
+        [_subwindow respondsToSelector: @selector(refreshMillihertz)]
+        ? [_subwindow refreshMillihertz] : 0);
     if (CGLFlushDrawable(_glContext) == kCGLNoError &&
         [_subwindow respondsToSelector: @selector(flush)])
         [_subwindow flush];
