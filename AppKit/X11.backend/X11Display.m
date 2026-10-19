@@ -1625,14 +1625,13 @@ static NSPoint windowEventPoint(Display *dpy, X11Window *window, Window eventWin
             }
 
             [window setLastKnownCursorPosition: devicePos];
+            // The pointer moved: a cursor hidden until then comes back.
+            [self pointerMoved];
 
             // Button2Mask is the middle button, not the right one, so reading
             // it as a right drag made a middle-button drag indistinguishable
             // from a right-button one. AppKit has no NSOtherMouseDragged, so
             // the other buttons only move the mouse, as on macOS.
-            // The pointer moved: a cursor hidden until then comes back.
-            [self pointerMoved];
-
             type = NSMouseMoved;
 
             if (ev->xmotion.state & Button1Mask) {
