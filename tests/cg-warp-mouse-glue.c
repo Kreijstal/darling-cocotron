@@ -106,6 +106,12 @@ int main(void) {
     e = CGDisplayMoveCursorToPoint(1, CGPointMake(1, 1));
     CK(e == kCGErrorInvalidConnection, "no display, move: %d", e);
 
+    /* Every output inactive: the main screen is a zero rect, so there is no desktop to warp inside. */
+    NSScreen *allDead[1] = {dead};
+    theDisplay = disp(1, allDead, 1);
+    e = CGWarpMouseCursorPosition(CGPointMake(10, 10));
+    CK(e == kCGErrorCannotComplete && theDisplay->calls == 0, "empty main frame: %d, %d warps", e, theDisplay->calls);
+
     /* 2x: the far edges are one device pixel (half a point) inside. */
     NSScreen *m2 = mk(0, 0, 960, 540, 2, 1), *one[1] = {m2};
     theDisplay = disp(1, one, 1);
