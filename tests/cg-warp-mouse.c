@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
 // Host test for CGWarpMouseCursorPosition / CGDisplayMoveCursorToPoint on the X11 backend: the conversion from
 // CoreGraphics' global space (origin at the main display's top-left, y down, points) to the pointer's device
 // pixel and back to what CGEventGetLocation reports. It calls the pure helpers the backends use

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
 /* Runs the real warp glue of CoreGraphics/CGDirectDisplay.m against mock screens.
  *
  * tests/cg-warp-mouse-glue.sh extracts the text of the functions below from CGDirectDisplay.m and swaps only the
