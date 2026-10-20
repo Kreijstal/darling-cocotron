@@ -1722,6 +1722,7 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
 }
 
 - (void) removeFromSuperview {
+    [[self retain] autorelease];
     [_superview setNeedsDisplayInRect: [self frame]];
     [self removeFromSuperviewWithoutNeedingDisplay];
 }
@@ -1731,16 +1732,19 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
 }
 
 - (void) removeFromSuperviewWithoutNeedingDisplay {
-    NSView *removeFrom = _superview;
-    NSWindow *window = [self window];
+    [[self retain] autorelease];
+    NSView *removeFrom = [_superview retain];
+    NSWindow *window = [[self window] retain];
 
     for (NSView *ancestor = _superview; ancestor != nil; ancestor = [ancestor superview]) {
-        for (NSLayoutConstraint *constraint in [ancestor constraints]) {
-            NSView *first = [constraint firstItem], *second = [constraint secondItem];
+        NSArray *constraints = [[ancestor constraints] copy];
+        for (NSLayoutConstraint *constraint in constraints) {
+            id first = [constraint firstItem], second = [constraint secondItem];
             if (([first isKindOfClass:[NSView class]] && [first isDescendantOf:self]) ||
                 ([second isKindOfClass:[NSView class]] && [second isDescendantOf:self]))
                 [constraint setActive:NO];
         }
+        [constraints release];
     }
 
     [self _deepResignFirstResponder];
@@ -1749,6 +1753,8 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
 
     [removeFrom _removeViewWithoutDisplay: self];
     [window _invalidateTrackingAreas];
+    [window release];
+    [removeFrom release];
 }
 
 - (void) viewWillMoveToSuperview: (NSView *) view {
@@ -2041,6 +2047,9 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
 }
 
 - (void) _addLayerToSuperlayer {
+    if (_layer == nil) {
+        return;
+    }
     CALayer *superlayer = [_superview layer];
     if (superlayer != nil) {
         if ([_layer superlayer] != superlayer || _layerContext != nil) {

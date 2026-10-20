@@ -504,11 +504,6 @@ static Class _rulerViewClass = nil;
 }
 
 - (void) createRulerViewsIfNeeded {
-    if ([_horizontalRuler superview] != nil)
-        [_horizontalRuler removeFromSuperview];
-    if ([_verticalRuler superview] != nil)
-        [_verticalRuler removeFromSuperview];
-
     if (_rulersVisible) {
         if (_hasHorizontalRuler) {
             if (_horizontalRuler == nil)
@@ -516,7 +511,10 @@ static Class _rulerViewClass = nil;
                         initWithScrollView: self
                                orientation: NSHorizontalRuler];
 
-            [self addSubview: _horizontalRuler];
+            if ([_horizontalRuler superview] == nil)
+                [self addSubview: _horizontalRuler];
+        } else if ([_horizontalRuler superview] != nil) {
+            [_horizontalRuler removeFromSuperview];
         }
         if (_hasVerticalRuler) {
             if (_verticalRuler == nil)
@@ -524,8 +522,16 @@ static Class _rulerViewClass = nil;
                         initWithScrollView: self
                                orientation: NSVerticalRuler];
 
-            [self addSubview: _verticalRuler];
+            if ([_verticalRuler superview] == nil)
+                [self addSubview: _verticalRuler];
+        } else if ([_verticalRuler superview] != nil) {
+            [_verticalRuler removeFromSuperview];
         }
+    } else {
+        if ([_horizontalRuler superview] != nil)
+            [_horizontalRuler removeFromSuperview];
+        if ([_verticalRuler superview] != nil)
+            [_verticalRuler removeFromSuperview];
     }
 }
 
@@ -731,6 +737,16 @@ static Class _rulerViewClass = nil;
     [_verticalScroller setScrollerStyle: newScrollerStyle];
     [_horizontalScroller setScrollerStyle: newScrollerStyle];
     [self tile];
+}
+
+- (NSScrollerKnobStyle) scrollerKnobStyle {
+    return _scrollerKnobStyle;
+}
+
+- (void) setScrollerKnobStyle: (NSScrollerKnobStyle) knobStyle {
+    _scrollerKnobStyle = knobStyle;
+    [_verticalScroller setKnobStyle: knobStyle];
+    [_horizontalScroller setKnobStyle: knobStyle];
 }
 
 - (void) setHorizontalScroller: (NSScroller *) scroller {

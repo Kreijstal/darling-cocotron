@@ -69,7 +69,7 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
 
 @class NSUndoTyping;
 
-@interface NSTextView : NSText <NSTextInput, NSTextLayoutOrientationProvider> {
+@interface NSTextView : NSText <NSTextInput, NSTextInputClient, NSTextLayoutOrientationProvider> {
     NSTextStorage *_textStorage;
     NSTextContainer *_textContainer;
     NSSize _textContainerInset;
@@ -109,6 +109,8 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
     NSSelectionAffinity _selectionAffinity;
     NSSelectionGranularity _selectionGranularity;
     NSDictionary *_selectedTextAttributes;
+    NSDictionary *_linkTextAttributes;
+    NSDictionary *_markedTextAttributes;
     NSParagraphStyle *_defaultParagraphStyle;
 
     BOOL _didSendTextDidEndNotification;
@@ -150,11 +152,17 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
     BOOL _usesInspectorBar;
     BOOL _usesAdaptiveColorMappingForDarkAppearance;
     BOOL _importsGraphics;
+    BOOL _acceptsGlyphInfo;
 }
 
 - initWithFrame: (NSRect) frame textContainer: (NSTextContainer *) container;
 
 - initWithFrame: (NSRect) frame;
+
+- (BOOL) acceptsGlyphInfo;
+- (void) setAcceptsGlyphInfo: (BOOL) flag;
+
+- (void) setNeedsDisplayInRect: (NSRect) rect avoidAdditionalLayout: (BOOL) avoidLayout;
 
 - (void) _setTextStorage: (NSTextStorage *) storage;
 - (void) replaceTextStorage: (NSTextStorage *) textStorage;
@@ -176,6 +184,8 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
 - (NSColor *) insertionPointColor;
 - (NSDictionary *) typingAttributes;
 - (NSDictionary *) selectedTextAttributes;
+- (NSDictionary *) linkTextAttributes;
+- (NSDictionary *) markedTextAttributes;
 - (NSArray *) selectedRanges;
 - (NSParagraphStyle *) defaultParagraphStyle;
 
@@ -188,6 +198,8 @@ APPKIT_EXPORT NSString *const NSAllRomanInputSourcesLocaleIdentifier;
 - (void) setInsertionPointColor: (NSColor *) color;
 - (void) setTypingAttributes: (NSDictionary *) attributes;
 - (void) setSelectedTextAttributes: (NSDictionary *) attributes;
+- (void) setLinkTextAttributes: (NSDictionary *) attributes;
+- (void) setMarkedTextAttributes: (NSDictionary *) attributes;
 - (void) setDefaultParagraphStyle: (NSParagraphStyle *) paragraphStyle;
 
 - (NSRange) selectionRangeForProposedRange: (NSRange) range
