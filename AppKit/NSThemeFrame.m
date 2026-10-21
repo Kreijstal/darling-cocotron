@@ -313,6 +313,7 @@ static const CGFloat kTitleBarHeight = 28.0;
     }
 
     [contentView setFrame: contentFrame];
+    [self layoutTrafficLights];
 }
 
 - (void) mouseDown: (NSEvent *) event {
