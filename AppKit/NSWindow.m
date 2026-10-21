@@ -293,6 +293,8 @@ static BOOL _allowsAutomaticWindowTabbing;
     if ([self hasMainMenuForStyleMask: styleMask])
         result.size.height += [NSMainMenuView menuHeight];
 
+    result.size.height += [NSThemeFrame titleBarHeightForStyleMask: styleMask];
+
     return result;
 }
 
@@ -304,6 +306,8 @@ static BOOL _allowsAutomaticWindowTabbing;
 
     if ([self hasMainMenuForStyleMask: styleMask])
         result.size.height -= [NSMainMenuView menuHeight];
+
+    result.size.height -= [NSThemeFrame titleBarHeightForStyleMask: styleMask];
 
     return result;
 }
@@ -1540,11 +1544,36 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (NSButton *) standardWindowButton: (NSWindowButton) value {
-    static NSButton *dummyButton = nil;
-    if (!dummyButton) {
-        dummyButton = [[NSButton alloc] init];
+    NSInteger tag;
+
+    switch (value) {
+    case NSWindowCloseButton: tag = 0; break;
+    case NSWindowMiniaturizeButton: tag = 1; break;
+    case NSWindowZoomButton: tag = 2; break;
+    default: return nil;
     }
-    return dummyButton;
+
+    NSView *frame = [[self contentView] superview];
+    for (NSView *view in [frame subviews]) {
+        if ([view isKindOfClass: [NSThemeFrameButton class]] && [view tag] == tag)
+            return (NSButton *) view;
+    }
+
+    NSButton *button = [[NSThemeFrameButton alloc] initWithFrame: NSMakeRect(0, 0, 12, 12)];
+    [button setTag: tag];
+    [button setBordered: NO];
+    [button setTarget: self];
+    [button setAction: @selector(_trafficLightClicked:)];
+    [frame addSubview: button];
+    return button;
+}
+
+- (void) _trafficLightClicked: (NSButton *) sender {
+    switch ([sender tag]) {
+    case 0: [self performClose: sender]; break;
+    case 1: [self miniaturize: sender]; break;
+    case 2: [self zoom: sender]; break;
+    }
 }
 
 - (NSButtonCell *) defaultButtonCell {
@@ -1747,6 +1776,8 @@ static BOOL _allowsAutomaticWindowTabbing;
         result.size.height += [[_toolbar _view] frame].size.height;
     }
 
+    result.size.height += [NSThemeFrame titleBarHeightForStyleMask: [self styleMask]];
+
     return result;
 }
 
@@ -1761,6 +1792,8 @@ static BOOL _allowsAutomaticWindowTabbing;
     if ([_toolbar _view] != nil && ![[_toolbar _view] isHidden]) {
         result.size.height -= [[_toolbar _view] frame].size.height;
     }
+
+    result.size.height -= [NSThemeFrame titleBarHeightForStyleMask: [self styleMask]];
 
     return result;
 }
