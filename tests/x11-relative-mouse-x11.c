@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
 // Host test for AppKit/X11.backend/X11RelativeMouseGrab.h, the Xlib half of relative mouse mode, on a real X server.
 // XTest supplies the physical motion; the test pumps the connection's events through the same functions the backend
 // calls, and checks that the cursor stays frozen, the deltas add up, and a warp's own echo is never taken for
