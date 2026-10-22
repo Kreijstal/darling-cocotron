@@ -104,6 +104,11 @@ typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
     NSTitlebarSeparatorStyleShadow = 3
 };
 
+typedef NS_ENUM(NSInteger, NSWindowTitleVisibility) {
+    NSWindowTitleVisible = 0,
+    NSWindowTitleHidden = 1
+};
+
 enum {
     NSNormalWindowLevel = kCGNormalWindowLevel,
     NSFloatingWindowLevel = kCGFloatingWindowLevel,
@@ -317,6 +322,7 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
     NSWindowToolbarStyle _toolbarStyle;
     NSTitlebarSeparatorStyle _titlebarSeparatorStyle;
     BOOL _titlebarAppearsTransparent;
+    NSWindowTitleVisibility _titleVisibility;
 }
 
 @property(class) BOOL allowsAutomaticWindowTabbing;
@@ -385,6 +391,8 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
 - (NSSize) maxSize;
 @property NSSize contentMinSize;
 @property NSSize contentMaxSize;
+@property NSSize minFullScreenContentSize;
+@property NSSize maxFullScreenContentSize;
 
 - (BOOL) isOneShot;
 @property (getter=isOpaque) BOOL opaque;
@@ -745,6 +753,7 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 @property NSWindowToolbarStyle toolbarStyle;
 @property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
 @property BOOL titlebarAppearsTransparent;
+@property NSWindowTitleVisibility titleVisibility;
 @end
 
 @interface NSWindow (Darling)

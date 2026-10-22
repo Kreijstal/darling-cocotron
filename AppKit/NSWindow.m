@@ -644,6 +644,22 @@ static BOOL _allowsAutomaticWindowTabbing;
     return _contentMaxSize;
 }
 
+- (NSSize) minFullScreenContentSize {
+    return _contentMinSize;
+}
+
+- (void) setMinFullScreenContentSize: (NSSize) value {
+    (void)value;
+}
+
+- (NSSize) maxFullScreenContentSize {
+    return _contentMaxSize;
+}
+
+- (void) setMaxFullScreenContentSize: (NSSize) value {
+    (void)value;
+}
+
 - (BOOL) isOneShot {
     return _isOneShot;
 }
@@ -3966,6 +3982,14 @@ static inline NSRect scaleWindowRect(NSRect rect, CGFloat scale) {
 
 - (void) setTitlebarSeparatorStyle: (NSTitlebarSeparatorStyle) style {
     _titlebarSeparatorStyle = style;
+}
+
+- (NSWindowTitleVisibility) titleVisibility {
+    return _titleVisibility;
+}
+
+- (void) setTitleVisibility: (NSWindowTitleVisibility) value {
+    _titleVisibility = value;
 }
 
 @end

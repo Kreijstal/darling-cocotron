@@ -600,8 +600,8 @@ static NSLock *_cacheLock = nil;
             }
         }
     }
-    NSLog(@"unable to match font descriptor: %@", descriptor);
-    return nil;
+    NSLog(@"unable to match font descriptor: %@, falling back to system font", descriptor);
+    return [NSFont systemFontOfSize: size > 0 ? size : [NSFont systemFontSize]];
 }
 
 + (NSFont *) fontWithDescriptor: (NSFontDescriptor *) descriptor
