@@ -121,6 +121,7 @@ typedef enum {
     unsigned int _gridStyleMask;
     NSTableViewSelectionHighlightStyle _selectionHighlightStyle;
     BOOL _floatsGroupRows;
+    BOOL _usesAutomaticRowHeights;
     NSTableViewRowSizeStyle _rowSizeStyle;
     CGFloat _styledRowHeight;
     NSTableViewStyle _style;
@@ -131,6 +132,7 @@ typedef enum {
     NSInteger _clickedColumn, _clickedRow;
     NSInteger _editedColumn, _editedRow;
     NSInteger _numberOfRows;
+    NSInteger _updatesNestingCount;
     id _editingCell;
     NSRect _editingFrame, _editingBorder;
     NSArray *_sortDescriptors;
@@ -177,6 +179,8 @@ typedef enum {
 - (NSTableViewSelectionHighlightStyle) selectionHighlightStyle;
 // Floating applies to view-based tables only; Cocotron's tables are cell-based.
 - (BOOL) floatsGroupRows;
+- (BOOL) usesAutomaticRowHeights;
+- (void) setUsesAutomaticRowHeights: (BOOL) value;
 - (NSTableViewRowSizeStyle) rowSizeStyle;
 - (NSTableViewRowSizeStyle) effectiveRowSizeStyle;
 
@@ -264,11 +268,29 @@ typedef enum {
 - (void) deselectAll: sender;
 
 - (void) scrollRowToVisible: (NSInteger) index;
+typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
+    NSTableViewAnimationEffectNone = 0x0,
+    NSTableViewAnimationEffectFade = 0x1,
+    NSTableViewAnimationEffectGap = 0x2,
+    NSTableViewAnimationSlideUp = 0x10,
+    NSTableViewAnimationSlideDown = 0x20,
+    NSTableViewAnimationSlideLeft = 0x30,
+    NSTableViewAnimationSlideRight = 0x40,
+};
+
 - (void) scrollColumnToVisible: (NSInteger) index;
+
+- (void) beginUpdates;
+- (void) endUpdates;
+- (void) insertRowsAtIndexes: (NSIndexSet *) indexes withAnimation: (NSTableViewAnimationOptions) animationOptions;
+- (void) removeRowsAtIndexes: (NSIndexSet *) indexes withAnimation: (NSTableViewAnimationOptions) animationOptions;
+- (void) moveRowAtIndex: (NSInteger) oldIndex toIndex: (NSInteger) newIndex;
 
 - (void) noteNumberOfRowsChanged;
 - (void) noteHeightOfRowsWithIndexesChanged: (NSIndexSet *) indexSet;
 - (void) reloadData;
+- (void) reloadDataForRowIndexes: (NSIndexSet *) rowIndexes
+                   columnIndexes: (NSIndexSet *) columnIndexes;
 - (void) tile;
 
 - (void) sizeLastColumnToFit;

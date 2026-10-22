@@ -57,7 +57,8 @@ static DBusHandlerResult dbusFilterCallback(DBusConnection *connection,
         _available = NO;
 
         const char *dbusAddr = getenv("DBUS_SESSION_BUS_ADDRESS");
-        if (!dbusAddr || !*dbusAddr) {
+        if (!dbusAddr || !*dbusAddr || getenv("DARLING_NO_GLOBAL_MENU") ||
+            [[NSUserDefaults standardUserDefaults] boolForKey: @"CocotronNoGlobalMenu"]) {
             return self;
         }
 

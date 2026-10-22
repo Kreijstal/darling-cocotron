@@ -24,6 +24,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSMenu.h>
 #import <AppKit/NSNib.h>
+#import <AppKit/NSWindow.h>
+#import <AppKit/NSPanel.h>
 #import <AppKit/NSNibLoading.h>
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSTableCornerView.h>
@@ -273,8 +275,11 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
         for (i = 0; i < count; i++) {
             id object = [_allObjects objectAtIndex: i];
 
-            if ([object respondsToSelector: @selector(awakeFromNib)])
+            if ([object respondsToSelector: @selector(awakeFromNib)]) {
+                NSLog(@"Entering awakeFromNib for %d/%d: %@", i, count, [object class]);
                 [object awakeFromNib];
+                NSLog(@"Exiting awakeFromNib for %d/%d: %@", i, count, [object class]);
+            }
         }
 
         for (i = 0; i < count; i++) {
@@ -284,9 +289,23 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
                 [object performSelector: @selector(postAwakeFromNib)];
         }
 
-        [[objectData visibleWindows]
-                makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
-                                withObject: nil];
+        if ([[objectData visibleWindows] count] > 0) {
+            [[objectData visibleWindows]
+                    makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
+                                    withObject: nil];
+        } else {
+            // For compiled NIBArchives where NSVisibleWindows was not preserved in IB.objectdata:
+            // make non-sheet, non-panel windows visible.
+            for (id obj in _allObjects) {
+                if ([obj isKindOfClass: [NSWindow class]]) {
+                    NSWindow *w = (NSWindow *)obj;
+                    if (![w isSheet] && ![w isKindOfClass: [NSPanel class]]) {
+                        NSLog(@"NSNib: ordering front window %p, title '%@'", w, [w title]);
+                        [w makeKeyAndOrderFront: nil];
+                    }
+                }
+            }
+        }
     }
 
     return (objectData != nil);

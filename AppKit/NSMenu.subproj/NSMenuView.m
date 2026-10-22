@@ -220,7 +220,7 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
                     // itemIndexAtPoint: runs, leaving the submenu with no
                     // selected item.
                     if (checkView == lastRectView &&
-                        NSMouseInRect(checkPoint, lastRect, [self isFlipped]))
+                        NSMouseInRect(checkPoint, lastRect, [checkView isFlipped]))
                         break;
 
                     // Which item is the cursor on top of?
@@ -252,14 +252,11 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
                             delaySubmenu = nil;
                         }
 
-                        // If it's got a cascading menu then push that on the
-                        // stack
-                        // Do this with a delay to improve performance - this is what toolkits commonly do
-                        double delay = (count == 0) ? 0 : 0.05;
-                        delaySubmenu = [[NSTimer timerWithTimeInterval: delay repeats: NO block: ^(NSTimer* timer){
-
+                        // If it's the top-level menu bar (count == 0), open the submenu immediately
+                        // so that mouse-up doesn't exit before the submenu is visible.
+                        // Submenus in cascading popups use a brief delay as standard.
+                        if (count == 0) {
                             NSMenuView *branch;
-
                             if ((branch = [checkView
                                         viewAtSelectedIndexPositionOnScreen:
                                                 screen]) != nil) {
@@ -267,9 +264,20 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
                                         branch);
                                 [viewStack addObject: branch];
                             }
-                        }] retain];
-                        [[NSRunLoop currentRunLoop] addTimer: delaySubmenu
-                                                     forMode: NSEventTrackingRunLoopMode];
+                        } else {
+                            delaySubmenu = [[NSTimer timerWithTimeInterval: 0.05 repeats: NO block: ^(NSTimer* timer){
+                                NSMenuView *branch;
+                                if ((branch = [checkView
+                                            viewAtSelectedIndexPositionOnScreen:
+                                                    screen]) != nil) {
+                                    MENUDEBUG(@"adding a new cascading view: %@",
+                                            branch);
+                                    [viewStack addObject: branch];
+                                }
+                            }] retain];
+                            [[NSRunLoop currentRunLoop] addTimer: delaySubmenu
+                                                         forMode: NSEventTrackingRunLoopMode];
+                        }
                     }
                     // And bail out of the while loop - we're in the right place
                     break;
@@ -602,13 +610,27 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
                 item = [activeView itemAtSelectedIndex];
                 if ([event type] == NSLeftMouseUp) {
                     MENUDEBUG(@"mouseUp on item: %@", item);
-                    if (item == nil || ([viewStack count] <= 2) ||
-                        [item isEnabled]) {
-                        MENUDEBUG(@"mouse up - exiting because of many "
-                                  @"possible reasons...");
+                    if (item == nil) {
+                        BOOL insideAnyMenu = NO;
+                        for (NSMenuView *v in viewStack) {
+                            NSPoint p = [[v window] convertScreenToBase: point];
+                            p = [v convertPoint: p fromView: nil];
+                            if (NSMouseInRect(p, [v bounds], [v isFlipped])) {
+                                insideAnyMenu = YES;
+                                break;
+                            }
+                        }
+                        if (!insideAnyMenu) {
+                            state = STATE_EXIT;
+                        } else {
+                            state = STATE_MOUSEUP;
+                        }
+                    } else if ([item hasSubmenu]) {
+                        state = STATE_MOUSEUP;
+                    } else if ([item isEnabled] && ![item isSeparatorItem]) {
                         state = STATE_EXIT;
                     } else {
-                        MENUDEBUG(@"mouse up");
+                        // Clicking a disabled (grayed out) item or separator does not dismiss the menu
                         state = STATE_MOUSEUP;
                     }
                 }

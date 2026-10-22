@@ -3930,11 +3930,15 @@ static inline NSRect scaleWindowRect(NSRect rect, CGFloat scale) {
 
 - (CGWindow *) platformWindow {
     if (_platformWindow == nil) {
-        [self performSelectorOnMainThread: @selector
-                (_createPlatformWindowOnMainThread)
-                               withObject: nil
-                            waitUntilDone: YES
-                                    modes: @[ NSDefaultRunLoopMode ]];
+        if ([NSThread isMainThread]) {
+            [self _createPlatformWindowOnMainThread];
+        } else {
+            [self performSelectorOnMainThread: @selector
+                    (_createPlatformWindowOnMainThread)
+                                   withObject: nil
+                                waitUntilDone: YES
+                                        modes: @[ NSDefaultRunLoopMode ]];
+        }
     }
 
     return _platformWindow;

@@ -3401,6 +3401,14 @@ static id anchorForView(NSView *view, NSString *className,
     return NSMakeSize(NSViewNoIntrinsicMetric, NSViewNoIntrinsicMetric);
 }
 
+- (NSSize) fittingSize {
+    NSSize intrinsic = [self intrinsicContentSize];
+    if (intrinsic.width != NSViewNoIntrinsicMetric && intrinsic.height != NSViewNoIntrinsicMetric) {
+        return intrinsic;
+    }
+    return [self bounds].size;
+}
+
 - (void) invalidateIntrinsicContentSize {
     _needsLayout = YES;
 }

@@ -270,6 +270,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                                       styleMask: _windowStyleMask
                                         backing: _windowBacking
                                           defer: self.isDeferred];
+    NSLog(@"NSWindowTemplate awakeAfterUsingCoder: created window %p, class %@, title '%@', wtFlags=0x%x", result, class, _windowTitle, _wtFlags);
     [result setMinSize: _minSize];
     [result setMaxSize: _maxSize];
     [result setOneShot: self.isOneShot];

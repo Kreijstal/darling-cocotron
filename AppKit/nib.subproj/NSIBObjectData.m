@@ -163,14 +163,21 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
         for (NSUInteger i = 0; i < classesKeys.count; ++i) {
             [_classTable setObject: classesValues[i] forKey: classesKeys[i]];
         }
+        NSLog(@"STEP 1: after NSClassesValues");
 
         [_connections setArray: [keyed decodeObjectForKey: @"NSConnections"]];
+        NSLog(@"STEP 2: after NSConnections");
         _fontManager = [[keyed decodeObjectForKey: @"NSFontManager"] retain];
+        NSLog(@"STEP 3: after NSFontManager");
         self.targetFramework = [keyed decodeObjectForKey: @"NSFramework"];
+        NSLog(@"STEP 4: after NSFramework");
         _nextOid = [keyed decodeInt64ForKey: @"NSNextOid"];
+        NSLog(@"STEP 5: after NSNextOid");
 
         NSArray *objectKeys = [keyed decodeObjectForKey: @"NSObjectsKeys"];
+        NSLog(@"STEP 6: after NSObjectsKeys, count=%lu", (unsigned long)objectKeys.count);
         NSArray *objectValues = [keyed decodeObjectForKey: @"NSObjectsValues"];
+        NSLog(@"STEP 7: after NSObjectsValues, count=%lu", (unsigned long)objectValues.count);
 
         // Replace any custom object with the real thing - and update anything
         // tracking them
@@ -540,10 +547,10 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
     int i, count = [_connections count];
 
     for (i = 0; i < count; i++) {
+        NSLog(@"establishConnection %d/%d: %@", i, count, [_connections objectAtIndex: i]);
         NS_DURING[[_connections objectAtIndex: i] establishConnection];
         NS_HANDLER
-        if (NSDebugEnabled)
-            NSLog(@"Exception during -establishConnection %@", localException);
+        NSLog(@"Exception during -establishConnection %@: %@", [_connections objectAtIndex: i], localException);
         NS_ENDHANDLER
     }
 }

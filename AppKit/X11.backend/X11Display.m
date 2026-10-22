@@ -1415,6 +1415,21 @@ static BOOL relativeEventPoint(Display *dpy, X11Window *window, const X11Relativ
     NSEventType type;
     X11Window* window = (X11Window*) [self windowForID: ev->xany.window];
 
+    if (window == nil) {
+        switch (ev->type) {
+        case SelectionClear:
+        case SelectionRequest:
+        case SelectionNotify:
+        case PropertyNotify:
+        case ClientMessage:
+        case MappingNotify:
+        case GenericEvent:
+            break;
+        default:
+            return;
+        }
+    }
+
     id delegate = [window delegate];
 
     // Expected warp echoes are among the events queued when the warp was
@@ -1675,6 +1690,8 @@ static BOOL relativeEventPoint(Display *dpy, X11Window *window, const X11Relativ
             }
             CGPoint devicePos = NSMakePoint(winX, winY);
             CGFloat scale = [window backingScaleFactor];
+            if (scale <= 0.0)
+                scale = 1.0;
             CGFloat deltaX, deltaY;
 
             if (_relativeMouse.active) {

@@ -523,6 +523,7 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 // NSViewNoIntrinsicMetric in both dimensions; subclasses that know their own
 // size override it.
 @property(readonly) NSSize intrinsicContentSize;
+@property(readonly) NSSize fittingSize;
 @property(readonly, copy) NSArray *layoutGuides;
 - (void) addLayoutGuide: (NSLayoutGuide *) guide;
 - (void) removeLayoutGuide: (NSLayoutGuide *) guide;

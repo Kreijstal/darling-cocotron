@@ -1107,7 +1107,8 @@ static int ignoreBadWindow(Display *display, XErrorEvent *errorEvent) {
 }
 
 - (CGFloat) backingScaleFactor {
-    return [(X11Display *) [NSDisplay currentDisplay] backingScale];
+    CGFloat scale = [(X11Display *) [NSDisplay currentDisplay] backingScale];
+    return scale > 0.0 ? scale : 1.0;
 }
 
 static CGFloat X11ScaledOrigin(CGFloat logical, CGFloat scale) {
