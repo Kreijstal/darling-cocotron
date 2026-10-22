@@ -19,7 +19,33 @@
 
 #import <AppKit/AppKitExport.h>
 #import <Foundation/Foundation.h>
+#import <AppKit/NSUserInterfaceItemIdentification.h>
 
-@interface NSLayoutGuide : NSObject <NSCoding>
+@class NSView, NSLayoutXAxisAnchor, NSLayoutYAxisAnchor, NSLayoutDimension;
+
+@interface NSLayoutGuide : NSObject <NSCoding, NSUserInterfaceItemIdentification> {
+    NSRect _frame;
+    NSView *_owningView;
+    NSString *_identifier;
+}
+
+- (instancetype) init;
+- (instancetype) initWithCoder: (NSCoder *) coder;
+- (void) encodeWithCoder: (NSCoder *) coder;
+
+@property (assign) NSView *owningView;
+@property (copy) NSString *identifier;
+@property (readonly) NSRect frame;
+
+@property (readonly, strong) NSLayoutXAxisAnchor *leadingAnchor;
+@property (readonly, strong) NSLayoutXAxisAnchor *trailingAnchor;
+@property (readonly, strong) NSLayoutXAxisAnchor *leftAnchor;
+@property (readonly, strong) NSLayoutXAxisAnchor *rightAnchor;
+@property (readonly, strong) NSLayoutYAxisAnchor *topAnchor;
+@property (readonly, strong) NSLayoutYAxisAnchor *bottomAnchor;
+@property (readonly, strong) NSLayoutDimension *widthAnchor;
+@property (readonly, strong) NSLayoutDimension *heightAnchor;
+@property (readonly, strong) NSLayoutXAxisAnchor *centerXAnchor;
+@property (readonly, strong) NSLayoutYAxisAnchor *centerYAnchor;
 
 @end

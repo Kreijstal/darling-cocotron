@@ -36,7 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         NSTextInputContext, NSImage, NSBitmapImageRep, NSScrollView,
         NSTrackingArea, NSShadow, NSScreen, CALayer, CIFilter, CALayerContext,
         NSLayoutDimension, NSLayoutXAxisAnchor, NSLayoutYAxisAnchor,
-        NSGestureRecognizer, NSView;
+        NSGestureRecognizer, NSView, NSLayoutGuide;
 
 // See Cocoa Event Handling Guide : Using Tracking-Area Objects : Compatibility
 // Issues
@@ -523,6 +523,9 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 // NSViewNoIntrinsicMetric in both dimensions; subclasses that know their own
 // size override it.
 @property(readonly) NSSize intrinsicContentSize;
+@property(readonly, copy) NSArray *layoutGuides;
+- (void) addLayoutGuide: (NSLayoutGuide *) guide;
+- (void) removeLayoutGuide: (NSLayoutGuide *) guide;
 // Marks the view as needing layout. There is no constraint solver to notify,
 // so nothing recomputes a size from it.
 - (void) invalidateIntrinsicContentSize;

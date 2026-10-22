@@ -754,6 +754,7 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 @property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
 @property BOOL titlebarAppearsTransparent;
 @property NSWindowTitleVisibility titleVisibility;
+@property(getter=isMovableByWindowBackground) BOOL movableByWindowBackground;
 @end
 
 @interface NSWindow (Darling)

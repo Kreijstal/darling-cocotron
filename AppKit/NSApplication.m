@@ -735,7 +735,20 @@ NSApplication *NSApp = nil;
     NS_HANDLER [self reportException: localException];
     NS_ENDHANDLER
 
-            [pool release];
+    // At the end of finishLaunching (run once on startup): if the application launched
+    // without opening any windows, notify the delegate that the app was opened without visible windows.
+    BOOL hasVisible = NO;
+    for (NSWindow *w in _windows) {
+        if ([w isVisible]) {
+            hasVisible = YES;
+            break;
+        }
+    }
+    if (!hasVisible) {
+        [self _reopen];
+    }
+
+    [pool release];
 }
 
 - (void) _checkForReleasedWindows {

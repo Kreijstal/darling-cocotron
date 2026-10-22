@@ -3405,6 +3405,46 @@ static id anchorForView(NSView *view, NSString *className,
     _needsLayout = YES;
 }
 
+static char installedViewLayoutGuidesKey;
+
+static NSMutableArray *installedViewLayoutGuides(NSView *view, BOOL create) {
+    NSMutableArray *guides = objc_getAssociatedObject(view, &installedViewLayoutGuidesKey);
+    if (guides == nil && create) {
+        guides = [NSMutableArray array];
+        objc_setAssociatedObject(view, &installedViewLayoutGuidesKey, guides,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return guides;
+}
+
+- (NSArray *) layoutGuides {
+    NSArray *guides = installedViewLayoutGuides(self, NO);
+    return guides ? [[guides copy] autorelease] : [NSArray array];
+}
+
+- (void) addLayoutGuide: (NSLayoutGuide *) guide {
+    if (guide == nil) return;
+    NSView *oldOwner = [guide owningView];
+    if (oldOwner != nil && oldOwner != self) {
+        [oldOwner removeLayoutGuide: guide];
+    }
+    NSMutableArray *guides = installedViewLayoutGuides(self, YES);
+    if (![guides containsObject: guide]) {
+        [guides addObject: guide];
+        [guide setOwningView: self];
+    }
+}
+
+- (void) removeLayoutGuide: (NSLayoutGuide *) guide {
+    if (guide == nil) return;
+    NSMutableArray *guides = installedViewLayoutGuides(self, NO);
+    if ([guides containsObject: guide]) {
+        [guides removeObject: guide];
+        if ([guide owningView] == self)
+            [guide setOwningView: nil];
+    }
+}
+
 static NSMutableArray *installedViewConstraints(NSView *view, BOOL create) {
     NSMutableArray *constraints = objc_getAssociatedObject(view, &installedViewConstraintsKey);
     if (constraints == nil && create) {

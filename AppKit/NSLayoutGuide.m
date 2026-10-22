@@ -18,17 +18,126 @@
 */
 
 #import <AppKit/NSLayoutGuide.h>
+#import <AppKit/NSView.h>
+#import <Foundation/NSLayoutConstraint.h>
 
 @implementation NSLayoutGuide
 
-- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
-{
-    return [NSMethodSignature signatureWithObjCTypes: "v@:"];
+- (instancetype) init {
+    self = [super init];
+    if (self) {
+        _frame = NSZeroRect;
+        _owningView = nil;
+        _identifier = nil;
+    }
+    return self;
 }
 
-- (void)forwardInvocation:(NSInvocation *)anInvocation
-{
-    NSLog(@"Stub called: %@ in %@", NSStringFromSelector([anInvocation selector]), [self class]);
+- (void) dealloc {
+    [_identifier release];
+    [super dealloc];
+}
+
+- (instancetype) initWithCoder: (NSCoder *) coder {
+    self = [super init];
+    if (self) {
+        if ([coder allowsKeyedCoding]) {
+            _frame = [coder decodeRectForKey: @"NSFrame"];
+            _identifier = [[coder decodeObjectForKey: @"NSUserInterfaceItemIdentifier"] copy];
+        } else {
+            _frame = NSZeroRect;
+            _identifier = nil;
+        }
+        _owningView = nil;
+    }
+    return self;
+}
+
+- (void) encodeWithCoder: (NSCoder *) coder {
+    if ([coder allowsKeyedCoding]) {
+        [coder encodeRect: _frame forKey: @"NSFrame"];
+        [coder encodeObject: _identifier forKey: @"NSUserInterfaceItemIdentifier"];
+    }
+}
+
+- (NSView *) owningView {
+    return _owningView;
+}
+
+- (void) setOwningView: (NSView *) view {
+    _owningView = view;
+}
+
+- (id) nsli_superitem {
+    return _owningView;
+}
+
+- (NSString *) identifier {
+    return _identifier;
+}
+
+- (void) setIdentifier: (NSString *) identifier {
+    if (_identifier != identifier) {
+        [_identifier release];
+        _identifier = [identifier copy];
+    }
+}
+
+- (NSRect) frame {
+    return _frame;
+}
+
+- (void) setFrame: (NSRect) frame {
+    _frame = frame;
+}
+
+static id anchorForItem(id item, NSString *className, NSLayoutAttribute attribute) {
+    Class cls = NSClassFromString(className);
+    if (cls == Nil)
+        cls = NSClassFromString(@"NSLayoutAnchor");
+    if (cls == Nil || ![cls instancesRespondToSelector: @selector(initWithItem:attribute:)])
+        return nil;
+    return [[[cls alloc] initWithItem: item attribute: attribute] autorelease];
+}
+
+- (NSLayoutXAxisAnchor *) leadingAnchor {
+    return anchorForItem(self, @"NSLayoutXAxisAnchor", NSLayoutAttributeLeading);
+}
+
+- (NSLayoutXAxisAnchor *) trailingAnchor {
+    return anchorForItem(self, @"NSLayoutXAxisAnchor", NSLayoutAttributeTrailing);
+}
+
+- (NSLayoutXAxisAnchor *) leftAnchor {
+    return anchorForItem(self, @"NSLayoutXAxisAnchor", NSLayoutAttributeLeft);
+}
+
+- (NSLayoutXAxisAnchor *) rightAnchor {
+    return anchorForItem(self, @"NSLayoutXAxisAnchor", NSLayoutAttributeRight);
+}
+
+- (NSLayoutYAxisAnchor *) topAnchor {
+    return anchorForItem(self, @"NSLayoutYAxisAnchor", NSLayoutAttributeTop);
+}
+
+- (NSLayoutYAxisAnchor *) bottomAnchor {
+    return anchorForItem(self, @"NSLayoutYAxisAnchor", NSLayoutAttributeBottom);
+}
+
+- (NSLayoutDimension *) widthAnchor {
+    return anchorForItem(self, @"NSLayoutDimension", NSLayoutAttributeWidth);
+}
+
+- (NSLayoutDimension *) heightAnchor {
+    return anchorForItem(self, @"NSLayoutDimension", NSLayoutAttributeHeight);
+}
+
+- (NSLayoutXAxisAnchor *) centerXAnchor {
+    return anchorForItem(self, @"NSLayoutXAxisAnchor", NSLayoutAttributeCenterX);
+}
+
+- (NSLayoutYAxisAnchor *) centerYAnchor {
+    return anchorForItem(self, @"NSLayoutYAxisAnchor", NSLayoutAttributeCenterY);
 }
 
 @end
