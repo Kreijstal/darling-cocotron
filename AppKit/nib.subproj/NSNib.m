@@ -292,9 +292,22 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
                 [object performSelector: @selector(postAwakeFromNib)];
         }
 
-        [[objectData visibleWindows]
-                makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
-                                withObject: nil];
+        if ([[objectData visibleWindows] count] > 0) {
+            [[objectData visibleWindows]
+                    makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
+                                    withObject: nil];
+        } else {
+            // For compiled NIBArchives where NSVisibleWindows was not preserved in IB.objectdata:
+            // make non-sheet, non-panel windows visible.
+            for (id obj in _allObjects) {
+                if ([obj isKindOfClass: [NSWindow class]]) {
+                    NSWindow *w = (NSWindow *)obj;
+                    if (![w isSheet] && ![w isKindOfClass: [NSPanel class]]) {
+                        [w makeKeyAndOrderFront: nil];
+                    }
+                }
+            }
+        }
     }
 
     return (objectData != nil);

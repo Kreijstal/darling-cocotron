@@ -130,8 +130,10 @@ static NSDocumentController *s_sharedDocumentController = nil;
 }
 
 - (void) dealloc {
-    if (s_sharedDocumentController == self)
-        s_sharedDocumentController = nil;
+    @synchronized([NSDocumentController class]) {
+        if (s_sharedDocumentController == self)
+            s_sharedDocumentController = nil;
+    }
     [_documents release];
     [_fileTypes release];
     [super dealloc];

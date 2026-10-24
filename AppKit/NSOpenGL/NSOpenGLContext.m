@@ -185,7 +185,7 @@ static inline void _clearCurrentContext() {
         } else {
             [self performSelectorOnMainThread: @selector(updateViewParameters)
                                    withObject: nil
-                                waitUntilDone: NO];
+                                waitUntilDone: YES];
         }
     }
 
@@ -209,7 +209,7 @@ static inline void _clearCurrentContext() {
             NSLog(@"CGLSetCurrentContext without window failed with %d in %s %d", error, __FILE__, __LINE__);
             return;
         }
-        _drawableAttachmentSucceeded = NO;
+        _drawableAttachmentSucceeded = YES;
     }
 
     _setCurrentContext(self);
