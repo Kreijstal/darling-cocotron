@@ -14,7 +14,7 @@ typedef NS_OPTIONS(unsigned int, CAEdgeAntialiasingMask) {
     kCALayerTopEdge = 1U << 3,
 };
 
-enum {
+typedef NS_OPTIONS(unsigned int, CAAutoresizingMask) {
     kCALayerNotSizable = 0x00,
     kCALayerMinXMargin = 0x01,
     kCALayerWidthSizable = 0x02,
@@ -137,10 +137,12 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
     NSArray *_constraints;
     NSDictionary *_actions;
     BOOL _geometryFlipped;
+    CAAutoresizingMask _autoresizingMask;
 }
 
 + layer;
 
+@property CAAutoresizingMask autoresizingMask;
 @property(copy) NSString *name;
 @property(readonly) CALayer *superlayer;
 @property(copy) NSArray<CALayer *> *sublayers;
@@ -236,6 +238,7 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 - (void) removeFromSuperlayer;
 - (void) setNeedsDisplay;
 - (void) setNeedsDisplayInRect: (CGRect) rect;
+- (CGRect) visibleRect;
 
 - (void) addAnimation: (CAAnimation *) animation forKey: (NSString *) key;
 - (CAAnimation *) animationForKey: (NSString *) key;

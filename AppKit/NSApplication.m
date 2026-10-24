@@ -720,11 +720,8 @@ NSApplication *NSApp = nil;
     }
 
     if (needsUntitled && controller &&
-        ![controller documentClassForType: [controller defaultType]]) {
-        needsUntitled = NO;
-    }
-
-    if (needsUntitled && controller) {
+        [controller defaultType] != nil &&
+        [controller documentClassForType: [controller defaultType]] != Nil) {
         [controller _updateRecentDocumentsMenu];
         [controller newDocument: self];
     }
@@ -1922,6 +1919,11 @@ void NSUpdateDynamicServices(void) {
 BOOL NSPerformService(NSString *itemName, NSPasteboard *pasteboard) {
     NSUnimplementedFunction();
     return NO;
+}
+
+BOOL NSApplicationLoad(void) {
+    [NSApplication sharedApplication];
+    return YES;
 }
 
 @implementation NSApplication (NSWindowEnumeration)

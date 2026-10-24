@@ -1021,6 +1021,18 @@ static BOOL _allowsAutomaticWindowTabbing;
           display: (BOOL) display
           animate: (BOOL) animate
 {
+    if (_minSize.width > 0)
+        newFrame.size.width = MAX(newFrame.size.width, _minSize.width);
+    if (_minSize.height > 0)
+        newFrame.size.height = MAX(newFrame.size.height, _minSize.height);
+    if (_contentMinSize.width > 0 || _contentMinSize.height > 0) {
+        NSRect minFrame = [self frameRectForContentRect: NSMakeRect(0, 0, _contentMinSize.width, _contentMinSize.height)];
+        if (minFrame.size.width > 0)
+            newFrame.size.width = MAX(newFrame.size.width, minFrame.size.width);
+        if (minFrame.size.height > 0)
+            newFrame.size.height = MAX(newFrame.size.height, minFrame.size.height);
+    }
+
     BOOL didSize = !NSEqualSizes(newFrame.size, _frame.size);
     BOOL didMove = !NSEqualPoints(newFrame.origin, _frame.origin);
 
@@ -1031,6 +1043,7 @@ static BOOL _allowsAutomaticWindowTabbing;
     [_platformWindow setFrame: _frame];
 
     if (didSize) {
+        [self layoutIfNeeded];
         [self resetCursorRects];
         [self postNotificationName: NSWindowDidResizeNotification];
     }

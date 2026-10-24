@@ -544,6 +544,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [(NSTextFieldCell *) _cell setAllowsDefaultTighteningForTruncation: flag];
 }
 
+- (BOOL) allowsEditingTextAttributes {
+    return [(NSTextFieldCell *) _cell allowsEditingTextAttributes];
+}
+
+- (void) setAllowsEditingTextAttributes: (BOOL) flag {
+    [(NSTextFieldCell *) _cell setAllowsEditingTextAttributes: flag];
+}
+
 @end
 
 @implementation NSTextField (Bindings)

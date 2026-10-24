@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 @property CGFloat preferredMaxLayoutWidth;
 @property(getter=isAutomaticTextCompletionEnabled) BOOL automaticTextCompletionEnabled;
 @property NSTextFieldBezelStyle bezelStyle;
+@property BOOL allowsEditingTextAttributes;
 
 + (instancetype)labelWithString:(NSString *)stringValue;
 
@@ -63,6 +64,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 @property BOOL allowsDefaultTighteningForTruncation;
 - (BOOL) allowsDefaultTighteningForTruncation;
 - (void) setAllowsDefaultTighteningForTruncation: (BOOL) flag;
+
+- (BOOL) allowsEditingTextAttributes;
+- (void) setAllowsEditingTextAttributes: (BOOL) flag;
 
 - (BOOL) textView: (NSTextView *) textView doCommandBySelector: (SEL) selector;
 

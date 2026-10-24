@@ -276,9 +276,12 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
             id object = [_allObjects objectAtIndex: i];
 
             if ([object respondsToSelector: @selector(awakeFromNib)]) {
-                NSLog(@"Entering awakeFromNib for %d/%d: %@", i, count, [object class]);
-                [object awakeFromNib];
-                NSLog(@"Exiting awakeFromNib for %d/%d: %@", i, count, [object class]);
+                @try {
+                    [object awakeFromNib];
+                } @catch (NSException *e) {
+                    NSLog(@"EXCEPTION in awakeFromNib for %@: %@: %@\n%@", [object class], [e name], [e reason], [e callStackSymbols]);
+                    @throw;
+                }
             }
         }
 
@@ -289,23 +292,9 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
                 [object performSelector: @selector(postAwakeFromNib)];
         }
 
-        if ([[objectData visibleWindows] count] > 0) {
-            [[objectData visibleWindows]
-                    makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
-                                    withObject: nil];
-        } else {
-            // For compiled NIBArchives where NSVisibleWindows was not preserved in IB.objectdata:
-            // make non-sheet, non-panel windows visible.
-            for (id obj in _allObjects) {
-                if ([obj isKindOfClass: [NSWindow class]]) {
-                    NSWindow *w = (NSWindow *)obj;
-                    if (![w isSheet] && ![w isKindOfClass: [NSPanel class]]) {
-                        NSLog(@"NSNib: ordering front window %p, title '%@'", w, [w title]);
-                        [w makeKeyAndOrderFront: nil];
-                    }
-                }
-            }
-        }
+        [[objectData visibleWindows]
+                makeObjectsPerformSelector: @selector(makeKeyAndOrderFront:)
+                                withObject: nil];
     }
 
     return (objectData != nil);

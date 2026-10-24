@@ -205,7 +205,7 @@ static void eventPosted(void *info) {}
 {
     NSEvent *result = nil;
 
-    if ([_eventQueue count])
+    if ([_eventQueue count] || [untilDate timeIntervalSinceNow] <= 0.0)
         untilDate = [NSDate date];
 
     [[NSRunLoop currentRunLoop] runMode: mode beforeDate: untilDate];

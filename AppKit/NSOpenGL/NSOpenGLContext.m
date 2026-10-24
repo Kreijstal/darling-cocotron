@@ -179,26 +179,40 @@ static inline void _clearCurrentContext() {
     CGLError error;
     _drawableAttachmentSucceeded = NO;
 
-    [self performSelectorOnMainThread: @selector(updateViewParameters)
-                           withObject: nil
-                        waitUntilDone: YES];
+    if (_subwindow == nil) {
+        if ([NSThread isMainThread]) {
+            [self updateViewParameters];
+        } else {
+            [self performSelectorOnMainThread: @selector(updateViewParameters)
+                                   withObject: nil
+                                waitUntilDone: NO];
+        }
+    }
 
     if ([_subwindow respondsToSelector: @selector(requiresMainThreadPresentation)] &&
         [_subwindow requiresMainThreadPresentation] && ![NSThread isMainThread]) {
         NSLog(@"This window backend requires OpenGL rendering on the main thread");
         return;
     }
-    if ((error = CGLContextMakeCurrentAndAttachToWindow(
-                 _glContext, _cglWindow)) != kCGLNoError) {
-        NSLog(@"CGLSetCurrentContext failed with %d in %s %d", error, __FILE__,
-              __LINE__);
-        // A swap-interval error may occur after EGL successfully switched.
-        if (CGLGetCurrentContext() == _glContext) _setCurrentContext(self);
-        return;
+    if (_cglWindow != NULL) {
+        if ((error = CGLContextMakeCurrentAndAttachToWindow(
+                     _glContext, _cglWindow)) != kCGLNoError) {
+            NSLog(@"CGLSetCurrentContext failed with %d in %s %d", error, __FILE__,
+                  __LINE__);
+            // A swap-interval error may occur after EGL successfully switched.
+            if (CGLGetCurrentContext() == _glContext) _setCurrentContext(self);
+            return;
+        }
+        _drawableAttachmentSucceeded = YES;
+    } else {
+        if ((error = CGLSetCurrentContext(_glContext)) != kCGLNoError) {
+            NSLog(@"CGLSetCurrentContext without window failed with %d in %s %d", error, __FILE__, __LINE__);
+            return;
+        }
+        _drawableAttachmentSucceeded = NO;
     }
 
     _setCurrentContext(self);
-    _drawableAttachmentSucceeded = YES;
 
     if (!_hasPrepared) {
         _hasPrepared = YES;

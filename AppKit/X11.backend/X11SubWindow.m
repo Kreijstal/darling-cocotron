@@ -25,6 +25,8 @@
 
     // A child window is positioned in the parent's DEVICE pixels.
     O2Rect device = [parent deviceRect: parentFrame];
+    device.size.width = fmax(device.size.width, 1.0);
+    device.size.height = fmax(device.size.height, 1.0);
     _window = XCreateSimpleWindow(_display, [parent windowHandle],
                                   device.origin.x, device.origin.y,
                                   device.size.width, device.size.height, 0, 0,
@@ -64,12 +66,14 @@
 }
 
 - (void) flush {
-    XFlush(_display);
+    // Presentation is handled by EGL/CGL; avoid concurrent XFlush on _display from background threads
 }
 
 - (void) setFrame: (CGRect) frame {
     _frame = frame;
     O2Rect device = [_parent deviceRect: [self convertFrame: frame]];
+    device.size.width = fmax(device.size.width, 1.0);
+    device.size.height = fmax(device.size.height, 1.0);
 
     XMoveResizeWindow(_display, _window, device.origin.x, device.origin.y,
                       device.size.width, device.size.height);

@@ -108,9 +108,38 @@ public:
             NSView *view = entry.first;
             Geometry &g = entry.second;
             NSRect frame = view == root ? [root bounds] : [view convertRect:[view bounds] toView:root];
-            if (view == root || [view translatesAutoresizingMaskIntoConstraints]) {
+            if (view == root) {
                 add(g.x == frame.origin.x); add(g.y == frame.origin.y);
                 add(g.width == frame.size.width); add(g.height == frame.size.height);
+            } else if ([view translatesAutoresizingMaskIntoConstraints]) {
+                NSUInteger mask = [view autoresizingMask];
+                auto p_found = geometry.find([view superview]);
+                // Full resizing mask covers container-filling views.
+                // TODO: handle partial autoresizing masks (e.g. single-axis flexible, margins)
+                if (p_found != geometry.end() && (mask & (NSViewWidthSizable | NSViewHeightSizable)) == (NSViewWidthSizable | NSViewHeightSizable)) {
+                    Geometry &p = p_found->second;
+                    NSRect curFrame = [view frame];
+                    NSView *parentView = [view superview];
+                    NSRect pBounds = [parentView bounds];
+                    CGFloat leftMargin = curFrame.origin.x - pBounds.origin.x;
+                    CGFloat rightMargin = (pBounds.origin.x + pBounds.size.width) - (curFrame.origin.x + curFrame.size.width);
+                    CGFloat bottomMargin, topMargin;
+                    if ([parentView isFlipped]) {
+                        topMargin = curFrame.origin.y - pBounds.origin.y;
+                        bottomMargin = (pBounds.origin.y + pBounds.size.height) - (curFrame.origin.y + curFrame.size.height);
+                    } else {
+                        bottomMargin = curFrame.origin.y - pBounds.origin.y;
+                        topMargin = (pBounds.origin.y + pBounds.size.height) - (curFrame.origin.y + curFrame.size.height);
+                    }
+
+                    add(g.x == p.x + leftMargin);
+                    add(g.y == p.y + bottomMargin);
+                    add(g.width == p.width - (leftMargin + rightMargin));
+                    add(g.height == p.height - (bottomMargin + topMargin));
+                } else {
+                    add(g.x == frame.origin.x); add(g.y == frame.origin.y);
+                    add(g.width == frame.size.width); add(g.height == frame.size.height);
+                }
             } else {
                 add(g.width >= 0.0); add(g.height >= 0.0);
                 intrinsic(view, g);
@@ -138,11 +167,21 @@ public:
         NSMutableArray *views = [NSMutableArray array];
         NSMutableArray *frames = [NSMutableArray array];
         for (NSView *view : traversal) {
-            if (view == root || [view translatesAutoresizingMaskIntoConstraints]) continue;
-            Geometry &g = geometry.at(view);
-            NSRect absolute = NSMakeRect(g.x.value(), g.y.value(), g.width.value(), g.height.value());
+            if (view == root) continue;
+            if ([view translatesAutoresizingMaskIntoConstraints]) {
+                NSUInteger mask = [view autoresizingMask];
+                if ((mask & (NSViewWidthSizable | NSViewHeightSizable)) != (NSViewWidthSizable | NSViewHeightSizable))
+                    continue;
+            }
+            auto g_it = geometry.find(view);
+            if (g_it == geometry.end()) continue;
+            Geometry &g = g_it->second;
             NSView *parent = [view superview];
-            Geometry &p = geometry.at(parent);
+            if (!parent) continue;
+            auto p_it = geometry.find(parent);
+            if (p_it == geometry.end()) continue;
+            Geometry &p = p_it->second;
+            NSRect absolute = NSMakeRect(g.x.value(), g.y.value(), g.width.value(), g.height.value());
             NSRect relative = NSMakeRect(absolute.origin.x - p.x.value(), absolute.origin.y - p.y.value(), absolute.size.width, absolute.size.height);
             if ([parent isFlipped] != [root isFlipped])
                 relative.origin.y = p.height.value() - relative.origin.y - relative.size.height;

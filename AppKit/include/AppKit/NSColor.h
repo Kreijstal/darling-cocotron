@@ -28,6 +28,15 @@ APPKIT_EXPORT NSNotificationName const NSSystemColorsDidChangeNotification;
 typedef NSString *NSColorListName;
 typedef NSString *NSColorName;
 typedef NSString *NSColorSpaceName;
+#ifndef _NSCONTROLTINT_DEFINED
+#define _NSCONTROLTINT_DEFINED
+typedef NS_ENUM(NSUInteger, NSControlTint) {
+    NSDefaultControlTint = 0,
+    NSBlueControlTint = 1,
+    NSGraphiteControlTint = 6,
+    NSClearControlTint = 7
+};
+#endif
 
 typedef NS_ENUM(NSInteger, NSColorType) {
     NSColorTypeComponentBased = 0,
@@ -181,6 +190,8 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 + (NSColor *) controlHighlightColor;
 + (NSColor *) controlLightHighlightColor;
 + (NSColor *) controlShadowColor;
++ (NSControlTint) currentControlTint;
++ (NSColor *) colorForControlTint: (NSControlTint) controlTint;
 + (NSArray *) controlAlternatingRowBackgroundColors;
 
 + (NSColor *) keyboardFocusIndicatorColor;

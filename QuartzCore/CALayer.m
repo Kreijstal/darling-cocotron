@@ -120,6 +120,18 @@ static char swiftUIViewTestPropertiesAssociationKey;
     _delegate = value;
 }
 
+- (CAAutoresizingMask) autoresizingMask {
+    return _autoresizingMask;
+}
+
+- (void) setAutoresizingMask: (CAAutoresizingMask) mask {
+    _autoresizingMask = mask;
+}
+
+- (CGRect) visibleRect {
+    return _bounds;
+}
+
 - (NSString *) name {
     return _name;
 }

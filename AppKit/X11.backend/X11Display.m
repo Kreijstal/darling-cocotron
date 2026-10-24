@@ -28,8 +28,8 @@
 #import <Foundation/NSDebug.h>
 #import <poll.h>
 
-#ifndef DARLING
 #import <Foundation/NSSelectInputSource.h>
+#ifndef DARLING
 #import <Foundation/NSSocket_bsd.h>
 #endif
 
@@ -92,6 +92,7 @@ static void socketCallback(CFSocketRef s, CFSocketCallBackType type,
 
 - init {
     if (self = [super init]) {
+        XInitThreads();
 
         _display = XOpenDisplay(NULL);
 
@@ -1153,33 +1154,19 @@ static int compareFontPatterns(const void *a, const void *b) {
                              inMode: (NSRunLoopMode) mode
                             dequeue: (BOOL) dequeue
 {
-#ifndef DARLING
-    [[NSRunLoop currentRunLoop] addInputSource: _inputSource forMode: mode];
-#else
     [self processPendingEvents];
-#endif
 
-    NSEvent *result = [super nextEventMatchingMask: mask
-                                         untilDate: untilDate
-                                            inMode: mode
-                                           dequeue: dequeue];
-
-#ifdef DARLING
-    if (result == nil && XPending(_display) == 0 && [_eventQueue count] == 0) {
-        NSTimeInterval timeout = [untilDate timeIntervalSinceNow];
-        if (timeout > 0.0) {
-            struct pollfd pfd = { .fd = _fileDescriptor, .events = POLLIN };
-            poll(&pfd, 1, 1);
+    if ([_eventQueue count] == 0) {
+        struct pollfd pfd = { .fd = _fileDescriptor, .events = POLLIN };
+        if (poll(&pfd, 1, 0) > 0) {
             [self processPendingEvents];
         }
     }
-#endif
 
-#ifndef DARLING
-    [[NSRunLoop currentRunLoop] removeInputSource: _inputSource forMode: mode];
-#endif
-
-    return result;
+    return [super nextEventMatchingMask: mask
+                              untilDate: untilDate
+                                 inMode: mode
+                                dequeue: dequeue];
 }
 
 - (NSEventModifierFlags) modifierFlagsForState: (unsigned int) state {
@@ -1999,13 +1986,7 @@ static BOOL relativeEventPoint(Display *dpy, X11Window *window, const X11Relativ
     }
 }
 
-#ifndef DARLING
-- (void) selectInputSource: (NSSelectInputSource *) inputSource
-               selectEvent: (NSUInteger) selectEvent
-{
-#else
 - (void) processPendingEvents {
-#endif
     int numEvents;
 
     while ((numEvents = XPending(_display)) > 0) {
@@ -2017,6 +1998,12 @@ static BOOL relativeEventPoint(Display *dpy, X11Window *window, const X11Relativ
         else
             [self postXEvent: &e];
     }
+}
+
+- (void) selectInputSource: (NSSelectInputSource *) inputSource
+               selectEvent: (NSUInteger) selectEvent
+{
+    [self processPendingEvents];
 }
 
 - (int) handleError: (XErrorEvent *) errorEvent {

@@ -102,32 +102,36 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @implementation NSDocumentController
 
-static NSDocumentController *shared = nil;
+static NSDocumentController *s_sharedDocumentController = nil;
 
-+ sharedDocumentController {
-    if (shared == nil) {
-        // NOTE: it is important that this is `self` and not `NSDocumentController` directly;
-        //       Xcode subclasses NSDocumentController and invokes this class method on said subclass,
-        //       expecting the shared controller to be allocated as that subclass instead of `NSDocumentController`.
-        shared = [[self alloc] init];
-        [shared _updateRecentDocumentsMenu];
++ (id) sharedDocumentController {
+    if (s_sharedDocumentController == nil) {
+        @synchronized([NSDocumentController class]) {
+            if (s_sharedDocumentController == nil) {
+                s_sharedDocumentController = [[self alloc] init];
+                [s_sharedDocumentController _updateRecentDocumentsMenu];
+            }
+        }
     }
-
-    return shared;
+    return s_sharedDocumentController;
 }
 
 - init {
-    if (shared == nil)
-        shared = self;
-
-    _documents = [NSMutableArray new];
-    _fileTypes = [[[[NSBundle mainBundle] infoDictionary]
-            objectForKey: @"CFBundleDocumentTypes"] retain];
-    _autosavingDelay = 0;
+    self = [super init];
+    if (self) {
+        if (s_sharedDocumentController == nil)
+            s_sharedDocumentController = self;
+        _documents = [NSMutableArray new];
+        _fileTypes = [[[[NSBundle mainBundle] infoDictionary]
+                objectForKey: @"CFBundleDocumentTypes"] retain];
+        _autosavingDelay = 0;
+    }
     return self;
 }
 
 - (void) dealloc {
+    if (s_sharedDocumentController == self)
+        s_sharedDocumentController = nil;
     [_documents release];
     [_fileTypes release];
     [super dealloc];
@@ -485,7 +489,7 @@ static NSDocumentController *shared = nil;
  * window, which is what the missing action was preventing.
  */
 + (void) newDocument: (id) sender {
-    [[self sharedDocumentController] makeUntitledDocumentOfType: @"rtf" error: NULL];
+    [[self sharedDocumentController] openUntitledDocumentAndDisplay: YES error: NULL];
 }
 
 - (id) makeUntitledDocumentOfType: (NSString *) type

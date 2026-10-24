@@ -100,6 +100,7 @@
 
 - (void) setWindow: (id) window forID: (XID) i;
 
+- (void) processPendingEvents;
 - (CGFloat) doubleClickInterval;
 - (int) handleError: (XErrorEvent *) errorEvent;
 @end

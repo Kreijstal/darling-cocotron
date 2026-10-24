@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSBezierPath.h>
+#import <AppKit/NSCell.h>
 #import <AppKit/NSColor.h>
 #import <AppKit/NSColorSpace.h>
 #import <AppKit/NSColor_CGColor.h>
@@ -1331,6 +1332,16 @@ static void releasePatternInfo(void *info) {
         return [NSColor colorWithCalibratedRed: c[0] green: c[0] blue: c[0] alpha: c[1]];
     }
     return nil;
+}
+
++ (NSControlTint) currentControlTint {
+    return NSDefaultControlTint;
+}
+
++ (NSColor *) colorForControlTint: (NSControlTint) controlTint {
+    if (controlTint == NSGraphiteControlTint)
+        return [NSColor secondarySelectedControlColor];
+    return [NSColor selectedControlColor];
 }
 
 @end

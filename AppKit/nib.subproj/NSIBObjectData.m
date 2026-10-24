@@ -224,7 +224,12 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
             NSMapInsertIfAbsent(_oidTable, accessibilityOidKeys[i], (const void *)((NSNumber *)accessibilityOidValues[i]).integerValue);
         }
 
-        [_visibleWindows setSet: [keyed decodeObjectForKey: @"NSVisibleWindows"]];
+        id vis = [keyed decodeObjectForKey: @"NSVisibleWindows"];
+        if ([vis isKindOfClass: [NSSet class]]) {
+            [_visibleWindows setSet: vis];
+        } else if ([vis isKindOfClass: [NSArray class]]) {
+            [_visibleWindows addObjectsFromArray: vis];
+        }
     } else {
         NSInteger version = [coder versionForClassName: @"NSIBObjectData"];
         int count;
