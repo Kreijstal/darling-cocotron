@@ -313,6 +313,14 @@ NSApplication *NSApp = nil;
     return _isRunning;
 }
 
+- (BOOL) _running {
+    return _isRunning;
+}
+
+- (void) set_running: (BOOL) running {
+    _isRunning = running;
+}
+
 - (NSWindow *) makeWindowsPerform: (SEL) selector inOrder: (BOOL) inOrder {
     NSUnimplementedMethod();
     return nil;
