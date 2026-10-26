@@ -643,11 +643,19 @@ static id (*orig_specificationForIdentifier)(id, SEL, id, id) = NULL;
 
 static id hook_specificationForIdentifier(id self, SEL _cmd, id identifier, id doc)
 {
-    if (identifier == nil || [identifier isEqualToString:@"<unknown>"]) {
+    if (identifier == nil) {
         return nil;
     }
-    if (orig_specificationForIdentifier) {
-        return orig_specificationForIdentifier(self, _cmd, identifier, doc);
+    NSString *idStr = [identifier description];
+    if ([idStr length] == 0 || [idStr rangeOfString:@"unknown" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        return nil;
+    }
+    @try {
+        if (orig_specificationForIdentifier) {
+            return orig_specificationForIdentifier(self, _cmd, identifier, doc);
+        }
+    } @catch (NSException *ex) {
+        return nil;
     }
     return nil;
 }

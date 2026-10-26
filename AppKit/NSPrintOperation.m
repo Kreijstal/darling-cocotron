@@ -333,8 +333,16 @@ static NSPrintOperation *_currentOperation = nil;
 
         if ((context = (CGContextRef)
                      [[_printInfo dictionary] objectForKey: @"_KGContext"]) ==
-            nil)
-            return nil;
+            nil) {
+            NSRect bounds = [_printInfo imageablePageBounds];
+            CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+            context = CGBitmapContextCreate(NULL, fmax(bounds.size.width, 1.0), fmax(bounds.size.height, 1.0), 8, 0, cs, kCGImageAlphaPremultipliedLast);
+            CGColorSpaceRelease(cs);
+            if (context == nil) {
+                return nil;
+            }
+            [(id) context autorelease];
+        }
     } else if (_type == NSPrintOperationPDFInRect) {
         NSDictionary *auxiliaryInfo = [NSDictionary
                 dictionaryWithObject: [[_view window] title]
@@ -463,7 +471,9 @@ static NSPrintOperation *_currentOperation = nil;
     }
 
     [_view endDocument];
-    CGPDFContextClose(cgContext);
+    if (cgContext != NULL && _type == NSPrintOperationPDFInRect) {
+        CGPDFContextClose(cgContext);
+    }
     [NSGraphicsContext restoreGraphicsState];
 
     [self destroyContext];
@@ -507,7 +517,13 @@ static NSPrintOperation *_currentOperation = nil;
                      didRunSelector: (SEL) didRunSelector
                         contextInfo: (void *) contextInfo
 {
-    BOOL success = [self runOperation];
+    BOOL success = NO;
+    @try {
+        success = [self runOperation];
+    } @catch (NSException *ex) {
+        NSLog(@"[NSPrintOperation runOperation] raised: %@", ex);
+        success = NO;
+    }
     if (delegate != nil && didRunSelector != NULL)
         ((void (*)(id, SEL, NSPrintOperation *, BOOL, void *)) objc_msgSend)(
                 delegate, didRunSelector, self, success, contextInfo);

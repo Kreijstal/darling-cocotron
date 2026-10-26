@@ -764,3 +764,4 @@ else ()
 endif ()
 
 set_source_files_properties(DarlingLayout.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-std=c++14 -fexceptions")
+set_source_files_properties(NSApplication.m PROPERTIES COMPILE_FLAGS "-fobjc-exceptions")
