@@ -1290,7 +1290,6 @@ static NSString *stringWithCodepoint(uint32_t codepoint) {
     [window setLastKnownCursorPosition: NSMakePoint(warp.windowX, warp.windowY)];
     return YES;
 }
-}
 
 - (void) grabMouse: (BOOL) doGrab {
     _pointerLockRequested = doGrab;
