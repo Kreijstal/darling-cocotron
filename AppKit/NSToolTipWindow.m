@@ -141,3 +141,6 @@ NSString *const NSToolTipHelpKey = @"NSToolTipHelp";
 }
 
 @end
+
+@implementation NSToolTipPanel
+@end

@@ -30,6 +30,20 @@ APPKIT_EXPORT const NSNotificationName NSMenuDidSendActionNotification;
 APPKIT_EXPORT const NSNotificationName NSMenuDidBeginTrackingNotification;
 APPKIT_EXPORT const NSNotificationName NSMenuDidEndTrackingNotification;
 
+APPKIT_EXPORT NSString *const NSFontMenuName;
+APPKIT_EXPORT NSString *const NSHelpMenuName;
+APPKIT_EXPORT NSString *const NSMainMenuName;
+APPKIT_EXPORT NSString *const NSRecentDocumentsMenuName;
+APPKIT_EXPORT NSString *const NSServicesMenuName;
+APPKIT_EXPORT NSString *const NSWindowsMenuName;
+
+APPKIT_EXPORT NSString *const _NSFontMenuName;
+APPKIT_EXPORT NSString *const _NSHelpMenuName;
+APPKIT_EXPORT NSString *const _NSMainMenuName;
+APPKIT_EXPORT NSString *const _NSRecentDocumentsMenuName;
+APPKIT_EXPORT NSString *const _NSServicesMenuName;
+APPKIT_EXPORT NSString *const _NSWindowsMenuName;
+
 @interface NSMenu : NSObject <NSCopying, NSUserInterfaceItemIdentification> {
     NSMenu *_supermenu;
     NSString *_title;

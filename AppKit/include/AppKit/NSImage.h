@@ -286,6 +286,7 @@ APPKIT_EXPORT NSImageName const NSImageNameRefreshTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameRemoveTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameRevealFreestandingTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameRightFacingTriangleTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameScriptTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameShareTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameSlideshowTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameSmartBadgeTemplate;
@@ -309,6 +310,9 @@ APPKIT_EXPORT NSImageName const NSImageNameTouchBarPauseTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameTouchBarPlayTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameTouchBarRecordStopTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameTouchBarAddTabTemplate;
+
+APPKIT_EXPORT NSImage *_NSReadThemeImageFromRsrc(id arg1, ...);
+APPKIT_EXPORT NSImage *_NSGetThemePartImages(id arg1, ...);
 
 APPKIT_EXPORT NSImageHintKey const NSImageHintInterpolation;
 APPKIT_EXPORT NSImageHintKey const NSImageHintCTM NS_SWIFT_NAME(ctm);

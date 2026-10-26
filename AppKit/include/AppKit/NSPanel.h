@@ -53,6 +53,10 @@ APPKIT_EXPORT NSInteger NSRunAlertPanel(NSString *title, NSString *message,
                                         NSString *defaultButton,
                                         NSString *alternateButton,
                                         NSString *otherButton, ...);
+APPKIT_EXPORT NSInteger NSRunAlertPanelRelativeToWindow(
+        NSString *title, NSString *message, NSString *defaultButton,
+        NSString *alternateButton, NSString *otherButton,
+        NSWindow *docWindow, ...);
 APPKIT_EXPORT NSInteger NSRunInformationalAlertPanel(
         NSString *title, NSString *msgFormat, NSString *defaultButton,
         NSString *alternateButton, NSString *otherButton, ...);

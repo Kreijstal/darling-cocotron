@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSModalSessionX.h>
 #import <AppKit/NSNibLoading.h>
 #import <AppKit/NSPageLayout.h>
+#import <objc/runtime.h>
 #import <AppKit/NSPanel.h>
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSScreen.h>
@@ -248,6 +249,17 @@ NSApplication *NSApp = nil;
 
 - (NSMenu *) mainMenu {
     return _mainMenu;
+}
+
+- (NSMenu *) dockMenu {
+    return _dockMenu;
+}
+
+- (void) setDockMenu: (NSMenu *) menu {
+    if (_dockMenu != menu) {
+        [_dockMenu release];
+        _dockMenu = [menu retain];
+    }
 }
 
 - (NSMenu *) menu {
@@ -589,6 +601,120 @@ NSApplication *NSApp = nil;
 #endif
 }
 
+static id (*orig_platformForName)(id, SEL, id) = NULL;
+
+static id hook_platformForName(id self, SEL _cmd, id name)
+{
+    if (name == nil) {
+        if ([self respondsToSelector: @selector(defaultPlatform)]) {
+            id def = [self performSelector: @selector(defaultPlatform)];
+            if (def != nil) return def;
+        }
+        if ([self respondsToSelector: @selector(allPlatforms)]) {
+            NSArray *all = [self performSelector: @selector(allPlatforms)];
+            if ([all count] > 0)
+                return [all objectAtIndex: 0];
+        }
+        name = @"macosx";
+    }
+    if (orig_platformForName) {
+        id result = orig_platformForName(self, _cmd, name);
+        if (result == nil && [self respondsToSelector: @selector(allPlatforms)]) {
+            NSArray *all = [self performSelector: @selector(allPlatforms)];
+            if ([all count] > 0)
+                return [all objectAtIndex: 0];
+        }
+        return result;
+    }
+    return nil;
+}
+
+static void (*orig_configureWithSpecification)(id, SEL, id) = NULL;
+static void (*orig_moduleWindowWillClose)(id, SEL, id) = NULL;
+static id (*orig_specificationForIdentifier)(id, SEL, id, id) = NULL;
+
+static id hook_specificationForIdentifier(id self, SEL _cmd, id identifier, id doc)
+{
+    if (identifier == nil || [identifier isEqualToString:@"<unknown>"]) {
+        return nil;
+    }
+    if (orig_specificationForIdentifier) {
+        return orig_specificationForIdentifier(self, _cmd, identifier, doc);
+    }
+    return nil;
+}
+
+static void hook_moduleWindowWillClose(id self, SEL _cmd, id note)
+{
+    @try {
+        if (orig_moduleWindowWillClose) {
+            orig_moduleWindowWillClose(self, _cmd, note);
+        }
+    } @catch (NSException *ex) {
+        // Xcode splash screen assertion failure on close is safely absorbed:
+        // [NSAssertionHandler handleFailureInMethod:object:file:lineNumber:description:]
+        // throws NSInternalInconsistencyException
+        if ([[ex name] isEqualToString: NSInternalInconsistencyException]) {
+            return;
+        }
+        @throw;
+    }
+}
+
+static void hook_configureWithSpecification(id self, SEL _cmd, id spec)
+{
+    if (spec == nil) {
+        return;
+    }
+    if (orig_configureWithSpecification) {
+        orig_configureWithSpecification(self, _cmd, spec);
+    }
+}
+
+static void _hookXcodeDevTools(void)
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        Class platClass = objc_lookUpClass("XCPlatformSpecification");
+        if (platClass != Nil) {
+            Class meta = object_getClass((id)platClass);
+            Method m = class_getClassMethod(platClass, @selector(platformForName:));
+            if (m != NULL) {
+                orig_platformForName = (id (*)(id, SEL, id))method_getImplementation(m);
+                class_replaceMethod(meta, @selector(platformForName:), (IMP)hook_platformForName, method_getTypeEncoding(m));
+            }
+        }
+
+        Class perspClass = objc_lookUpClass("XCPerspectiveModule");
+        if (perspClass != Nil) {
+            Method m = class_getInstanceMethod(perspClass, @selector(configureWithSpecification:));
+            if (m != NULL) {
+                orig_configureWithSpecification = (void (*)(id, SEL, id))method_getImplementation(m);
+                class_replaceMethod(perspClass, @selector(configureWithSpecification:), (IMP)hook_configureWithSpecification, method_getTypeEncoding(m));
+            }
+        }
+
+        Class ssmClass = objc_lookUpClass("XCSplashScreenModule");
+        if (ssmClass != Nil) {
+            Method m = class_getInstanceMethod(ssmClass, @selector(moduleWindowWillClose:));
+            if (m != NULL) {
+                orig_moduleWindowWillClose = (void (*)(id, SEL, id))method_getImplementation(m);
+                class_replaceMethod(ssmClass, @selector(moduleWindowWillClose:), (IMP)hook_moduleWindowWillClose, method_getTypeEncoding(m));
+            }
+        }
+
+        Class specClass = objc_lookUpClass("XCPerspectivesSpecification");
+        if (specClass != Nil) {
+            Class meta = object_getClass((id)specClass);
+            Method m = class_getClassMethod(specClass, @selector(specificationForIdentifier:forProjectDocument:));
+            if (m != NULL) {
+                orig_specificationForIdentifier = (id (*)(id, SEL, id, id))method_getImplementation(m);
+                class_replaceMethod(meta, @selector(specificationForIdentifier:forProjectDocument:), (IMP)hook_specificationForIdentifier, method_getTypeEncoding(m));
+            }
+        }
+    });
+}
+
 - (BOOL) openFiles {
     BOOL opened = NO;
     NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
@@ -632,11 +758,20 @@ NSApplication *NSApp = nil;
             }
         }
 
-        // argv[0] is the executable; anything starting with "-" is a switch, not a document.
-        for (NSUInteger i = 1; i < [arguments count]; i++) {
-            NSString *argument = [arguments objectAtIndex: i];
-            if ([argument length] > 0 && ![argument hasPrefix: @"-"])
-                [openFiles addObject: argument];
+        NSArray *procArgs = [[NSProcessInfo processInfo] arguments];
+        if ([procArgs count] > 1) {
+            for (NSUInteger i = 1; i < [procArgs count]; i++) {
+                NSString *argument = [procArgs objectAtIndex: i];
+                if ([argument length] > 0 && ![argument hasPrefix: @"-"])
+                    [openFiles addObject: argument];
+            }
+        } else {
+            // argv[0] is the executable; anything starting with "-" is a switch, not a document.
+            for (NSUInteger i = 1; i < [arguments count]; i++) {
+                NSString *argument = [arguments objectAtIndex: i];
+                if ([argument length] > 0 && ![argument hasPrefix: @"-"])
+                    [openFiles addObject: argument];
+            }
         }
     }
 
@@ -670,13 +805,16 @@ NSApplication *NSApp = nil;
 }
 
 - (void) finishLaunching {
+    _hookXcodeDevTools();
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
     BOOL needsUntitled = YES;
 
     NS_DURING [[NSNotificationCenter defaultCenter]
             postNotificationName: NSApplicationWillFinishLaunchingNotification
                           object: self];
-    NS_HANDLER [self reportException: localException];
+    NS_HANDLER {
+        [self reportException: localException];
+    }
     NS_ENDHANDLER
 
     // Load the application icon if we have one
@@ -719,10 +857,13 @@ NSApplication *NSApp = nil;
         needsUntitled = ![_delegate applicationOpenUntitledFile: self];
     }
 
+    if (controller) {
+        [controller _updateRecentDocumentsMenu];
+    }
+
     if (needsUntitled && controller &&
         [controller defaultType] != nil &&
         [controller documentClassForType: [controller defaultType]] != Nil) {
-        [controller _updateRecentDocumentsMenu];
         [controller newDocument: self];
     }
 
@@ -872,6 +1013,10 @@ NSApplication *NSApp = nil;
     return NO;
 }
 
+- (BOOL) _handleKeyEquivalent: (NSEvent *) event {
+    return [self _performKeyEquivalent: event];
+}
+
 - (void) sendEvent: (NSEvent *) event {
     event = [NSEvent _filterEventWithLocalMonitors: event];
     if (event == nil)
@@ -880,7 +1025,7 @@ NSApplication *NSApp = nil;
     if ([event type] == NSKeyDown) {
         unsigned modifierFlags = [event modifierFlags];
         if (modifierFlags & (NSCommandKeyMask | NSAlternateKeyMask | NSControlKeyMask)) {
-            if ([self _performKeyEquivalent: event])
+            if ([self _handleKeyEquivalent: event])
                 return;
         }
     }
@@ -1097,7 +1242,6 @@ NSApplication *NSApp = nil;
 
 - (void) setWindowsNeedUpdate: (BOOL) value {
     _windowsNeedUpdate = value;
-    NSUnimplementedMethod();
 }
 
 - (void) updateWindows {
@@ -1232,8 +1376,12 @@ NSApplication *NSApp = nil;
     NSModalResponse result;
 
     while ((result = [NSApp runModalSession: session]) ==
-           NSRunContinuesResponse)
-        ;
+           NSRunContinuesResponse) {
+        [self nextEventMatchingMask: NSAnyEventMask
+                          untilDate: [NSDate distantFuture]
+                             inMode: NSModalPanelRunLoopMode
+                            dequeue: NO];
+    }
     [self endModalSession: session];
 
     [values setObject: [NSNumber numberWithInteger: result] forKey: @"result"];
@@ -1283,7 +1431,11 @@ NSApplication *NSApp = nil;
                                       contextInfo: contextInfo
                                             frame: [sheet frame]];
 
-    if ([[NSUserDefaults standardUserDefaults]
+    if (window == nil) {
+        [sheet _setSheetContext: context];
+        [sheet center];
+        [sheet makeKeyAndOrderFront: self];
+    } else if ([[NSUserDefaults standardUserDefaults]
                 boolForKey: @"NSRunAllSheetsAsModalPanel"]) {
         // Center the sheet on the window.
         NSPoint windowCenter =
@@ -1300,8 +1452,10 @@ NSApplication *NSApp = nil;
         [context setModalSession: session];
 
         while ([NSApp runModalSession: session] == NSRunContinuesResponse) {
-            [[NSRunLoop currentRunLoop] runMode: NSModalPanelRunLoopMode
-                                     beforeDate: [NSDate distantFuture]];
+            [self nextEventMatchingMask: NSAnyEventMask
+                              untilDate: [NSDate distantFuture]
+                                 inMode: NSModalPanelRunLoopMode
+                                dequeue: NO];
         }
         [self endModalSession: session];
     } else {
@@ -1310,11 +1464,12 @@ NSApplication *NSApp = nil;
 }
 
 - (void) endSheet: (NSWindow *) sheet returnCode: (NSModalResponse) returnCode {
-    if ([[NSUserDefaults standardUserDefaults]
-                boolForKey: @"NSRunAllSheetsAsModalPanel"]) {
-        NSSheetContext *context = [sheet _sheetContext];
+    NSSheetContext *context = [sheet _sheetContext];
+    if (context != nil) {
         NSModalSession session = [context modalSession];
-        [session stopModalWithCode: NSRunStoppedResponse];
+        if (session != nil) {
+            [session stopModalWithCode: NSRunStoppedResponse];
+        }
 
         IMP function = [[context modalDelegate]
                 methodForSelector: [context didEndSelector]];
@@ -1323,6 +1478,8 @@ NSApplication *NSApp = nil;
                      returnCode, [context contextInfo]);
         }
         [sheet _setSheetContext: nil];
+        [sheet orderOut: nil];
+        return;
     } else {
         NSInteger count = [_windows count];
 
@@ -1546,6 +1703,13 @@ NSApplication *NSApp = nil;
         rect.origin.x += CASCADE_DELTA;
         rect.origin.y -= CASCADE_DELTA;
     }
+}
+
+- (BOOL) validateMenuItem: (NSMenuItem *) item {
+    SEL action = [item action];
+    if (action == NULL)
+        return YES;
+    return [self respondsToSelector: action];
 }
 
 // This is a method removed from official headers in 10.4,
@@ -1773,11 +1937,20 @@ static _Atomic long relaunchOnLoginDisableCount;
 
 // private method called when the application is reopened
 - (void) _reopen {
+    BOOL hasVisible = NO;
+    if (!_isHidden) {
+        for (NSWindow *w in _windows) {
+            if ([w isVisible]) {
+                hasVisible = YES;
+                break;
+            }
+        }
+    }
     BOOL doReopen = YES;
     if ([_delegate respondsToSelector: @selector
                    (applicationShouldHandleReopen:hasVisibleWindows:)])
         doReopen = [_delegate applicationShouldHandleReopen: self
-                                          hasVisibleWindows: !_isHidden];
+                                          hasVisibleWindows: hasVisible];
     if (!doReopen)
         return;
     if (_isHidden)

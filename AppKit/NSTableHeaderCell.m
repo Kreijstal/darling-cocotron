@@ -43,14 +43,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return rect;
 }
 
+- (void) _drawThemeContents: (NSRect) cellFrame
+                highlighted: (BOOL) highlighted
+                     inView: (NSView *) controlView
+{
+    [[self attributedStringValue]
+            _clipAndDrawInRect: [self titleRectForBounds: cellFrame]
+                lineBreakMode: _lineBreakMode];
+}
+
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView {
     _controlView = controlView;
     [[controlView graphicsStyle]
             drawTableViewHeaderInRect: cellFrame
                           highlighted: [self isHighlighted]];
-    [[self attributedStringValue]
-            _clipAndDrawInRect: [self titleRectForBounds: cellFrame]
-                lineBreakMode: _lineBreakMode];
+    [self _drawThemeContents: cellFrame
+                 highlighted: [self isHighlighted]
+                      inView: controlView];
 }
 
 @end

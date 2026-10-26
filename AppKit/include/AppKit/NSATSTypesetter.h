@@ -20,6 +20,9 @@
 #import <AppKit/AppKitExport.h>
 #import <AppKit/NSTypesetter.h>
 
-@interface NSATSTypesetter : NSTypesetter
+@interface NSATSTypesetter : NSTypesetter {
+@public
+    CGFloat lineFragmentPadding;
+}
 + (NSATSTypesetter *) sharedSystemTypesetter;
 @end

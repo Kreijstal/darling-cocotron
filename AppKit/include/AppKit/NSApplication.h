@@ -28,7 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <Foundation/NSNotification.h>
 #import <Foundation/NSRunLoop.h>
 
-@class NSWindow, NSImage, NSMenu, NSPasteboard, NSDisplay, NSDockTile;
+@class NSWindow, NSImage, NSMenu, NSMenuItem, NSPasteboard, NSDisplay, NSDockTile;
 @protocol NSApplicationDelegate;
 
 APPKIT_EXPORT const NSRunLoopMode NSModalPanelRunLoopMode;
@@ -121,6 +121,8 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 };
 
 @interface NSApplication : NSResponder {
+@public
+    id _eventDelegate;
     NSDisplay *_display;
     NSAppearance *_appearance;
     id _delegate;
@@ -131,6 +133,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
     NSMenu *_windowsMenu;
     NSMenu *_servicesMenu;
     NSMenu *_helpMenu;
+    NSMenu *_dockMenu;
 
     NSImage *_applicationIconImage;
 
@@ -181,6 +184,8 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (NSWindow *) windowWithWindowNumber: (NSInteger) number;
 
 - (NSMenu *) mainMenu;
+- (NSMenu *) dockMenu;
+- (void) setDockMenu: (NSMenu *) menu;
 - (NSMenu *) windowsMenu;
 - (NSWindow *) mainWindow;
 - (NSWindow *) keyWindow;
@@ -217,6 +222,8 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) run;
 
 - (void) sendEvent: (NSEvent *) event;
+- (BOOL) _handleKeyEquivalent: (NSEvent *) event;
+- (BOOL) _handleKeyEquivalent: (NSEvent *) event;
 
 - (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
                           untilDate: (NSDate *) untilDate
@@ -279,6 +286,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) replyToOpenOrPrint: (NSApplicationDelegateReply) reply;
 
 - (void) arrangeInFront: sender;
+- (BOOL) validateMenuItem: (NSMenuItem *) item;
 
 - (NSMenu *) servicesMenu;
 - (void) setServicesMenu: (NSMenu *) menu;

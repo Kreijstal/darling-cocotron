@@ -113,6 +113,10 @@ APPKIT_EXPORT void NSRectClip(NSRect rect);
 
 APPKIT_EXPORT void NSRectFillListWithColors(const NSRect *rects,
                                             NSColor **colors, int count);
+APPKIT_EXPORT void NSRectFillListWithColorsUsingOperation(const NSRect *rects,
+                                                         NSColor * const *colors,
+                                                         NSInteger count,
+                                                         NSCompositingOperation op);
 APPKIT_EXPORT void NSRectFillListWithGrays(const NSRect *rects,
                                            const CGFloat *grays, int count);
 APPKIT_EXPORT void NSRectFillList(const NSRect *rects, int count);
@@ -141,10 +145,15 @@ APPKIT_EXPORT void NSDrawLightBezel(NSRect rect, NSRect clipRect);
 APPKIT_EXPORT void NSDrawGroove(NSRect rect, NSRect clipRect);
 
 APPKIT_EXPORT void NSDrawWindowBackground(NSRect rect);
+APPKIT_EXPORT void NSDrawScopeBar(NSRect rect, NSRect clipRect);
 
 APPKIT_EXPORT NSRect NSDrawTiledRects(NSRect bounds, NSRect clip,
                                       const NSRectEdge *sides,
                                       const CGFloat *grays, int count);
+APPKIT_EXPORT NSRect NSDrawColorTiledRects(NSRect bounds, NSRect clip,
+                                          const NSRectEdge *sides,
+                                          NSColor * const *colors,
+                                          NSInteger count);
 
 APPKIT_EXPORT void NSHighlightRect(NSRect rect);
 APPKIT_EXPORT void NSCopyBits(int gState, NSRect rect, NSPoint point);

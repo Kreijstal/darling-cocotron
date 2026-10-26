@@ -294,6 +294,10 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
                        userData: (void *) userData;
 - (void) removeToolTip: (NSToolTipTag) tag;
 - (void) removeAllToolTips;
+- (BOOL) displaysTooltips;
+- (void) setDisplaysTooltips: (BOOL) flag;
+- (BOOL) displaysTooltips;
+- (void) setDisplaysTooltips: (BOOL) flag;
 
 - (void) addCursorRect: (NSRect) rect cursor: (NSCursor *) cursor;
 - (void) removeCursorRect: (NSRect) rect cursor: (NSCursor *) cursor;
@@ -338,6 +342,10 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 - (NSRect) rectPreservedDuringLiveResize;
 - (void) viewWillStartLiveResize;
 - (void) viewDidEndLiveResize;
+- (void) _startLiveResizeAsTopLevel;
+- (void) _endLiveResizeAsTopLevel;
+- (void) _startLiveResizeAsTopLevel;
+- (void) _endLiveResizeAsTopLevel;
 
 - (BOOL) enterFullScreenMode: (NSScreen *) screen
                  withOptions: (NSDictionary *) options;
@@ -589,4 +597,10 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
         stringForToolTip: (NSToolTipTag) tag
                    point: (NSPoint) point
                 userData: (void *) data;
+@end
+
+@interface NSFlippableView : NSView {
+    BOOL _isFlipped;
+}
+- (void) setFlipped: (BOOL) flipped;
 @end

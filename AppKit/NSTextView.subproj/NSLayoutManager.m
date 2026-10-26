@@ -243,6 +243,11 @@ static inline NSGlyphFragment *fragmentAtGlyphIndex(NSLayoutManager *self,
     // The text storage owns the layout manager - so we can't retain
     _textStorage = textStorage;
 
+    for (NSTextContainer *container in [self textContainers]) {
+        NSTextView *textView = [container textView];
+        [textView _setTextStorage: textStorage];
+    }
+
     NSFreeRangeEntries(_rangeToTemporaryAttributes);
 
     _rangeToTemporaryAttributes = NSCreateRangeToCopiedObjectEntries(0);
@@ -718,6 +723,11 @@ static inline NSGlyphFragment *fragmentAtGlyphIndex(NSLayoutManager *self,
           NSStringFromRange(glyphRange));
 #define DEBUG_validateGlyphsAndLayoutForGlyphRange 0
 #endif
+
+    // If there is no text storage or no text container attached yet,
+    // layout cannot be performed and completion must not be signaled.
+    if (_textStorage == nil || [_textContainers count] == 0)
+        return NSMakeRange(0, 0);
 
     // TODO: Validate glyphs in glyph cache for glyph range
 

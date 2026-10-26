@@ -247,9 +247,6 @@ static NSMutableDictionary *_storeTypes = nil;
     NSManagedObjectModel *model = [self managedObjectModel];
 
     if ([_stores count] == 0) {
-        [NSException
-                 raise: NSInvalidArgumentException
-                format: @"-[%@ %s] no persistent stores", [self class], _cmd];
         return nil;
     }
 

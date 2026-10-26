@@ -771,3 +771,9 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 APPKIT_EXPORT const NSNotificationName NSWindowWillAnimateNotification;
 APPKIT_EXPORT const NSNotificationName NSWindowAnimatingNotification;
 APPKIT_EXPORT const NSNotificationName NSWindowDidAnimateNotification;
+
+APPKIT_EXPORT void NSCountWindows(NSInteger *count);
+APPKIT_EXPORT void NSWindowList(NSInteger size, NSInteger list[]);
+APPKIT_EXPORT void NSCountWindowsForContext(NSInteger context, NSInteger *count);
+APPKIT_EXPORT void NSWindowListForContext(NSInteger context, NSInteger size, NSInteger list[]);
+

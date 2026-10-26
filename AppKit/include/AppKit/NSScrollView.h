@@ -36,7 +36,9 @@ typedef NS_ENUM(NSInteger, NSScrollElasticity) {
 };
 
 @interface NSScrollView : NSView {
-    NSClipView *_clipView;
+@public
+    NSClipView *_contentView;
+#define _clipView _contentView
     NSClipView *_headerClipView;
     NSView *_cornerView;
     NSScroller *_verticalScroller;

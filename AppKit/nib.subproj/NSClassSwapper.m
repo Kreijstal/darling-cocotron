@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import "NSClassSwapper.h"
+#import <AppKit/NSView.h>
 #import <Foundation/NSException.h>
 #import <Foundation/NSKeyedArchiver.h>
 #import <Foundation/NSString.h>
@@ -36,12 +37,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (id) initWithCoder: (NSCoder *) coder {
-    _className = [[coder decodeObjectForKey: @"NSClassName"] retain];
-    _originalClassName =
-            [[coder decodeObjectForKey: @"NSOriginalClassName"] retain];
+    if ([coder allowsKeyedCoding]) {
+        _className = [[coder decodeObjectForKey: @"NSClassName"] retain];
+        _originalClassName =
+                [[coder decodeObjectForKey: @"NSOriginalClassName"] retain];
+    } else {
+        [coder decodeValuesOfObjCTypes: "@@", &_className, &_originalClassName];
+        [_className retain];
+        [_originalClassName retain];
+    }
 
-    Class class = NSClassFromString(_className);
-    Class original = NSClassFromString(_originalClassName);
+    Class class = _className ? NSClassFromString(_className) : Nil;
+    Class original = _originalClassName ? NSClassFromString(_originalClassName) : Nil;
 
     if (original != Nil &&
         (class == Nil || ![class isSubclassOfClass: original])) {
@@ -50,10 +57,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         class = original;
     }
 
+    if (class == Nil && original != Nil) {
+        class = original;
+    }
     if (class == Nil) {
-        [NSException raise: NSInvalidArgumentException
-                    format: @"NSClassSwapper is unable to find class %@",
-                            _className];
+        NSLog(@"NSClassSwapper: unable to find class %@ or original %@, falling back to NSView",
+              _className, _originalClassName);
+        class = [NSView class];
     }
 
     _object = [class alloc];
@@ -80,6 +90,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [_originalClassName release];
     [_object release];
     [super dealloc];
+}
+
+- (id) forwardingTargetForSelector: (SEL) aSelector {
+    return _object;
 }
 
 - (void) setTemplate: (id) template {

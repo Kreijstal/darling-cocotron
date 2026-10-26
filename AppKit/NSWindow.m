@@ -1927,6 +1927,10 @@ static BOOL _allowsAutomaticWindowTabbing;
 - (void) makeKeyWindow {
     [[self platformWindow] makeKey];
 
+    if (![self isKeyWindow]) {
+        [self becomeKeyWindow];
+    }
+
     if (_hasBeenOnScreen) {
         return;
     }
@@ -1953,10 +1957,6 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) becomeKeyWindow {
-    // The platform should always be told to become key when we want to become
-    // key.
-    [self makeKeyWindow];
-
     // If we don't return early we may resign ourselves.
     if ([self isKeyWindow]) {
         return;
@@ -3252,6 +3252,7 @@ static BOOL _allowsAutomaticWindowTabbing;
         (NSSheetContext *) sheetContext
 {
     NSWindow *sheet = [sheetContext sheet];
+    NSLog(@"_attachSheetContextOrderFrontAndAnimate: sheet=%p (%@) window=%p (%@)", sheet, [sheet title], self, [self title]);
 
     if ([sheet styleMask] != NSDocModalWindowMask)
         [sheet setStyleMask: NSDocModalWindowMask];
@@ -4010,3 +4011,27 @@ static inline NSRect scaleWindowRect(NSRect rect, CGFloat scale) {
 }
 
 @end
+
+void NSCountWindows(NSInteger *count) {
+    if (count != NULL) {
+        *count = [[NSApp windows] count];
+    }
+}
+
+void NSWindowList(NSInteger size, NSInteger list[]) {
+    if (list == NULL || size <= 0) return;
+    NSArray *windows = [NSApp windows];
+    NSInteger count = [windows count];
+    if (count > size) count = size;
+    for (NSInteger i = 0; i < count; i++) {
+        list[i] = [[windows objectAtIndex:i] windowNumber];
+    }
+}
+
+void NSCountWindowsForContext(NSInteger context, NSInteger *count) {
+    NSCountWindows(count);
+}
+
+void NSWindowListForContext(NSInteger context, NSInteger size, NSInteger list[]) {
+    NSWindowList(size, list);
+}

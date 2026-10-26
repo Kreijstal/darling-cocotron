@@ -31,12 +31,20 @@ APPKIT_EXPORT NSString *const NSTextStorageWillProcessEditingNotification;
 APPKIT_EXPORT NSString *const NSTextStorageDidProcessEditingNotification;
 
 @interface NSTextStorage : NSMutableAttributedString <NSCoding> {
+@public
     id _delegate;
     NSMutableArray *_layoutManagers;
-    int _changeInLength;
+    NSInteger _changeInLength;
+    NSInteger _editedDelta;
     unsigned _editedMask;
     NSRange _editedRange;
     int _beginEditing;
+    struct {
+        unsigned int _isUnarchiving:1;
+        unsigned int _wrappedBySuper:1;
+        unsigned int _reserved:30;
+    } _flags;
+    void *_sideData;
 }
 
 - delegate;
@@ -57,6 +65,8 @@ APPKIT_EXPORT NSString *const NSTextStorageDidProcessEditingNotification;
         changeInLength: (int) delta;
 
 - (void) setFont: (NSFont *) font;
+- (void) ensureAttributesAreFixedInRange: (NSRange) range;
+- (void) ensureAttributesAreFixedInRange: (NSRange) range;
 
 @end
 

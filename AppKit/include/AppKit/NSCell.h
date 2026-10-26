@@ -208,6 +208,8 @@ APPKIT_EXPORT NSNotificationName NSControlTintDidChangeNotification;
 - (BOOL) showsFirstResponder;
 - (BOOL) refusesFirstResponder;
 - (BOOL) isHighlighted;
+- (NSInteger) cellAttribute: (NSUInteger) attribute;
+- (void) setCellAttribute: (NSUInteger) attribute to: (NSInteger) value;
 
 - (BOOL) hasValidObjectValue;
 - objectValue;

@@ -278,21 +278,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) removeObserver: (NSObject *) observer
              forKeyPath: (NSString *) keyPath
 {
+    if (keyPath == nil)
+        return;
     _NSObservationProxy *proxy =
             [[_NSObservationProxy alloc] initWithKeyPath: keyPath
                                                 observer: observer
                                                   object: self];
     NSInteger idx = [_observationProxies indexOfObject: proxy];
-    if (idx == NSNotFound) {
-    }
-
     [proxy release];
 
     if (idx != NSNotFound) {
-        [[self observableSelection]
-                removeObserver: [_observationProxies objectAtIndex: idx]
-                    forKeyPath: keyPath];
+        _NSObservationProxy *savedProxy = [[[_observationProxies objectAtIndex: idx] retain] autorelease];
         [_observationProxies removeObjectAtIndex: idx];
+        if (_observableSelection != nil) {
+            [_observableSelection removeObserver: savedProxy forKeyPath: keyPath];
+        }
     }
 }
 

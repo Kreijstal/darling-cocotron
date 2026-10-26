@@ -201,9 +201,20 @@ NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsD
         keyed = (NSKeyedUnarchiver *) coder;
         colorSpace = [keyed decodeIntForKey: @"NSColorSpace"];
     } else {
-        uint8_t space;
-        [coder decodeValuesOfObjCTypes: "c", &space];
-        colorSpace = space;
+        NSInteger version = [coder versionForClassName: @"NSColor"];
+        NSLog(@"[NSColor initWithCoder] unkeyed version=%ld", (long)version);
+        signed char c = 0;
+        if ([coder respondsToSelector: @selector(decodeChar:)]) {
+            [(id)coder decodeChar: &c];
+            if ((uint8_t)c == 0xaa) {
+                [(id)coder decodeChar: &c];
+            }
+        } else {
+            uint8_t s = 0;
+            [coder decodeValuesOfObjCTypes: "c", &s];
+            c = s;
+        }
+        colorSpace = c;
     }
 
     switch (colorSpace) {

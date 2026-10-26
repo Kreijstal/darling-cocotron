@@ -29,6 +29,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 + sharedDocumentController;
++ (BOOL) shouldCreateUI;
++ (BOOL) shouldCreateUI;
 
 - init;
 
@@ -48,6 +50,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) addDocument: (NSDocument *) document;
 - (void) removeDocument: (NSDocument *) document;
 - documentForURL: (NSURL *) url;
+- (id) documentForFileName: (NSString *) fileName;
+- (id) documentForFileName: (NSString *) fileName;
 
 - currentDocument;
 - (NSString *) currentDirectory;
@@ -105,8 +109,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSArray *) URLsFromRunningOpenPanel;
 
 - (NSArray *) recentDocumentURLs;
+- (NSArray *) _recentDocumentURLsForKey: (NSString *) key;
+- (NSArray *) _recentDocumentURLsForKey: (NSString *) key;
 - (unsigned) maximumRecentDocumentCount;
 - (void) noteNewRecentDocumentURL: (NSURL *) url;
+- (void) _noteNewRecentDocumentURL: (NSURL *) url forKey: (NSString *) key;
 - (void) noteNewRecentDocument: (NSDocument *) document;
 - (void) clearRecentDocuments: sender;
 
@@ -116,6 +123,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (BOOL) validateMenuItem: (NSMenuItem *) item;
 - (BOOL) validateUserInterfaceItem: (id<NSValidatedUserInterfaceItem>) item;
+- (BOOL) shouldCreateUI;
+- (BOOL) shouldCreateUI;
 
 // deprecated
 - (BOOL) closeAllDocuments;

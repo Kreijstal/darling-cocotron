@@ -105,6 +105,24 @@ void NSRectFillListWithColors(const NSRect *rects, NSColor **colors, int count)
     CGContextRestoreGState(context);
 }
 
+void NSRectFillListWithColorsUsingOperation(const NSRect *rects,
+                                            NSColor * const *colors,
+                                            NSInteger count,
+                                            NSCompositingOperation op)
+{
+    CGContextRef context = NSCurrentGraphicsPort();
+    NSInteger i;
+
+    CGContextSaveGState(context);
+    CGContextSetBlendMode(context, blendModeForCompositeOp(op));
+    for (i = 0; i < count; i++) {
+        [colors[i] setFill];
+        if (rects[i].size.width > 0 && rects[i].size.height > 0)
+            NSRectFillUsingOperation(rects[i], op);
+    }
+    CGContextRestoreGState(context);
+}
+
 void NSRectFillListWithGrays(const NSRect *rects, const CGFloat *grays,
                              int count)
 {
@@ -496,8 +514,22 @@ void NSDrawWindowBackground(NSRect rect) {
     NSRectFill(rect);
 }
 
+void NSDrawScopeBar(NSRect rect, NSRect clipRect) {
+    [[NSColor colorWithCalibratedWhite: 0.88 alpha: 1.0] setFill];
+    NSRectFill(rect);
+    [[NSColor controlShadowColor] setFill];
+    NSRect bottomLine = NSMakeRect(rect.origin.x, rect.origin.y, rect.size.width, 1.0);
+    NSRectFill(bottomLine);
+}
+
 NSRect NSDrawTiledRects(NSRect bounds, NSRect clip, const NSRectEdge *sides,
                         const CGFloat *grays, int count)
+{
+    return bounds;
+}
+
+NSRect NSDrawColorTiledRects(NSRect bounds, NSRect clip, const NSRectEdge *sides,
+                             NSColor * const *colors, NSInteger count)
 {
     return bounds;
 }

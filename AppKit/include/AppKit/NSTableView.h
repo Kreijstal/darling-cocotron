@@ -144,6 +144,7 @@ typedef enum {
     NSMutableDictionary *_prototypeViews;
     NSMutableDictionary *_reusableViews;
     NSMutableArray *_activeRowViews;
+    BOOL _verticalMotionCanBeginDrag;
 }
 
 - (NSView *) makeViewWithIdentifier: (NSString *) identifier owner: (id) owner;
@@ -151,6 +152,14 @@ typedef enum {
 - (NSView *) viewAtColumn: (NSInteger) column row: (NSInteger) row makeIfNecessary: (BOOL) makeIfNecessary;
 
 - (SEL) doubleAction;
+- (id) doubleClickTarget;
+- (void) setDoubleClickTarget: (id) target;
+- (SEL) doubleClickAction;
+- (void) setDoubleClickAction: (SEL) action;
+- (id) doubleClickTarget;
+- (void) setDoubleClickTarget: (id) target;
+- (SEL) doubleClickAction;
+- (void) setDoubleClickAction: (SEL) action;
 
 - (id) dataSource;
 - (id) delegate;
@@ -223,6 +232,8 @@ typedef enum {
 - (void) setDraggingSourceOperationMask: (NSDragOperation) mask
                                forLocal: (BOOL) isLocal;
 - (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL) isLocal;
+- (BOOL) verticalMotionCanBeginDrag;
+- (void) setVerticalMotionCanBeginDrag: (BOOL) flag;
 - (void) setAutosaveTableColumns: (BOOL) flag;
 
 - (void) setUsesAlternatingRowBackgroundColors: (BOOL) flag;

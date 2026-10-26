@@ -117,7 +117,11 @@ typedef enum {
     float _periodicDelay, _periodicInterval;
     NSImage *_alternateImageOrKeyEquivalentFont;
     NSUInteger _bcFlags;
+    id _buttonImageSource;
 }
+
+- (id) _buttonImageSource;
+- (void) _setButtonImageSource: (id) source;
 
 - (BOOL) isTransparent;
 - (NSString *) keyEquivalent;

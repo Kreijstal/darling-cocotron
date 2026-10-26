@@ -52,3 +52,6 @@ typedef enum {
 - (void) setPlaceholderAttributedString: (NSAttributedString *) value;
 
 @end
+
+@interface NSImageTextFieldCell : NSTextFieldCell
+@end

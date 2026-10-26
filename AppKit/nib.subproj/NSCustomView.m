@@ -87,9 +87,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             return (NSCustomView*)newView;
         }
     } else {
-        [NSException raise: NSInvalidArgumentException
-                    format: @"-[%@ %s] does not handle %@", [self class],
-                            sel_getName(_cmd), [coder class]];
+        self = [super initWithCoder: coder];
+        if (self) {
+            NSString *className = nil;
+            id extension = nil;
+            @try {
+                [coder decodeValuesOfObjCTypes: "@@", &className, &extension];
+            } @catch (id ex) {
+                @try {
+                    [coder decodeValuesOfObjCTypes: "@", &className];
+                } @catch (id ex2) {
+                }
+            }
+            if (className) {
+                Class class = NSClassFromString(className);
+                if (class != Nil && [class isSubclassOfClass: [NSView class]]) {
+                    object_setClass(self, class);
+                }
+            }
+        }
         return self;
     }
 }

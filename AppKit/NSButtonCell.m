@@ -458,6 +458,7 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) dealloc {
+    [_buttonImageSource release];
     [_titleOrAttributedTitle release];
     [_normalImage release];
     [_alternateTitle release];
@@ -669,6 +670,24 @@ static const CGFloat kImageMargin = 2.;
     image = [image retain];
     [_alternateImage release];
     _alternateImage = image;
+}
+
+- (id) _buttonImageSource {
+    return _buttonImageSource;
+}
+
+- (void) _setButtonImageSource: (id) source {
+    if (_buttonImageSource != source) {
+        [_buttonImageSource release];
+        _buttonImageSource = [source retain];
+
+        if ([source respondsToSelector: @selector(normalImage)]) {
+            [self setImage: [source normalImage]];
+        }
+        if ([source respondsToSelector: @selector(alternateImage)]) {
+            [self setAlternateImage: [source alternateImage]];
+        }
+    }
 }
 
 - (void) setAttributedTitle: (NSAttributedString *) title {

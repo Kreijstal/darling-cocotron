@@ -95,6 +95,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return _pullsDown;
 }
 
+- (BOOL) usesItemFromMenu {
+    return _usesItemFromMenu;
+}
+
+- (void) setUsesItemFromMenu: (BOOL) value {
+    _usesItemFromMenu = value;
+}
+
 - (NSMenu *) menu {
     return _menu;
 }

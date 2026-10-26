@@ -42,6 +42,10 @@ typedef enum {
 
 - (NSPopUpArrowPosition) arrowPosition;
 - (BOOL) pullsDown;
+- (BOOL) usesItemFromMenu;
+- (void) setUsesItemFromMenu: (BOOL) value;
+- (BOOL) usesItemFromMenu;
+- (void) setUsesItemFromMenu: (BOOL) value;
 - (NSMenu *) menu;
 - (BOOL) autoenablesItems;
 - (NSRectEdge) preferredEdge;

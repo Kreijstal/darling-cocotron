@@ -109,6 +109,23 @@ NSInteger NSRunAlertPanel(NSString *title, NSString *format,
     return result;
 }
 
+NSInteger NSRunAlertPanelRelativeToWindow(NSString *title, NSString *format,
+                                         NSString *defaultButton,
+                                         NSString *alternateButton,
+                                         NSString *otherButton,
+                                         NSWindow *docWindow, ...)
+{
+    va_list arguments;
+    va_start(arguments, docWindow);
+    NSString *message =
+            [[[NSString alloc] initWithFormat: format
+                                    arguments: arguments] autorelease];
+    va_end(arguments);
+
+    return NSRunAlertPanel(title, @"%@", defaultButton, alternateButton,
+                           otherButton, message);
+}
+
 NSInteger NSRunInformationalAlertPanel(NSString *title, NSString *format,
                                        NSString *defaultButton,
                                        NSString *alternateButton,

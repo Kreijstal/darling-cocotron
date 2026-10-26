@@ -157,9 +157,64 @@ const CGFloat NSTableViewDefaultRowHeight = 16.0f;
         else
             _gridStyleMask = NSTableViewGridNone;
     } else {
-        [NSException raise: NSInvalidArgumentException
-                    format: @"-[%@ %s] is not implemented for coder %@",
-                            [self class], sel_getName(_cmd), coder];
+        NSInteger version = [coder versionForClassName: @"NSTableView"];
+        _selectedRowIndexes = [[NSIndexSet alloc] init];
+        _selectedColumns = [[NSMutableArray alloc] init];
+        _prototypeViews = [[NSMutableDictionary alloc] init];
+        _reusableViews = [[NSMutableDictionary alloc] init];
+        _activeRowViews = [[NSMutableArray alloc] init];
+        _editedColumn = -1;
+        _editedRow = -1;
+        _numberOfRows = -1;
+        _draggingRow = -1;
+        _intercellSpacing = NSMakeSize(3.0, 2.0);
+        _standardRowHeight = 16.0;
+        _allowsColumnReordering = YES;
+        _allowsColumnResizing = YES;
+        _autoresizesAllColumnsToFit = YES;
+
+        _dataSource = [coder decodeObject];
+        id cols = [coder decodeObject];
+        if ([cols isKindOfClass: [NSArray class]]) {
+            _tableColumns = [cols mutableCopy];
+        } else {
+            _tableColumns = [[NSMutableArray alloc] init];
+        }
+        _gridColor = [[coder decodeObject] retain];
+        _backgroundColor = [[coder decodeObject] retain];
+        _headerView = [[coder decodeObject] retain];
+        _cornerView = [[coder decodeObject] retain];
+        id aDelegate = [coder decodeObject];
+        _target = [coder decodeObject];
+
+        [self setDelegate: aDelegate];
+        [_headerView setTableView: self];
+        [_tableColumns makeObjectsPerformSelector: @selector(setTableView:) withObject: self];
+
+        int number = 0;
+        [coder decodeValueOfObjCType: @encode(int) at: &number];
+        _numberOfRows = number;
+        int numCols = 0;
+        [coder decodeValueOfObjCType: @encode(int) at: &numCols];
+        BOOL drawsGrid = NO;
+        [coder decodeValueOfObjCType: @encode(BOOL) at: &drawsGrid];
+        float rowH = 16.0;
+        [coder decodeValueOfObjCType: @encode(float) at: &rowH];
+        _standardRowHeight = rowH;
+        [coder decodeValueOfObjCType: @encode(SEL) at: &_doubleAction];
+        _intercellSpacing = [coder decodeSize];
+
+        [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsMultipleSelection];
+        [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsEmptySelection];
+        [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsColumnSelection];
+        [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsColumnResizing];
+
+        if (version >= 3) {
+            [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsColumnReordering];
+        }
+        if (version >= 2) {
+            [coder decodeValueOfObjCType: @encode(BOOL) at: &_autoresizesAllColumnsToFit];
+        }
     }
     return self;
 }
@@ -239,6 +294,22 @@ const CGFloat NSTableViewDefaultRowHeight = 16.0f;
 
 - (SEL) doubleAction {
     return _doubleAction;
+}
+
+- (id) doubleClickTarget {
+    return [self target];
+}
+
+- (void) setDoubleClickTarget: (id) target {
+    [self setTarget: target];
+}
+
+- (SEL) doubleClickAction {
+    return [self doubleAction];
+}
+
+- (void) setDoubleClickAction: (SEL) action {
+    [self setDoubleAction: action];
 }
 
 - dataSource {
@@ -2144,6 +2215,14 @@ static CGFloat rowHeightAtIndex(NSTableView *self, NSInteger index) {
 
 - (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL) isLocal {
     return isLocal ? _draggingSourceMaskLocal : _draggingSourceMaskNonLocal;
+}
+
+- (BOOL) verticalMotionCanBeginDrag {
+    return _verticalMotionCanBeginDrag;
+}
+
+- (void) setVerticalMotionCanBeginDrag: (BOOL) flag {
+    _verticalMotionCanBeginDrag = flag;
 }
 
 - (NSInteger) _getDraggedRow: (id<NSDraggingInfo>) info {

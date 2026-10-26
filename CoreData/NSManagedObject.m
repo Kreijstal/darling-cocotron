@@ -55,8 +55,10 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
         class = [NSManagedObject class];
     }
 
-    [super dealloc];
-    self = [class allocWithZone: NULL];
+    if (class != Nil && [self class] != class) {
+        [super dealloc];
+        self = [class allocWithZone: NULL];
+    }
 
     _objectID = [objectID copy];
     _context = context;
@@ -73,8 +75,9 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
             [[[NSManagedObjectID alloc] initWithEntity: entity] autorelease];
 
     if ((self = [self initWithObjectID: objectID
-                  managedObjectContext: context]) == nil)
+                  managedObjectContext: context]) == nil) {
         return nil;
+    }
 
     NSDictionary *attributes = [entity attributesByName];
     NSEnumerator *state = [attributes keyEnumerator];
@@ -96,6 +99,8 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
 - (void) dealloc {
     [self didTurnIntoFault];
 
+    [(id)_observationInfo release];
+    _observationInfo = nil;
     [_objectID release];
     [_changedValues release];
     [super dealloc];
@@ -252,48 +257,77 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
         return [self valueForUndefinedKey: nil];
 
     NSPropertyDescription *property =
-            [[self entity] _propertyForSelector: NSSelectorFromString(key)];
-    NSString *propertyName = [property name];
+            [[self entity] propertyByName: key];
+    if (property == nil)
+        property = [[self entity] _propertyForSelector: NSSelectorFromString(key)];
 
-    if ([property isKindOfClass: [NSAttributeDescription class]]) {
-        [self willAccessValueForKey: propertyName];
+    if (property != nil) {
+        NSString *propertyName = [property name];
 
-        id result = [self primitiveValueForKey: propertyName];
+        if ([property isKindOfClass: [NSAttributeDescription class]]) {
+            [self willAccessValueForKey: propertyName];
 
-        [self didAccessValueForKey: propertyName];
+            id result = [self primitiveValueForKey: propertyName];
 
-        return result;
-    } else if ([property isKindOfClass: [NSRelationshipDescription class]]) {
-        NSRelationshipDescription *relationship =
-                (NSRelationshipDescription *) property;
+            [self didAccessValueForKey: propertyName];
 
-        [self willAccessValueForKey: propertyName];
+            NSAttributeType attrType = [(NSAttributeDescription *)property attributeType];
+            if (attrType == NSBooleanAttributeType) {
+                if ((uintptr_t)result <= 1) {
+                    return [NSNumber numberWithBool:(BOOL)(uintptr_t)result];
+                }
+            } else if (attrType == NSInteger16AttributeType || attrType == NSInteger32AttributeType || attrType == NSInteger64AttributeType) {
+                if (result != nil && (uintptr_t)result < 0x10000 && ![(id)result respondsToSelector:@selector(intValue)]) {
+                    return [NSNumber numberWithInteger:(NSInteger)(uintptr_t)result];
+                }
+            }
 
-        id result = [self primitiveValueForKey: propertyName];
+            return result;
+        } else if ([property isKindOfClass: [NSRelationshipDescription class]]) {
+            NSRelationshipDescription *relationship =
+                    (NSRelationshipDescription *) property;
 
-        if (result != nil) {
-            if ([relationship isToMany])
-                result = [[[NSManagedObjectSet alloc]
-                        initWithManagedObjectContext: _context
-                                                 set: result] autorelease];
-            else
-                result = [_context objectWithID: result];
+            [self willAccessValueForKey: propertyName];
+
+            id result = [self primitiveValueForKey: propertyName];
+
+            if (result != nil) {
+                if ([relationship isToMany])
+                    result = [[[NSManagedObjectSet alloc]
+                            initWithManagedObjectContext: _context
+                                                     set: result] autorelease];
+                else
+                    result = [_context objectWithID: result];
+            }
+
+            [self didAccessValueForKey: propertyName];
+
+            return result;
         }
-
-        [self didAccessValueForKey: propertyName];
-
-        return result;
     }
 
-    return [super valueForKey: key];
+    id prim = [self primitiveValueForKey: key];
+    if (prim != nil)
+        return prim;
+
+    return nil;
 }
 
 - (void) setValue: value forKey: (NSString *) key {
+    if (!key)
+        return;
+
     NSPropertyDescription *property =
-            [[self entity] _propertyForSelector: NSSelectorFromString(key)];
-    NSString *propertyName = [property name];
+            [[self entity] propertyByName: key];
+    if (property == nil)
+        property = [[self entity] _propertyForSelector: NSSelectorFromString(key)];
+    NSString *propertyName = [property name] ? [property name] : key;
 
     if ([property isKindOfClass: [NSAttributeDescription class]]) {
+        NSAttributeType attrType = [(NSAttributeDescription *)property attributeType];
+        if (attrType == NSBooleanAttributeType && (uintptr_t)value <= 1 && value != nil) {
+            value = [NSNumber numberWithBool:(BOOL)(uintptr_t)value];
+        }
         [self willChangeValueForKey: propertyName];
         [self setPrimitiveValue: value forKey: propertyName];
         [self didChangeValueForKey: propertyName];
@@ -380,7 +414,7 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
         return;
     }
 
-    [super setValue: value forKey: key];
+    [self setPrimitiveValue: value forKey: key];
 }
 
 - (NSMutableSet *) mutableSetValueForKey: (NSString *) key {
@@ -399,6 +433,13 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
 }
 
 - (void) setPrimitiveValue: value forKey: (NSString *) key {
+    NSPropertyDescription *property = [[self entity] propertyByName: key];
+    if ([property isKindOfClass: [NSAttributeDescription class]]) {
+        NSAttributeType attrType = [(NSAttributeDescription *)property attributeType];
+        if (attrType == NSBooleanAttributeType && (uintptr_t)value <= 1 && value != nil) {
+            value = [NSNumber numberWithBool:(BOOL)(uintptr_t)value];
+        }
+    }
     if (value == nil)
         [_changedValues removeObjectForKey: key];
     else {
@@ -444,7 +485,10 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
 }
 
 - (void) setObservationInfo: (void *) value {
-    _observationInfo = value;
+    if (_observationInfo != value) {
+        [(id)_observationInfo release];
+        _observationInfo = [(id)value retain];
+    }
 }
 
 - (void) willAccessValueForKey: (NSString *) key {

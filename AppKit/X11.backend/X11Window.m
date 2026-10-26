@@ -216,7 +216,7 @@ static NSData *makeWindowIcon() {
         cmap = DefaultColormap(_display, screen);
     }
 
-    if (cmap < 0) {
+    if (cmap == None) {
         NSLog(@"XCreateColormap failed");
         [self release];
         return nil;
@@ -1090,6 +1090,9 @@ static int ignoreBadWindow(Display *display, XErrorEvent *errorEvent) {
     X11Frame root = X11FrameToRoot([self primaryFrameInPoints],
                                    (X11Frame){frame.origin.x, frame.origin.y,
                                               frame.size.width, frame.size.height});
+    if ((_styleMask & NSTitledWindowMask) && root.y < 0) {
+        root.y = 0;
+    }
     return NSMakeRect(root.x, root.y, fmax(root.width, 1.0), fmax(root.height, 1.0));
 }
 

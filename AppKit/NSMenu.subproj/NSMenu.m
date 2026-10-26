@@ -30,6 +30,13 @@ const NSNotificationName NSMenuWillSendActionNotification = @"NSMenuWillSendActi
 const NSNotificationName NSMenuDidSendActionNotification = @"NSMenuDidSendActionNotification";
 const NSNotificationName NSMenuDidBeginTrackingNotification = @"NSMenuDidBeginTrackingNotification";
 const NSNotificationName NSMenuDidEndTrackingNotification = @"NSMenuDidEndTrackingNotification";
+NSString *const NSFontMenuName = @"Font";
+NSString *const NSHelpMenuName = @"Help";
+NSString *const NSMainMenuName = @"Application";
+NSString *const NSRecentDocumentsMenuName = @"Recents";
+NSString *const NSServicesMenuName = @"Services";
+NSString *const NSWindowsMenuName = @"Window";
+
 NSString *const _NSFontMenuName = @"Font";
 NSString *const _NSHelpMenuName = @"Help";
 NSString *const _NSMainMenuName = @"Application";
@@ -386,64 +393,85 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 BOOL itemIsEnabled(NSMenuItem *item) {
+    if (item == nil) return NO;
+    static NSMutableSet *sValidatingItems = nil;
+    if (sValidatingItems == nil) {
+        sValidatingItems = [[NSMutableSet alloc] init];
+    }
+    if ([sValidatingItems containsObject: item]) {
+        return [item isEnabled];
+    }
+    [sValidatingItems addObject: item];
+
     BOOL enabled = NO;
+    @try {
+        if ([item action] != NULL) {
+            id target = [item target];
 
-    if ([item action] != NULL) {
-        id target = [item target];
+            target = [NSApp targetForAction: [item action]
+                                         to: [item target]
+                                       from: nil];
 
-        target = [NSApp targetForAction: [item action]
-                                     to: [item target]
-                                   from: nil];
-
-        if ((target == nil) || ![target respondsToSelector: [item action]]) {
-            enabled = NO;
-        } else {
-            // Cocoa treats an absent validation scheme as "enabled". This
-            // runtime reports a selector as present when the class declares it
-            // without implementing it, so the sends below can still raise;
-            // fall back to enabled rather than aborting the whole -update.
-            enabled = NO;
-            @try {
-                if ([target respondsToSelector: @selector(validateMenuItem:)]) {
-                    enabled = [target validateMenuItem: item];
-                } else if ([target respondsToSelector: @selector
-                                       (validateUserInterfaceItem:)]) {
-                    enabled = [target validateUserInterfaceItem: item];
-                } else {
+            if ((target == nil) || ![target respondsToSelector: [item action]]) {
+                enabled = NO;
+            } else {
+                // Cocoa treats an absent validation scheme as "enabled". This
+                // runtime reports a selector as present when the class declares it
+                // without implementing it, so the sends below can still raise;
+                // fall back to enabled rather than aborting the whole -update.
+                enabled = NO;
+                @try {
+                    if ([target respondsToSelector: @selector(validateMenuItem:)]) {
+                        enabled = [target validateMenuItem: item];
+                    } else if ([target respondsToSelector: @selector
+                                           (validateUserInterfaceItem:)]) {
+                        enabled = [target validateUserInterfaceItem: item];
+                    } else {
+                        enabled = YES;
+                    }
+                }
+                @catch (NSException *exception) {
                     enabled = YES;
                 }
             }
-            @catch (NSException *exception) {
-                enabled = YES;
-            }
         }
+    } @finally {
+        [sValidatingItems removeObject: item];
     }
 
     return enabled;
 }
 
 - (void) update {
-    if ([_delegate respondsToSelector: @selector(menuNeedsUpdate:)]) {
-        [_delegate menuNeedsUpdate: self];
-    }
-
-    NSInteger i, count = [_itemArray count];
-
-    for (i = 0; i < count; i++) {
-        NSMenuItem *item = [_itemArray objectAtIndex: i];
-
-        if (_autoenablesItems) {
-            BOOL enabled = itemIsEnabled(item) ? YES : NO;
-            BOOL currentlyEnabled = [item isEnabled] ? YES : NO;
-
-            if (enabled != currentlyEnabled &&
-                ![item _binderForBinding: @"enabled" create: NO]) {
-                [item setEnabled: enabled];
-                [self itemChanged: item];
-            }
+    static int sUpdateRecursionDepth = 0;
+    if (sUpdateRecursionDepth > 2)
+        return;
+    sUpdateRecursionDepth++;
+    @try {
+        if ([_delegate respondsToSelector: @selector(menuNeedsUpdate:)]) {
+            [_delegate menuNeedsUpdate: self];
         }
 
-        [[item submenu] update];
+        NSInteger i, count = [_itemArray count];
+
+        for (i = 0; i < count; i++) {
+            NSMenuItem *item = [_itemArray objectAtIndex: i];
+
+            if (_autoenablesItems) {
+                BOOL enabled = itemIsEnabled(item) ? YES : NO;
+                BOOL currentlyEnabled = [item isEnabled] ? YES : NO;
+
+                if (enabled != currentlyEnabled &&
+                    ![item _binderForBinding: @"enabled" create: NO]) {
+                    [item setEnabled: enabled];
+                    [self itemChanged: item];
+                }
+            }
+
+            [[item submenu] update];
+        }
+    } @finally {
+        sUpdateRecursionDepth--;
     }
 }
 

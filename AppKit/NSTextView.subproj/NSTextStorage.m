@@ -192,4 +192,16 @@ NSString *const NSTextStorageDidProcessEditingNotification =
                  range: NSMakeRange(0, [self length])];
 }
 
+- (void) ensureAttributesAreFixedInRange: (NSRange) range {
+    static BOOL sIsFixing = NO;
+    if (sIsFixing || _beginEditing > 0)
+        return;
+    sIsFixing = YES;
+    @try {
+        [self fixAttributesInRange: range];
+    } @finally {
+        sIsFixing = NO;
+    }
+}
+
 @end

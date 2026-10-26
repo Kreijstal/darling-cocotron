@@ -23,6 +23,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSDocumentController.h>
 #import <AppKit/NSMenu.h>
 #import <AppKit/NSMenuItem.h>
+#import <dispatch/dispatch.h>
 #import <AppKit/NSOpenPanel.h>
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSWindowController.h>
@@ -105,12 +106,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 static NSDocumentController *s_sharedDocumentController = nil;
 
 + (id) sharedDocumentController {
-    if (s_sharedDocumentController == nil) {
-        @synchronized([NSDocumentController class]) {
-            if (s_sharedDocumentController == nil) {
-                s_sharedDocumentController = [[self alloc] init];
-                [s_sharedDocumentController _updateRecentDocumentsMenu];
-            }
+    @synchronized([NSDocumentController class]) {
+        if (s_sharedDocumentController == nil) {
+            s_sharedDocumentController = [[self alloc] init];
+            [s_sharedDocumentController _updateRecentDocumentsMenu];
         }
     }
     return s_sharedDocumentController;
@@ -350,6 +349,11 @@ static NSDocumentController *s_sharedDocumentController = nil;
     }
 
     return nil;
+}
+
+- (id) documentForFileName: (NSString *) fileName {
+    if (fileName == nil) return nil;
+    return [self documentForURL: [NSURL fileURLWithPath: fileName]];
 }
 
 - currentDocument {
@@ -899,6 +903,23 @@ static NSDocumentController *s_sharedDocumentController = nil;
     return result;
 }
 
+- (NSArray *) _recentDocumentURLsForKey: (NSString *) key {
+    if (key == nil) key = @"NSRecentDocumentPaths";
+
+    NSArray *paths = [[NSUserDefaults standardUserDefaults] arrayForKey: key];
+    if (paths == nil)
+        paths = [self _recentDocumentPaths];
+
+    NSMutableArray *result = [NSMutableArray arrayWithCapacity: [paths count]];
+    for (id item in paths) {
+        if ([item isKindOfClass: [NSURL class]])
+            [result addObject: item];
+        else if ([item isKindOfClass: [NSString class]])
+            [result addObject: [NSURL fileURLWithPath: item]];
+    }
+    return result;
+}
+
 - (unsigned) maximumRecentDocumentCount {
     NSString *value = [[NSUserDefaults standardUserDefaults]
             stringForKey: @"NSRecentDocumentMaximum"];
@@ -906,9 +927,14 @@ static NSDocumentController *s_sharedDocumentController = nil;
     return (value == nil) ? 10 : [value intValue];
 }
 
-- (void) noteNewRecentDocumentURL: (NSURL *) url {
+- (void) _noteNewRecentDocumentURL: (NSURL *) url forKey: (NSString *) key {
+    if (url == nil) return;
+    if (key == nil) key = @"NSRecentDocumentPaths";
     NSString *path = [url path];
-    NSMutableArray *array = [self _recentDocumentPaths];
+    if (path == nil) return;
+
+    NSArray *existing = [[NSUserDefaults standardUserDefaults] arrayForKey: key];
+    NSMutableArray *array = existing ? [[existing mutableCopy] autorelease] : [NSMutableArray array];
 
     [array removeObject: path];
     [array insertObject: path atIndex: 0];
@@ -916,9 +942,12 @@ static NSDocumentController *s_sharedDocumentController = nil;
     while ([array count] > [self maximumRecentDocumentCount])
         [array removeLastObject];
 
-    [[NSUserDefaults standardUserDefaults] setObject: array
-                                              forKey: @"NSRecentDocumentPaths"];
+    [[NSUserDefaults standardUserDefaults] setObject: array forKey: key];
     [self _updateRecentDocumentsMenu];
+}
+
+- (void) noteNewRecentDocumentURL: (NSURL *) url {
+    [self _noteNewRecentDocumentURL: url forKey: @"NSRecentDocumentPaths"];
 }
 
 - (void) noteNewRecentDocument: (NSDocument *) document {
@@ -1008,6 +1037,14 @@ static BOOL actionIsDocumentController(SEL selector) {
 {
     NSUnimplementedMethod();
     return 0;
+}
+
++ (BOOL) shouldCreateUI {
+    return YES;
+}
+
+- (BOOL) shouldCreateUI {
+    return YES;
 }
 
 @end

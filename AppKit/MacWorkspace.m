@@ -275,9 +275,14 @@ static NSImage *ImageForGenericIcon(NSString *name) {
 }
 
 - (NSString *) typeOfFile: (NSString *) path error: (NSError **) error {
-    // TODO: call LSCopyItemAttribute(kLSItemContentType)
-    NSUnimplementedMethod();
-    return NULL;
+    NSString *ext = [path pathExtension];
+    if ([ext length] > 0) {
+        UTType *type = [UTType typeWithFilenameExtension: ext];
+        if (type != nil && [type identifier] != nil) {
+            return [type identifier];
+        }
+    }
+    return @"public.data";
 }
 
 - (BOOL) openFile: (NSString *) path {
@@ -494,7 +499,28 @@ static NSImage *ImageForGenericIcon(NSString *name) {
 }
 
 - (BOOL) isFilePackageAtPath: (NSString *) path {
-    NSUnimplementedMethod();
+    if (path == nil) return NO;
+    NSString *ext = [[path pathExtension] lowercaseString];
+    if ([ext length] == 0) return NO;
+    static NSSet *sKnownPackageExtensions = nil;
+    if (sKnownPackageExtensions == nil) {
+        sKnownPackageExtensions = [[NSSet alloc] initWithObjects:
+            @"app", @"framework", @"plugin", @"bundle", @"kext",
+            @"xcodeproj", @"pbproj", @"xcworkspace", @"xcdatamodel", @"xcmappingmodel",
+            @"rtfd", @"pkg", @"mpkg", @"download", @"dsym", @"docset",
+            @"savedstate", @"pages", @"numbers", @"key", nil];
+    }
+    if ([sKnownPackageExtensions containsObject: ext])
+        return YES;
+
+    NSString *infoPlist = [path stringByAppendingPathComponent: @"Contents/Info.plist"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath: infoPlist])
+        return YES;
+    infoPlist = [path stringByAppendingPathComponent: @"Info.plist"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath: infoPlist])
+        return YES;
+
+    return NO;
 }
 
 - (NSString *) absolutePathForAppBundleWithIdentifier: (NSString *) identifier {

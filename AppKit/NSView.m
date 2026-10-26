@@ -1545,6 +1545,13 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
     [self _trackingAreasChanged];
 }
 
+- (BOOL) displaysTooltips {
+    return YES;
+}
+
+- (void) setDisplaysTooltips: (BOOL) flag {
+}
+
 - (void) addCursorRect: (NSRect) rect cursor: (NSCursor *) cursor {
     NSCursorRect *cursorRect = [[NSCursorRect alloc] initWithCursor: cursor];
     NSTrackingArea *area = nil;
@@ -1883,6 +1890,14 @@ static void alignAxis(CGFloat *origin, CGFloat *length, NSAlignmentOptions optio
 - (void) viewDidEndLiveResize {
     _inLiveResize = NO;
     [_subviews makeObjectsPerformSelector: _cmd];
+}
+
+- (void) _startLiveResizeAsTopLevel {
+    [self viewWillStartLiveResize];
+}
+
+- (void) _endLiveResizeAsTopLevel {
+    [self viewDidEndLiveResize];
 }
 
 - (BOOL) enterFullScreenMode: (NSScreen *) screen
@@ -3611,6 +3626,34 @@ static NSMutableArray *installedViewConstraints(NSView *view, BOOL create) {
     if (_superview != nil)
         return [_superview effectiveAppearance];
     return [NSAppearance currentAppearance];
+}
+
+@end
+
+@implementation NSFlippableView
+
+- init {
+    self = [super init];
+    if (self) {
+        _isFlipped = YES;
+    }
+    return self;
+}
+
+- initWithFrame: (NSRect) frame {
+    self = [super initWithFrame: frame];
+    if (self) {
+        _isFlipped = YES;
+    }
+    return self;
+}
+
+- (BOOL) isFlipped {
+    return _isFlipped;
+}
+
+- (void) setFlipped: (BOOL) flipped {
+    _isFlipped = flipped;
 }
 
 @end

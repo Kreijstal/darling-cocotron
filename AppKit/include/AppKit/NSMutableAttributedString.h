@@ -38,6 +38,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
              options: (NSDictionary<NSAttributedStringDocumentReadingOptionKey, id> *) opts 
   documentAttributes: (NSDictionary<NSAttributedStringDocumentAttributeKey, id> * _Nullable *) dict 
                error: (NSError * _Nullable *)error;
+- (BOOL) readFromURL: (NSURL *) url
+             options: (NSDictionary *) opts
+  documentAttributes: (NSDictionary **) dict;
+- (BOOL) readFromData: (NSData *) data
+              options: (NSDictionary *) opts
+   documentAttributes: (NSDictionary **) dict;
+- (BOOL) readFromURL: (NSURL *) url
+             options: (NSDictionary *) opts
+  documentAttributes: (NSDictionary **) dict;
+- (BOOL) readFromData: (NSData *) data
+              options: (NSDictionary *) opts
+   documentAttributes: (NSDictionary **) dict;
 
 - (void)addAttribute: (NSAttributedStringKey) name 
                value: (id) value 

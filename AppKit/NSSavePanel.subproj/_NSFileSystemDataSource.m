@@ -1,5 +1,6 @@
 #import "_NSFileSystemDataSource.h"
 #import <AppKit/NSOutlineView.h>
+#import <AppKit/NSWorkspace.h>
 
 @implementation _NSFileSystemDataSource
 
@@ -65,8 +66,11 @@
         return YES;
     }
 
-    BOOL isDirectory;
+    BOOL isDirectory = NO;
     [_fileManager fileExistsAtPath: [url path] isDirectory: &isDirectory];
+    if (isDirectory && [[NSWorkspace sharedWorkspace] isFilePackageAtPath: [url path]]) {
+        return NO;
+    }
     return isDirectory;
 }
 

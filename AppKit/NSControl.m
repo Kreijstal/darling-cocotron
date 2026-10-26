@@ -88,6 +88,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 
 - initWithCoder: (NSCoder *) coder {
     [super initWithCoder: coder];
+    NSLog(@"[NSControl initWithCoder: %@] start", [self class]);
 
     _aux = [[NSControlAuxiliary alloc] init];
 
@@ -129,14 +130,15 @@ static NSMutableDictionary *cellClassDictionary = nil;
 
             // TODO: flags
         } else {
-            NSInteger tag;
-            uint8_t flags1, flags2;
+            int tag = 0;
+            uint8_t flags1 = 0, flags2 = 0;
 
             [coder decodeValuesOfObjCTypes: "icc@", &tag, &flags1, &flags2,
                                             &self->_cell];
+            [_cell retain];
 
             [_aux setTag: tag];
-
+            NSLog(@"[NSControl initWithCoder] version=%ld done, cell=%@", (long)version, _cell);
             // TODO: flags
         }
     }

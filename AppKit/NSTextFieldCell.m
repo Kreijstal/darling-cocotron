@@ -473,3 +473,6 @@ static void drawRoundedBezel(CGContextRef context, CGRect frame) {
 }
 
 @end
+
+@implementation NSImageTextFieldCell
+@end

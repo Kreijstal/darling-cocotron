@@ -28,4 +28,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                           ascending: (BOOL) ascending
                            priority: (NSInteger) priority;
 
+- (void) _drawThemeContents: (NSRect) cellFrame
+                highlighted: (BOOL) highlighted
+                     inView: (NSView *) controlView;
+
+- (void) _drawThemeContents: (NSRect) cellFrame
+                highlighted: (BOOL) highlighted
+                     inView: (NSView *) controlView;
+
 @end

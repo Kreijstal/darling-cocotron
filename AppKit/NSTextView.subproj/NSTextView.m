@@ -412,6 +412,11 @@ static NSTextView *s_targetTextView = nil;
     [_textContainer setTextView: self];
     _textContainerInset = NSMakeSize(0, 0);
 
+    NSTextStorage *storage = [[_textContainer layoutManager] textStorage];
+    if (storage != nil) {
+        [self _setTextStorage: storage];
+    }
+
     _isEditable = YES;
     _isSelectable = YES;
     _isRichText = YES;
@@ -547,6 +552,13 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (NSTextStorage *) textStorage {
+    NSTextStorage *storage = [[self layoutManager] textStorage];
+    if (storage != nil) {
+        if (_textStorage != storage) {
+            [self _setTextStorage: storage];
+        }
+        return storage;
+    }
     return _textStorage;
 }
 
@@ -2476,7 +2488,7 @@ static NSTextView *s_targetTextView = nil;
             [[NSFontManager sharedFontManager] setSelectedFont: font
                                                     isMultiple: NO];
         }
-    } else {
+    } else if (selectedRange.location < [_textStorage length]) {
         // Use the font at the selection point and check if the selection is
         // using any other font
         NSRange effectiveRange;
@@ -3383,7 +3395,7 @@ static NSTextView *s_targetTextView = nil;
     NSEvent *lastDrag = event;
     NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
     CGFloat fraction = 0;
-    NSRange firstRange, lastRange, selection;
+    NSRange firstRange = NSMakeRange(0, 0), lastRange = NSMakeRange(0, 0), selection = NSMakeRange(0, 0);
     NSSelectionAffinity affinity = NSSelectionAffinityUpstream;
     NSSelectionGranularity granularity = [event clickCount] - 1;
     // Set when the press carries Shift, so the tracking loop keeps extending from the existing
@@ -3448,7 +3460,8 @@ static NSTextView *s_targetTextView = nil;
     } else {
         // Plain drag: the press point is the anchor, same as before.
         anchor = firstRange.location;
-        selection = NSUnionRange(firstRange, lastRange);
+        lastRange = firstRange;
+        selection = firstRange;
         [self setSelectedRange: selection affinity: affinity stillSelecting: YES];
     }
 

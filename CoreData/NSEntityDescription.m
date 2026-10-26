@@ -36,14 +36,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 static id getValue(id self, SEL selector) {
     NSPropertyDescription *property =
             [[self entity] _propertyForSelector: selector];
-    id result = [self valueForKey: [property name]];
-    return result;
+    NSString *name = [property name];
+    if (name == nil) {
+        name = NSStringFromSelector(selector);
+        property = [[self entity] propertyByName: name];
+        name = [property name];
+    }
+    if (name == nil)
+        return nil;
+    return [self valueForKey: name];
 }
 
 static void setValue(id self, SEL selector, id newValue) {
     NSPropertyDescription *property =
             [[self entity] _propertyForSelector: selector];
-    [self setValue: newValue forKey: [property name]];
+    NSString *name = [property name];
+    if (name == nil) {
+        NSString *selName = NSStringFromSelector(selector);
+        if ([selName hasPrefix: @"set"] && [selName hasSuffix: @":"] && [selName length] > 4) {
+            NSString *prop = [selName substringWithRange: NSMakeRange(3, [selName length] - 4)];
+            NSString *first = [[prop substringToIndex: 1] lowercaseString];
+            name = [first stringByAppendingString: [prop substringFromIndex: 1]];
+            property = [[self entity] propertyByName: name];
+            name = [property name];
+        }
+    }
+    if (name != nil)
+        [self setValue: newValue forKey: name];
 }
 
 static void addObject(id self, SEL selector, id value) {
@@ -181,6 +200,22 @@ static void appendMethodToList(Class class, NSString *selectorName, IMP imp,
     return self;
 }
 
+- copyWithZone: (NSZone *) zone {
+    NSEntityDescription *copy = [[NSEntityDescription allocWithZone: zone] init];
+    copy->_name = [_name copyWithZone: zone];
+    copy->_className = [_className copyWithZone: zone];
+    copy->_isAbstract = _isAbstract;
+    copy->_userInfo = [_userInfo copyWithZone: zone];
+    copy->_versionHashModifier = [_versionHashModifier copyWithZone: zone];
+    copy->_properties = [_properties mutableCopyWithZone: zone];
+    copy->_subentities = [_subentities mutableCopyWithZone: zone];
+    copy->_superentity = _superentity;
+    copy->_model = _model;
+    copy->_selectorPropertyMap = [_selectorPropertyMap mutableCopyWithZone: zone];
+    copy->_hasBeenInstantiated = _hasBeenInstantiated;
+    return copy;
+}
+
 - (NSString *) description {
     return [NSString stringWithFormat: @"<NSEntityDescription %@>", _name];
 }
@@ -292,14 +327,11 @@ static void appendMethodToList(Class class, NSString *selectorName, IMP imp,
     NSEntityDescription *entity = [self entityForName: entityName
                                inManagedObjectContext: context];
     NSString *className = [entity managedObjectClassName];
-    Class class;
+    Class class = Nil;
 
     if (className)
         class = NSClassFromString(className);
-    else {
-        NSLog(@"Unable to find class %@ specified by entity %@ in the runtime",
-              className, [entity name]);
-
+    if (class == Nil) {
         class = [NSManagedObject class];
     }
 
@@ -425,6 +457,15 @@ static void appendMethodToList(Class class, NSString *selectorName, IMP imp,
     return _properties;
 }
 
+- (NSPropertyDescription *) propertyByName: (NSString *) name {
+    for (NSEntityDescription *check = self; check != nil; check = check->_superentity) {
+        NSPropertyDescription *prop = [check->_properties objectForKey: name];
+        if (prop != nil)
+            return prop;
+    }
+    return nil;
+}
+
 - (NSDictionary *) relationshipsByName {
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
 
@@ -454,7 +495,7 @@ static void appendMethodToList(Class class, NSString *selectorName, IMP imp,
     NSEntityDescription *check = self;
 
     for (; check != nil; check = check->_superentity)
-        if (check == other)
+        if (check == other || [[check name] isEqualToString: [other name]])
             return YES;
 
     return NO;

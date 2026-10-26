@@ -97,6 +97,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) fixFontAttributeInRange: (NSRange) range {
+    static BOOL sIsFixingFont = NO;
+    if (sIsFixingFont) return;
+    sIsFixingFont = YES;
+    @try {
     NSString *string = [self string];
     unsigned location = range.location;
     unsigned limit = NSMaxRange(range);
@@ -150,6 +154,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             }
         }
         location = NSMaxRange(effectiveRange);
+    }
+    } @finally {
+        sIsFixingFont = NO;
     }
 }
 
@@ -258,6 +265,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [self setAttributedString: str];
     [str release];
     return YES;
+}
+
+- (BOOL) readFromURL: (NSURL *) url
+             options: (NSDictionary *) opts
+  documentAttributes: (NSDictionary **) dict
+{
+    return [self readFromURL: url options: opts documentAttributes: dict error: NULL];
+}
+
+- (BOOL) readFromData: (NSData *) data
+              options: (NSDictionary *) opts
+   documentAttributes: (NSDictionary **) dict
+{
+    return [self readFromData: data options: opts documentAttributes: dict error: NULL];
 }
 
 - (void)appendAttachment: (NSTextAttachment *) attachment {

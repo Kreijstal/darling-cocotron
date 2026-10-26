@@ -52,9 +52,17 @@ NSString *const NSSplitViewWillResizeSubviewsNotification =
         // The divider thickness in the nib may not be the same as ours
         [self resizeSubviewsWithOldSize: [self bounds].size];
     } else {
-        [NSException raise: NSInvalidArgumentException
-                    format: @"-[%@ %s] is not implemented for coder %@",
-                            [self class], sel_getName(_cmd), coder];
+        _isVertical = NO;
+        @try {
+            id obj = [coder decodeObject];
+            if ([obj isKindOfClass: [NSNumber class]]) {
+                _isVertical = [obj boolValue];
+            } else if ([obj isKindOfClass: [NSString class]]) {
+                _autosaveName = [obj retain];
+            }
+        } @catch (id ex) {
+        }
+        [self resizeSubviewsWithOldSize: [self bounds].size];
     }
 
     return self;

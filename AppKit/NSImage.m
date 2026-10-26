@@ -93,6 +93,27 @@ NSImageName const NSImageNameRevealFreestandingTemplate =
         @"NSRevealFreestandingTemplate";
 NSImageName const NSImageNameRightFacingTriangleTemplate =
         @"NSRightFacingTriangleTemplate";
+NSImageName const NSImageNameScriptTemplate = @"NSScriptTemplate";
+
+NSImage *_NSReadThemeImageFromRsrc(id arg1, ...) {
+    if ((uintptr_t)arg1 >= 0x10000 && [arg1 isKindOfClass: [NSString class]]) {
+        NSImage *img = [NSImage imageNamed: (NSString *)arg1];
+        if (img != nil)
+            return img;
+    }
+    return [[[NSImage alloc] initWithSize: NSMakeSize(16, 16)] autorelease];
+}
+
+NSImage *_NSGetThemePartImages(id arg1, ...) {
+    NSImage *img = nil;
+    if ((uintptr_t)arg1 >= 0x10000 && [arg1 isKindOfClass: [NSString class]]) {
+        img = [NSImage imageNamed: (NSString *)arg1];
+    }
+    if (img == nil) {
+        img = [[[NSImage alloc] initWithSize: NSMakeSize(16, 16)] autorelease];
+    }
+    return img;
+}
 NSImageName const NSImageNameShareTemplate = @"NSShareTemplate";
 NSImageName const NSImageNameSlideshowTemplate = @"NSSlideshowTemplate";
 NSImageName const NSImageNameSmartBadgeTemplate = @"NSSmartBadgeTemplate";

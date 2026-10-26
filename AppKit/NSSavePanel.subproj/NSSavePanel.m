@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSScrollView.h>
 #import <AppKit/NSTextField.h>
 #import <AppKit/NSView.h>
+#import <AppKit/NSWorkspace.h>
 
 // UTType; Darling's UTType may not implement it.
 @interface NSObject (NSSavePanelContentTypes)
@@ -232,8 +233,10 @@ static NSSavePanel *_newPanel = nil;
         }
         BOOL isDir = NO;
         if ([[NSFileManager defaultManager] fileExistsAtPath: [url path] isDirectory: &isDir] && isDir) {
+            BOOL isPackage = !_treatsFilePackagesAsDirectories &&
+                [[NSWorkspace sharedWorkspace] isFilePackageAtPath: [url path]];
             BOOL canChooseDirs = [self isKindOfClass: [NSOpenPanel class]] && [(NSOpenPanel *)self canChooseDirectories];
-            if (!canChooseDirs) {
+            if (!isPackage && !canChooseDirs) {
                 if ([_outlineView isItemExpanded: url])
                     [_outlineView collapseItem: url];
                 else

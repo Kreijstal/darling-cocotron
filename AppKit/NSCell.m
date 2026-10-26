@@ -560,6 +560,52 @@ NSNotificationName NSControlTintDidChangeNotification = @"NSControlTintDidChange
     return _isHighlighted;
 }
 
+- (NSInteger) cellAttribute: (NSUInteger) attribute {
+    switch (attribute) {
+    case 0: // NSCellDisabled
+        return [self isEnabled] ? 0 : 1;
+    case 1: // NSCellState
+        return [self state];
+    case 3: // NSCellEditable
+        return [self isEditable] ? 1 : 0;
+    case 5: // NSCellHighlight
+        return [self isHighlighted] ? 1 : 0;
+    case 7: // NSCellIsBordered
+        return [self isBordered] ? 1 : 0;
+    case 12: // NSCellIsOpaque
+        return [self isOpaque] ? 1 : 0;
+    case 16: // NSCellAllowsMixedState
+        return [self allowsMixedState] ? 1 : 0;
+    default:
+        return 0;
+    }
+}
+
+- (void) setCellAttribute: (NSUInteger) attribute to: (NSInteger) value {
+    switch (attribute) {
+    case 0: // NSCellDisabled
+        [self setEnabled: (value == 0)];
+        break;
+    case 1: // NSCellState
+        [self setState: value];
+        break;
+    case 3: // NSCellEditable
+        [self setEditable: (value != 0)];
+        break;
+    case 5: // NSCellHighlight
+        [self setHighlighted: (value != 0)];
+        break;
+    case 7: // NSCellIsBordered
+        [self setBordered: (value != 0)];
+        break;
+    case 16: // NSCellAllowsMixedState
+        [self setAllowsMixedState: (value != 0)];
+        break;
+    default:
+        break;
+    }
+}
+
 - (BOOL) hasValidObjectValue {
     return _hasValidObjectValue;
 }
@@ -1360,7 +1406,33 @@ void NSDrawThreePartImage(NSRect frame, NSImage *startCap, NSImage *centerFill,
                           NSCompositingOperation operation, CGFloat alpha,
                           BOOL flipped)
 {
-    NSUnimplementedFunction();
+    if (vertical) {
+        CGFloat startHeight = startCap ? [startCap size].height : 0;
+        CGFloat endHeight = endCap ? [endCap size].height : 0;
+        CGFloat centerHeight = frame.size.height - startHeight - endHeight;
+        if (centerHeight < 0) centerHeight = 0;
+
+        NSRect rStart = NSMakeRect(frame.origin.x, frame.origin.y, frame.size.width, startHeight);
+        NSRect rCenter = NSMakeRect(frame.origin.x, frame.origin.y + startHeight, frame.size.width, centerHeight);
+        NSRect rEnd = NSMakeRect(frame.origin.x, frame.origin.y + startHeight + centerHeight, frame.size.width, endHeight);
+
+        [startCap drawInRect: rStart fromRect: NSZeroRect operation: operation fraction: alpha];
+        [centerFill drawInRect: rCenter fromRect: NSZeroRect operation: operation fraction: alpha];
+        [endCap drawInRect: rEnd fromRect: NSZeroRect operation: operation fraction: alpha];
+    } else {
+        CGFloat startWidth = startCap ? [startCap size].width : 0;
+        CGFloat endWidth = endCap ? [endCap size].width : 0;
+        CGFloat centerWidth = frame.size.width - startWidth - endWidth;
+        if (centerWidth < 0) centerWidth = 0;
+
+        NSRect rStart = NSMakeRect(frame.origin.x, frame.origin.y, startWidth, frame.size.height);
+        NSRect rCenter = NSMakeRect(frame.origin.x + startWidth, frame.origin.y, centerWidth, frame.size.height);
+        NSRect rEnd = NSMakeRect(frame.origin.x + startWidth + centerWidth, frame.origin.y, endWidth, frame.size.height);
+
+        [startCap drawInRect: rStart fromRect: NSZeroRect operation: operation fraction: alpha];
+        [centerFill drawInRect: rCenter fromRect: NSZeroRect operation: operation fraction: alpha];
+        [endCap drawInRect: rEnd fromRect: NSZeroRect operation: operation fraction: alpha];
+    }
 }
 
 void NSDrawNinePartImage(NSRect frame, NSImage* topLeftCorner,
@@ -1371,5 +1443,37 @@ void NSDrawNinePartImage(NSRect frame, NSImage* topLeftCorner,
                           NSCompositingOperation operation, CGFloat alpha,
                           BOOL flipped)
 {
-    NSUnimplementedFunction();
-};
+    CGFloat leftW = topLeftCorner ? [topLeftCorner size].width : 0;
+    CGFloat rightW = topRightCorner ? [topRightCorner size].width : 0;
+    CGFloat centerW = frame.size.width - leftW - rightW;
+    if (centerW < 0) centerW = 0;
+
+    CGFloat bottomH = bottomLeftCorner ? [bottomLeftCorner size].height : 0;
+    CGFloat topH = topLeftCorner ? [topLeftCorner size].height : 0;
+    CGFloat centerH = frame.size.height - bottomH - topH;
+    if (centerH < 0) centerH = 0;
+
+    NSRect rBL = NSMakeRect(frame.origin.x, frame.origin.y, leftW, bottomH);
+    NSRect rB = NSMakeRect(frame.origin.x + leftW, frame.origin.y, centerW, bottomH);
+    NSRect rBR = NSMakeRect(frame.origin.x + leftW + centerW, frame.origin.y, rightW, bottomH);
+
+    NSRect rL = NSMakeRect(frame.origin.x, frame.origin.y + bottomH, leftW, centerH);
+    NSRect rC = NSMakeRect(frame.origin.x + leftW, frame.origin.y + bottomH, centerW, centerH);
+    NSRect rR = NSMakeRect(frame.origin.x + leftW + centerW, frame.origin.y + bottomH, rightW, centerH);
+
+    NSRect rTL = NSMakeRect(frame.origin.x, frame.origin.y + bottomH + centerH, leftW, topH);
+    NSRect rT = NSMakeRect(frame.origin.x + leftW, frame.origin.y + bottomH + centerH, centerW, topH);
+    NSRect rTR = NSMakeRect(frame.origin.x + leftW + centerW, frame.origin.y + bottomH + centerH, rightW, topH);
+
+    [bottomLeftCorner drawInRect: rBL fromRect: NSZeroRect operation: operation fraction: alpha];
+    [bottomEdgeFill drawInRect: rB fromRect: NSZeroRect operation: operation fraction: alpha];
+    [bottomRightCorner drawInRect: rBR fromRect: NSZeroRect operation: operation fraction: alpha];
+
+    [leftEdgeFill drawInRect: rL fromRect: NSZeroRect operation: operation fraction: alpha];
+    [centerFill drawInRect: rC fromRect: NSZeroRect operation: operation fraction: alpha];
+    [rightEdgeFill drawInRect: rR fromRect: NSZeroRect operation: operation fraction: alpha];
+
+    [topLeftCorner drawInRect: rTL fromRect: NSZeroRect operation: operation fraction: alpha];
+    [topEdgeFill drawInRect: rT fromRect: NSZeroRect operation: operation fraction: alpha];
+    [topRightCorner drawInRect: rTR fromRect: NSZeroRect operation: operation fraction: alpha];
+}
