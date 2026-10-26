@@ -2349,6 +2349,11 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) close {
+    // Prevent duplicate close calls within the same run-loop turn and ensure
+    // NSWindowWillCloseNotification is posted at most once per close cycle.
+    if (_isClosed)
+        return;
+    _isClosed = YES;
     /*
       I am not sure if orderOut comes before the notification or not. If we
       order out after the notification, Windows sends the window a bunch of
@@ -2401,6 +2406,7 @@ static BOOL _allowsAutomaticWindowTabbing;
 
     switch (place) {
     case NSWindowAbove:
+        _isClosed = NO;
         [self update];
         _isVisible = YES;
         [[self platformWindow] placeAboveWindow: relativeTo];
@@ -2419,6 +2425,7 @@ static BOOL _allowsAutomaticWindowTabbing;
         break;
 
     case NSWindowBelow:
+        _isClosed = NO;
         [self update];
         _isVisible = YES;
         [[self platformWindow] placeBelowWindow: relativeTo];
@@ -2437,6 +2444,9 @@ static BOOL _allowsAutomaticWindowTabbing;
         break;
 
     case NSWindowOut:
+        // Note: _isClosed is deliberately NOT reset here because -[NSWindow close]
+        // calls -[self orderOut: nil] with _isClosed = YES already set.
+        // Resetting here would immediately defeat double-close protection.
         _isVisible = NO;
         [[self platformWindow] hideWindow];
         if (![self isKindOfClass: [NSPanel class]]) {

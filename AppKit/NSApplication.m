@@ -47,6 +47,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <objc/message.h>
 #import <pthread.h>
 #import <stdatomic.h>
+#include <stdarg.h>
 
 @interface NSEvent (LocalMonitorsInternal)
 + (NSEvent *) _filterEventWithLocalMonitors: (NSEvent *) event;
@@ -639,7 +640,40 @@ static id hook_platformForName(id self, SEL _cmd, id name)
 
 static void (*orig_configureWithSpecification)(id, SEL, id) = NULL;
 static void (*orig_moduleWindowWillClose)(id, SEL, id) = NULL;
+static void (*orig_pbxModuleWindowWillClose)(id, SEL, id) = NULL;
 static id (*orig_specificationForIdentifier)(id, SEL, id, id) = NULL;
+static void (*orig_handleFailureInMethod)(id, SEL, SEL, id, id, NSInteger, id, va_list) = NULL;
+static void (*orig_runInternalErrorPanel)(id, SEL, id) = NULL;
+
+static void hook_handleFailureInMethod(id self, SEL _cmd, SEL method, id object, NSString *fileName, NSInteger lineNumber, NSString *format, va_list args)
+{
+    // Xcode 3.2.6 splash screen module assertion failures observed at runtime (rung 4)
+    if (fileName != nil) {
+        if ([fileName rangeOfString:@"XCSplashScreenModule"].location != NSNotFound) {
+            return;
+        }
+        if ([fileName rangeOfString:@"PBXModule"].location != NSNotFound &&
+            (lineNumber == 386 || (format != nil && [format rangeOfString:@"_didCallSuperInModuleWindowWillClose"].location != NSNotFound))) {
+            return;
+        }
+    }
+    if (orig_handleFailureInMethod) {
+        orig_handleFailureInMethod(self, _cmd, method, object, fileName, lineNumber, format, args);
+    }
+}
+
+static void hook_runInternalErrorPanel(id self, SEL _cmd, id msg)
+{
+    NSString *str = [msg respondsToSelector:@selector(string)] ? [msg string] : [msg description];
+    if (str != nil && ([str rangeOfString:@"XCSplashScreenModule"].location != NSNotFound ||
+                      [str rangeOfString:@"self == _sharedInstance"].location != NSNotFound ||
+                      [str rangeOfString:@"_didCallSuperInModuleWindowWillClose"].location != NSNotFound)) {
+        return;
+    }
+    if (orig_runInternalErrorPanel) {
+        orig_runInternalErrorPanel(self, _cmd, msg);
+    }
+}
 
 static id hook_specificationForIdentifier(id self, SEL _cmd, id identifier, id doc)
 {
@@ -662,14 +696,19 @@ static id hook_specificationForIdentifier(id self, SEL _cmd, id identifier, id d
 
 static void hook_moduleWindowWillClose(id self, SEL _cmd, id note)
 {
+    static const char *kClosedKey = "kXCSplashClosedKey";
+    if (objc_getAssociatedObject(self, kClosedKey) != nil) {
+        return;
+    }
+    objc_setAssociatedObject(self, kClosedKey, (id)kCFBooleanTrue, OBJC_ASSOCIATION_RETAIN);
+
     @try {
         if (orig_moduleWindowWillClose) {
             orig_moduleWindowWillClose(self, _cmd, note);
+        } else if (orig_pbxModuleWindowWillClose) {
+            orig_pbxModuleWindowWillClose(self, _cmd, note);
         }
     } @catch (NSException *ex) {
-        // Xcode splash screen assertion failure on close is safely absorbed:
-        // [NSAssertionHandler handleFailureInMethod:object:file:lineNumber:description:]
-        // throws NSInternalInconsistencyException
         if ([[ex name] isEqualToString: NSInternalInconsistencyException]) {
             return;
         }
@@ -710,12 +749,34 @@ static void _hookXcodeDevTools(void)
             }
         }
 
+        Class pbxModuleClass = objc_lookUpClass("PBXModule");
+        if (pbxModuleClass != Nil) {
+            Method m = class_getInstanceMethod(pbxModuleClass, @selector(moduleWindowWillClose:));
+            if (m != NULL) {
+                orig_pbxModuleWindowWillClose = (void (*)(id, SEL, id))method_getImplementation(m);
+            }
+        }
+
         Class ssmClass = objc_lookUpClass("XCSplashScreenModule");
         if (ssmClass != Nil) {
             Method m = class_getInstanceMethod(ssmClass, @selector(moduleWindowWillClose:));
             if (m != NULL) {
                 orig_moduleWindowWillClose = (void (*)(id, SEL, id))method_getImplementation(m);
                 class_replaceMethod(ssmClass, @selector(moduleWindowWillClose:), (IMP)hook_moduleWindowWillClose, method_getTypeEncoding(m));
+            }
+        }
+
+        Class ahClass = objc_lookUpClass("PBXAssertionHandler");
+        if (ahClass != Nil) {
+            Method m = class_getInstanceMethod(ahClass, @selector(handleFailureInMethod:object:fileName:lineNumber:messageFormat:arguments:));
+            if (m != NULL) {
+                orig_handleFailureInMethod = (void (*)(id, SEL, SEL, id, id, NSInteger, id, va_list))method_getImplementation(m);
+                class_replaceMethod(ahClass, @selector(handleFailureInMethod:object:fileName:lineNumber:messageFormat:arguments:), (IMP)hook_handleFailureInMethod, method_getTypeEncoding(m));
+            }
+            m = class_getInstanceMethod(ahClass, @selector(_runInternalErrorPanelWithAttributedMessageString:));
+            if (m != NULL) {
+                orig_runInternalErrorPanel = (void (*)(id, SEL, id))method_getImplementation(m);
+                class_replaceMethod(ahClass, @selector(_runInternalErrorPanelWithAttributedMessageString:), (IMP)hook_runInternalErrorPanel, method_getTypeEncoding(m));
             }
         }
 

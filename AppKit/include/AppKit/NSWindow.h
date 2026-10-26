@@ -266,6 +266,7 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
     BOOL _isOneShot;
     BOOL _useOptimizedDrawing;
     BOOL _releaseWhenClosed;
+    BOOL _isClosed;
     BOOL _hidesOnDeactivate;
     BOOL _hiddenForDeactivate;
     BOOL _isActive;
