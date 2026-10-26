@@ -179,7 +179,9 @@ static inline void _clearCurrentContext() {
     CGLError error;
     _drawableAttachmentSucceeded = NO;
 
-    if (_subwindow == nil) {
+    // Viewless contexts have no window geometry to update. In particular,
+    // background resource uploads must not wait for a main-thread run loop.
+    if (_subwindow == nil && _view != nil) {
         if ([NSThread isMainThread]) {
             [self updateViewParameters];
         } else {
