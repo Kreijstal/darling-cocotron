@@ -101,9 +101,8 @@ NSNotificationName const NSScreenColorSpaceDidChangeNotification = @"NSScreenCol
     return 0.0;
 }
 
-// No screen here has a camera housing or any other region the system reserves
-// along an edge, so no part of the frame is unsafe and there are no usable
-// areas beside a cut-out.
+// Base screens reserve no edge area. Backends such as PocketScreen override
+// these defaults for display cut-outs.
 - (NSEdgeInsets) safeAreaInsets {
     return NSEdgeInsetsMake(0, 0, 0, 0);
 }
