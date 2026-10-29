@@ -2825,15 +2825,11 @@ static NSView *viewBeingPrinted = nil;
 
         shouldFlush = [context isDrawingToScreen];
 
+        // Onyx2D clips a multi-rectangle path to its bounding box. Subviews
+        // clipped to fewer rectangles would leave holes, so use this redraw's
+        // enclosing rectangle consistently throughout the view hierarchy.
         CGContextClipToRect(graphicsPort, rect);
 
-        const NSRect *rects;
-        NSInteger rectsCount;
-        [self getRectsBeingDrawn: &rects count: &rectsCount];
-        // If there is only one rect, it's the visible rect - it's already
-        // clipped
-        if (rectsCount > 1)
-            CGContextClipToRects(graphicsPort, rects, rectsCount);
 
         // [_window dirtyRect:[self convertRect:rect toView:nil]];
         if ([NSGraphicsContext inQuartzDebugMode]) {
