@@ -53,6 +53,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <objc/message.h>
 #import <AppKit/NSLayoutConstraint.h>
 #import <AppKit/NSLayoutGuide.h>
+#import <AppKit/NSTouch.h>
 #import "NSLayoutConstraintInternal.h"
 #import <AppKit/NSTextInput.h>
 #import <AppKit/NSTextInputClient.h>
@@ -3645,6 +3646,24 @@ static id anchorForView(NSView *view, Class anchorClass, NSLayoutAttribute attri
     if (_superview != nil)
         return [_superview effectiveAppearance];
     return [NSAppearance currentAppearance];
+}
+
+@end
+
+@implementation NSView (DarlingAllowedTouchTypes)
+static char NSViewAllowedTouchTypesKey;
+
+// Trackpad touches only by default, as in AppKit: a touch screen finger moves
+// the mouse over views that do not ask for direct touches.
+- (void) setAllowedTouchTypes: (NSUInteger) mask {
+    objc_setAssociatedObject(self, &NSViewAllowedTouchTypesKey,
+                             mask == NSTouchTypeMaskIndirect ? nil : [NSNumber numberWithUnsignedInteger: mask],
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (NSUInteger) allowedTouchTypes {
+    NSNumber *mask = objc_getAssociatedObject(self, &NSViewAllowedTouchTypesKey);
+    return mask != nil ? [mask unsignedIntegerValue] : NSTouchTypeMaskIndirect;
 }
 
 @end

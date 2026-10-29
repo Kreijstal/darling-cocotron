@@ -283,6 +283,7 @@ set(AppKit_sources
 	NSEvent.subproj/NSEvent_other.m
 	NSEvent.subproj/NSEvent_keyboard.m
 	NSEvent.subproj/NSEvent_gesture.m
+	NSTouch.m
 	NSEvent.subproj/NSEvent.m
 
 	NSButton.m
@@ -654,6 +655,7 @@ add_backend(X11
 		X11.backend/X11Cursor.m
 		X11.backend/X11DropSession.m
 		X11.backend/X11DraggingManager.m
+		X11.backend/X11Touch.m
 	INFO_PLIST
 		X11.backend/Info.plist
 	DEPENDENCIES
@@ -675,6 +677,7 @@ add_backend(X11
 		fontconfig
 		xkbfile
 )
+target_include_directories(X11_backend PRIVATE ${CMAKE_SOURCE_DIR}/src/startup/mldr/elfcalls)
 
 set_source_files_properties(DarlingLayout.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-std=c++14 -fexceptions")
 

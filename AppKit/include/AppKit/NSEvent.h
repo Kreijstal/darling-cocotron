@@ -70,6 +70,7 @@ typedef NS_ENUM(NSUInteger, NSEventType) {
     NSEventTypeOtherMouseDragged = 27,
 
     NSEventTypeMagnify = 30,
+    NSEventTypeDirectTouch = 37,
 };
 
 // Names used before the modern spellings; plain constants, so Swift does not see them.
@@ -125,6 +126,8 @@ typedef NS_OPTIONS(unsigned long long, NSEventMask) {
     NSEventMaskOtherMouseDragged = 1ULL << NSEventTypeOtherMouseDragged,
     NSEventMaskRotate = 1ULL << NSEventTypeRotate,
     NSEventMaskMagnify = 1ULL << NSEventTypeMagnify,
+    NSEventMaskDirectTouch = 1ULL << NSEventTypeDirectTouch,
+    NSEventMaskAny = NSUIntegerMax,
 };
 
 // Pre-10.12 spellings.  NSAnyEventMask keeps Cocotron's 32-bit value rather
@@ -150,7 +153,7 @@ static const NSEventMask NSAppKitDefinedMask = NSEventMaskAppKitDefined;
 static const NSEventMask NSOtherMouseDownMask = NSEventMaskOtherMouseDown;
 static const NSEventMask NSOtherMouseUpMask = NSEventMaskOtherMouseUp;
 static const NSEventMask NSOtherMouseDraggedMask = NSEventMaskOtherMouseDragged;
-static const NSEventMask NSAnyEventMask = 0xffffffff;
+static const NSEventMask NSAnyEventMask = NSUIntegerMax;
 static const NSEventMask NSPlatformSpecificDisplayMask =
         1ULL << NSPlatformSpecificDisplayEvent;
 
@@ -321,6 +324,9 @@ typedef NS_OPTIONS(NSUInteger, NSEventSwipeTrackingOptions) {
 + (void) setMouseCoalescingEnabled: (BOOL) flag;
 + (BOOL) isMouseCoalescingEnabled;
 - (NSSet *) touchesMatchingPhase: (NSUInteger) phase inView: (NSView *) view;
+- (NSSet *) allTouches;
+- (NSSet *) touchesForView: (NSView *) view;
+- (NSArray *) coalescedTouchesForTouch: (id) touch;
 
 - (instancetype) initWithType: (NSEventType) type
                      location: (NSPoint) location
