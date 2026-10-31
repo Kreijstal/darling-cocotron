@@ -120,6 +120,7 @@
 // in the newest menu window), as menus do in other toolkits.
 - (void) menuWindowMapped: (X11Window *) window;
 - (void) menuWindowUnmapped: (X11Window *) window;
+- (NSArray *) windowsAboveLevel: (int) level;
 - (id) windowForID: (XID) i;
 
 // The object that shows the main menu outside the windows, created on first

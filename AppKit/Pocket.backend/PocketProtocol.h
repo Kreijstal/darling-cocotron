@@ -66,6 +66,7 @@ enum {
     POCKET_TOUCH = 103,   // struct pocket_touch
     POCKET_KEY = 104,     // struct pocket_key, then the characters (UTF-8)
     POCKET_TEXT = 105,    // UTF-8 text the input method commits
+    POCKET_KEYBOARD_FRAME = 106, // struct pocket_keyboard_frame: the soft keyboard came, went or resized
 };
 
 enum {
@@ -112,8 +113,24 @@ struct pocket_present {
     int32_t x, y, width, height;
 };
 
+enum {
+    POCKET_KEYBOARD_SECURE = 1,    // a password: nothing remembered or suggested
+    POCKET_KEYBOARD_MULTILINE = 2, // Return starts a new line
+};
+
+// Hosts take the fields after `shown` only when the message is long enough.
 struct pocket_keyboard {
     uint32_t shown;
+    // The text's UITextInputTraits, with iOS's values.
+    uint32_t keyboard_type;      // UIKeyboardType
+    uint32_t return_key;         // UIReturnKeyType
+    uint32_t autocapitalization; // UITextAutocapitalizationType
+    uint32_t autocorrection;     // UITextAutocorrectionType
+    uint32_t flags;              // POCKET_KEYBOARD_*
+};
+
+struct pocket_keyboard_frame {
+    uint32_t height; // pixels the keyboard covers at the bottom; 0 once it is gone
 };
 
 struct pocket_screen {

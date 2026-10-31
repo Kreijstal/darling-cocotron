@@ -111,6 +111,8 @@
 - (void) acquireLayerDrawable: (id) owner syncsToDisplay: (BOOL) syncs;
 - (void) setLayerDrawable: (id) owner syncsToDisplay: (BOOL) syncs;
 - (void) releaseLayerDrawable: (id) owner;
+- (int) x11Level;
+- (void) keepHigherLevelsInFront;
 
 - (void) frameChanged;
 - (void) setLastKnownCursorPosition: (CGPoint) point;

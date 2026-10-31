@@ -1027,6 +1027,24 @@ static NSData *makeWindowIcon() {
 
 - (void) setLevel: (int) value {
     _level = value;
+    if (_mapped)
+        [self keepHigherLevelsInFront];
+}
+
+- (int) x11Level {
+    return _level;
+}
+
+// Without a window manager nothing keeps windows of a higher level (alerts,
+// panels) in front: raising a window covers them. Raise them again after
+// it, lowest level first, so they stay in their order.
+- (void) keepHigherLevelsInFront {
+    X11Display *display = (X11Display *) [NSDisplay currentDisplay];
+    NSArray *above = [[display windowsAboveLevel: _level] sortedArrayUsingComparator: ^NSComparisonResult(X11Window *a, X11Window *b) {
+        return a->_level < b->_level ? NSOrderedAscending : a->_level > b->_level ? NSOrderedDescending : NSOrderedSame;
+    }];
+    for (X11Window *window in above)
+        XRaiseWindow(_display, window->_window);
 }
 
 - (void) setOpaque: (BOOL) value {
@@ -1071,6 +1089,7 @@ static NSData *makeWindowIcon() {
 
     if (!other) {
         XRaiseWindow(_display, _window);
+        [self keepHigherLevelsInFront];
     } else {
         Window w[2] = {_window, other->_window};
         XRestackWindows(_display, w, 2);
@@ -1188,6 +1207,7 @@ BOOL X11WindowManagerIsRunning(Display *display) {
     if (_receivingFocus)
         return;
     XRaiseWindow(_display, _window);
+    [self keepHigherLevelsInFront];
     [self requestInputFocus];
 }
 
