@@ -50,7 +50,8 @@
     // Bottom to top, not retained.
     CFMutableArrayRef _windows;
     NSPoint _lastTouch;
-    BOOL _keyboardShown;
+    struct pocket_keyboard _keyboard; // what the host was last asked for
+    CGFloat _keyboardHeight;          // points, as the host last said
     NSMutableDictionary *_pasteboards;
 }
 
@@ -69,5 +70,7 @@
 - (void) windowLowered: (PocketWindow *) window;
 // Asks the host to show the soft keyboard while text is being edited.
 - (void) updateKeyboard;
+// The host's keyboard came, went or resized: NSSoftKeyboardHeightDidChangeNotification.
+- (void) keyboardFrameChanged: (struct pocket_keyboard_frame) frame;
 
 @end
