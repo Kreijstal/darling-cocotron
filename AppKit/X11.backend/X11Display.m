@@ -1148,6 +1148,17 @@ static int compareFontPatterns(const void *a, const void *b) {
     }
 }
 
+// The mapped windows of a higher level than the one given.
+- (NSArray *) windowsAboveLevel: (int) level {
+    NSMutableArray *above = [NSMutableArray array];
+    for (NSNumber *xid in _windowsByID) {
+        X11Window *window = _windowsByID[xid];
+        if ([window isKindOfClass: [X11Window class]] && [window isMapped] && [window x11Level] > level)
+            [above addObject: window];
+    }
+    return above;
+}
+
 - (id) windowForID: (XID) i {
     return [_windowsByID objectForKey: [NSNumber numberWithUnsignedLong: i]];
 }
