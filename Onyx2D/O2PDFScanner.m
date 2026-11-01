@@ -170,8 +170,7 @@ static BOOL debugError(const char *bytes, unsigned length,
 
     va_start(arguments, format);
     debugTracev(bytes, length, position, format, arguments);
-    [NSException raise: @"" format: @""];
-    ;
+    va_end(arguments);
     return NO;
 }
 
@@ -1301,7 +1300,6 @@ NSData *O2PDFScannerCreateDataWithLength(O2PDFScanner *self, size_t length) {
                 callback(self, _info);
             } else {
                 NSLog(@"unhandled identifier %@", object);
-                [NSException raise: @"" format: @""];
             }
         }
     }
