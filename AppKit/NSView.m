@@ -1423,10 +1423,13 @@ static void postFrameChange(NSView *self) {
     else {
         [view removeFromSuperview];
 
-        [view _setWindow: _window];
-
+        // As in Apple's AppKit and UIKit, the view has its superview by the
+        // time it hears that it moved to a window: UIKit views look up their
+        // view controller through the responder chain in didMoveToWindow.
         [view viewWillMoveToSuperview: self];
         [view _setSuperview: self];
+
+        [view _setWindow: _window];
     }
 
     if (index == NSNotFound)

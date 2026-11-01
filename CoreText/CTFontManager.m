@@ -3,6 +3,9 @@
 #import <Foundation/Foundation.h>
 #import <Onyx2D/O2Font_freetype.h>
 
+const CFStringRef kCTFontManagerErrorDomain = CFSTR("com.apple.CoreText.CTFontManagerErrorDomain");
+BOOL O2FontRegisterFontFile(NSString *path);
+
 const CFStringRef kCTFontManagerRegisteredFontsChangedNotification = CFSTR("CTFontManagerFontChangedNotification");
 
 bool CTFontManagerRegisterGraphicsFont(CGFontRef font, CFErrorRef* error)
@@ -34,7 +37,16 @@ CFArrayRef CTFontManagerCopyAvailableFontFamilyNames(void)
 
 bool CTFontManagerRegisterFontsForURL(CFURLRef fontURL, CTFontManagerScope scope, CFErrorRef * error)
 {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
+    NSURL *url = (NSURL *)fontURL;
+    if (url != nil && [url isFileURL] && O2FontRegisterFontFile([url path])) {
+        if (error) *error = NULL;
+        CFNotificationCenterPostNotification(CFNotificationCenterGetLocalCenter(),
+            kCTFontManagerRegisteredFontsChangedNotification, NULL, NULL, true);
+        return true;
+    }
+    if (error) *error = CFErrorCreate(kCFAllocatorDefault, kCTFontManagerErrorDomain,
+        url != nil && [url isFileURL] && ![[NSFileManager defaultManager] fileExistsAtPath: [url path]]
+            ? kCTFontManagerErrorFileNotFound : kCTFontManagerErrorInvalidFontData, NULL);
     return false;
 }
 

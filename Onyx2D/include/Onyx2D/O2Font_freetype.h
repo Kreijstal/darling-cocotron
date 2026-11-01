@@ -42,6 +42,8 @@ FT_Face O2FontFreeTypeFace(O2Font_freetype *self);
 
 FT_Library O2FontSharedFreeTypeLibrary();
 FcConfig *O2FontSharedFontConfig();
+// Adds a font file (or a directory of them) at a guest path to the fonts names resolve to.
+BOOL O2FontRegisterFontFile(NSString *path);
 
 /* Lists the installed faces whose properties equal all of the non-nil
  * arguments; no substitution takes place. Each element is a dictionary

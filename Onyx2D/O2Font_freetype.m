@@ -87,21 +87,27 @@ static NSString *guestPathFromHostPath(const char *path) {
 }
 #endif
 
-static void addAppFont(FcConfig *config, NSString *path) {
-    path = [[NSBundle mainBundle] pathForResource: path ofType: nil];
+static BOOL addFontFile(FcConfig *config, NSString *path) {
+    BOOL directory = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:path isDirectory:&directory]) return NO;
+    const FcChar8 *host = (const FcChar8 *)[hostPathFromGuestPath(path) UTF8String];
+    return directory ? FcConfigAppFontAddDir(config, host) : FcConfigAppFontAddFile(config, host);
+}
+
+static void addAppFont(FcConfig *config, NSString *name) {
+    NSString *path = [[NSBundle mainBundle] pathForResource:name ofType:nil];
     if (path == nil) {
-        NSLog(@"Cannot find font %@ in resources", path);
+        NSLog(@"Cannot find font %@ in resources", name);
         return;
     }
-    BOOL isDirectory;
-    [[NSFileManager defaultManager] fileExistsAtPath: path
-                                         isDirectory: &isDirectory];
-    path = hostPathFromGuestPath(path);
-    if (isDirectory) {
-        FcConfigAppFontAddDir(config, (const FcChar8 *) [path UTF8String]);
-    } else {
-        FcConfigAppFontAddFile(config, (const FcChar8 *) [path UTF8String]);
-    }
+    addFontFile(config, path);
+}
+
+static void addAppFonts(FcConfig *config, id paths) {
+    if ([paths isKindOfClass:[NSString class]]) addAppFont(config, paths);
+    else if ([paths isKindOfClass:[NSArray class]])
+        for (id path in paths)
+            if ([path isKindOfClass:[NSString class]]) addAppFont(config, path);
 }
 
 #ifdef DARLING
@@ -156,18 +162,19 @@ FcConfig *O2FontSharedFontConfig() {
         fontConfig = FcInitLoadConfigAndFonts();
 #endif
 
-        id appFontsPath = [[NSBundle mainBundle]
-                objectForInfoDictionaryKey: @"ATSApplicationFontsPath"];
-        if ([appFontsPath isKindOfClass: [NSString class]]) {
-            addAppFont(fontConfig, appFontsPath);
-        } else if ([appFontsPath isKindOfClass: [NSArray class]]) {
-            for (NSString *path in appFontsPath) {
-                addAppFont(fontConfig, path);
-            }
-        }
+        NSBundle *bundle = [NSBundle mainBundle];
+        addAppFonts(fontConfig, [bundle objectForInfoDictionaryKey:@"ATSApplicationFontsPath"]);
+        addAppFonts(fontConfig, [bundle objectForInfoDictionaryKey:@"UIAppFonts"]);
     }
 
     return fontConfig;
+}
+
+BOOL O2FontRegisterFontFile(NSString *path) {
+    @synchronized([O2Font_freetype class]) {
+        FcConfig *config = O2FontSharedFontConfig();
+        return config != NULL && path != nil && addFontFile(config, path);
+    }
 }
 
 NSArray *O2FontCopyInstalledFaces(NSString *family, NSString *postScriptName,
@@ -347,6 +354,34 @@ O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,
     return [[O2Font_freetype alloc] initWithFace: face];
 }
 
++ (NSString *) filenameForPostScriptName: (NSString *) name {
+    FcConfig *config = O2FontSharedFontConfig();
+    FcPattern *pat = FcPatternCreate();
+    // Not FcObjectSetBuild: fontconfig is a native library, and Darwin's arm64 calling convention
+    // passes variadic arguments differently from Linux's.
+    FcObjectSet *objects = FcObjectSetCreate();
+    if (objects != NULL && !FcObjectSetAdd(objects, FC_FILE)) {
+        FcObjectSetDestroy(objects);
+        objects = NULL;
+    }
+    NSString *res = nil;
+    if (pat != NULL && objects != NULL &&
+        FcPatternAddString(pat, FC_POSTSCRIPT_NAME, (const FcChar8 *) [name UTF8String])) {
+        FcFontSet *set = FcFontList(config, pat, objects);
+        FcChar8 *filename = NULL;
+        if (set != NULL && set->nfont > 0 &&
+            FcPatternGetString(set->fonts[0], FC_FILE, 0, &filename) == FcResultMatch)
+            res = [NSString stringWithUTF8String: (char *) filename];
+        if (set != NULL)
+            FcFontSetDestroy(set);
+    }
+    if (objects != NULL)
+        FcObjectSetDestroy(objects);
+    if (pat != NULL)
+        FcPatternDestroy(pat);
+    return res;
+}
+
 + (NSString *) filenameForPattern: (NSString *) pattern {
     FcConfig *config = O2FontSharedFontConfig();
 
@@ -391,7 +426,8 @@ O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,
 - (instancetype) initWithFontName: (NSString *) name {
     self = [super initWithFontName: name];
 
-    NSString *filename = [[self class] filenameForPattern: name];
+    NSString *filename = [[self class] filenameForPostScriptName: name];
+    if (filename == nil) filename = [[self class] filenameForPattern: name];
     if (filename == nil) {
         filename = [[self class] filenameForPattern: @""];
     }
