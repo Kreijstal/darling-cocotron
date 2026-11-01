@@ -56,8 +56,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         _currentPage = 0;
         CGDataProviderRef provider =
                 CGDataProviderCreateWithCFData((CFDataRef) _pdf);
-        _document = CGPDFDocumentCreateWithProvider(provider);
-        CGDataProviderRelease(provider);
+        @try {
+            _document = CGPDFDocumentCreateWithProvider(provider);
+        }
+        @catch (id ex) {
+            _document = NULL;
+        }
+        @finally {
+            CGDataProviderRelease(provider);
+        }
         if (_document == NULL) {
             [_pdf release];
             _pdf = nil;
