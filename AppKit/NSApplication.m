@@ -1516,10 +1516,14 @@ static void _hookXcodeDevTools(void)
 
     while ((result = [NSApp runModalSession: session]) ==
            NSRunContinuesResponse) {
-        [self nextEventMatchingMask: NSAnyEventMask
-                          untilDate: [NSDate distantFuture]
-                             inMode: NSModalPanelRunLoopMode
-                            dequeue: NO];
+        NSDate *limitDate = [NSDate dateWithTimeIntervalSinceNow: 0.05];
+        NSEvent *event = [self nextEventMatchingMask: NSAnyEventMask
+                                           untilDate: limitDate
+                                              inMode: NSModalPanelRunLoopMode
+                                             dequeue: NO];
+        if (event == nil) {
+            [[NSRunLoop currentRunLoop] runMode: NSModalPanelRunLoopMode beforeDate: limitDate];
+        }
     }
     [self endModalSession: session];
 
@@ -1591,10 +1595,14 @@ static void _hookXcodeDevTools(void)
         [context setModalSession: session];
 
         while ([NSApp runModalSession: session] == NSRunContinuesResponse) {
-            [self nextEventMatchingMask: NSAnyEventMask
-                              untilDate: [NSDate distantFuture]
-                                 inMode: NSModalPanelRunLoopMode
-                                dequeue: NO];
+            NSDate *limitDate = [NSDate dateWithTimeIntervalSinceNow: 0.05];
+            NSEvent *event = [self nextEventMatchingMask: NSAnyEventMask
+                                               untilDate: limitDate
+                                                  inMode: NSModalPanelRunLoopMode
+                                                 dequeue: NO];
+            if (event == nil) {
+                [[NSRunLoop currentRunLoop] runMode: NSModalPanelRunLoopMode beforeDate: limitDate];
+            }
         }
         [self endModalSession: session];
     } else {
