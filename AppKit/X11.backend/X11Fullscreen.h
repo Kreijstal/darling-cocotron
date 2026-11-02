@@ -44,15 +44,24 @@ static inline bool X11FullscreenLeaveBeforeMove(bool wanted, bool requested, boo
  * root window is the only monitor. */
 static inline bool X11FullscreenRectIsMonitor(Display *display, X11FullscreenRect rect) {
     Window root = DefaultRootWindow(display);
+    int screen = DefaultScreen(display);
     int eventBase, errorBase;
     if (!XRRQueryExtension(display, &eventBase, &errorBase)) {
-        int screen = DefaultScreen(display);
         return rect.x == 0 && rect.y == 0 && rect.width == (unsigned int) DisplayWidth(display, screen) &&
                rect.height == (unsigned int) DisplayHeight(display, screen);
     }
     XRRScreenResources *resources = XRRGetScreenResourcesCurrent(display, root);
-    if (resources == NULL)
-        return false;
+    if (resources == NULL || resources->ncrtc == 0) {
+        if (resources != NULL)
+            XRRFreeScreenResources(resources);
+        resources = XRRGetScreenResources(display, root);
+    }
+    if (resources == NULL || resources->ncrtc == 0) {
+        if (resources != NULL)
+            XRRFreeScreenResources(resources);
+        return rect.x == 0 && rect.y == 0 && rect.width == (unsigned int) DisplayWidth(display, screen) &&
+               rect.height == (unsigned int) DisplayHeight(display, screen);
+    }
     bool covers = false;
     for (int i = 0; i < resources->ncrtc && !covers; i++) {
         XRRCrtcInfo *crtc = XRRGetCrtcInfo(display, resources, resources->crtcs[i]);
