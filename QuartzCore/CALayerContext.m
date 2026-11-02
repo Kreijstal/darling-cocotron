@@ -7,6 +7,7 @@
 #include <math.h>
 
 #import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/CAOpenGLLayer.h>
 
 @interface CAMetalLayer (ContextPrivate)
 - (void)prepareRender;
@@ -255,6 +256,8 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
     if ([layer isKindOfClass: [CAMetalLayer class]] &&
         [(CAMetalLayer*)layer hasQueuedDrawables])
         return YES;
+    if ([layer isKindOfClass: [CAOpenGLLayer class]])
+        return YES;
     for (CALayer *child in layer.sublayers)
         if (layerTreeNeedsAnotherFrame(child))
             return YES;
@@ -294,24 +297,28 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
 }
 
 - (void) startTimerIfNeeded {
-    // Metal layers present from arbitrary app threads. A timer scheduled there
+    // Metal and OpenGL layers present from arbitrary app threads. A timer scheduled there
     // lands on a run loop that never spins, so the frame is never composited.
     if (![NSThread isMainThread]) {
         [self performSelectorOnMainThread: @selector(startTimerIfNeeded)
                                withObject: nil
                             waitUntilDone: NO
-                                    modes: [NSArray arrayWithObject: NSRunLoopCommonModes]];
+                                    modes: [NSArray arrayWithObjects: NSDefaultRunLoopMode, NSRunLoopCommonModes, @"NSModalPanelRunLoopMode", nil]];
         return;
     }
     _renderRequested = YES;
+    [self renderPendingPresents];
     if (_timer == nil) {
         _timer = [[NSTimer timerWithTimeInterval: 1.0 / 60.0
                                           target: self
                                         selector: @selector(timer:)
                                         userInfo: nil
                                          repeats: YES] retain];
-        // Common modes keep frames flowing during live resize/drag tracking.
+        // Common modes keep frames flowing during live resize/drag tracking,
+        // and default mode keeps frames flowing during normal event processing.
+        [[NSRunLoop mainRunLoop] addTimer: _timer forMode: NSDefaultRunLoopMode];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode: NSRunLoopCommonModes];
+        [[NSRunLoop mainRunLoop] addTimer: _timer forMode: @"NSModalPanelRunLoopMode"];
     }
 }
 
