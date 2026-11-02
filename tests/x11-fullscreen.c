@@ -98,7 +98,7 @@ static void monitorTest(Display *display) {
 /* Xvfb has a single CRTC and RandR, so a second monitor and a server without RandR cannot be set up on it. The
  * header's calls into RandR are therefore interposed here (this executable's definitions win over libXrandr's):
  * unless a fake is selected they forward to the real library. */
-static enum { FakeOff, FakeTwoCrtcs, FakeNoRandR } fake;
+static enum { FakeOff, FakeTwoCrtcs, FakeNoRandR, FakeZeroCrtcs, FakeCurrentZeroRetrySucceeds } fake;
 static const struct {
     int x, y;
     unsigned width, height;
@@ -112,6 +112,11 @@ Bool XRRQueryExtension(Display *display, int *eventBase, int *errorBase) {
 }
 
 XRRScreenResources *XRRGetScreenResourcesCurrent(Display *display, Window window) {
+    if (fake == FakeZeroCrtcs || fake == FakeCurrentZeroRetrySucceeds) {
+        XRRScreenResources *resources = calloc(1, sizeof *resources);
+        resources->ncrtc = 0;
+        return resources;
+    }
     if (fake != FakeTwoCrtcs) {
         XRRScreenResources *(*real)(Display *, Window) =
                 (XRRScreenResources * (*) (Display *, Window)) dlsym(RTLD_NEXT, "XRRGetScreenResourcesCurrent");
@@ -126,7 +131,34 @@ XRRScreenResources *XRRGetScreenResourcesCurrent(Display *display, Window window
     return resources;
 }
 
+XRRScreenResources *XRRGetScreenResources(Display *display, Window window) {
+    if (fake == FakeZeroCrtcs) {
+        XRRScreenResources *resources = calloc(1, sizeof *resources);
+        resources->ncrtc = 0;
+        return resources;
+    }
+    if (fake == FakeCurrentZeroRetrySucceeds) {
+        XRRScreenResources *resources = calloc(1, sizeof *resources + sizeof *resources->crtcs);
+        resources->ncrtc = 1;
+        resources->crtcs = (RRCrtc *) (resources + 1);
+        resources->crtcs[0] = 1;
+        return resources;
+    }
+    XRRScreenResources *(*real)(Display *, Window) =
+            (XRRScreenResources * (*) (Display *, Window)) dlsym(RTLD_NEXT, "XRRGetScreenResources");
+    return real(display, window);
+}
+
 XRRCrtcInfo *XRRGetCrtcInfo(Display *display, XRRScreenResources *resources, RRCrtc crtc) {
+    if (fake == FakeCurrentZeroRetrySucceeds) {
+        XRRCrtcInfo *info = calloc(1, sizeof *info);
+        info->x = 0;
+        info->y = 0;
+        info->width = 1280;
+        info->height = 720;
+        info->mode = 1;
+        return info;
+    }
     if (fake != FakeTwoCrtcs) {
         XRRCrtcInfo *(*real)(Display *, XRRScreenResources *, RRCrtc) =
                 (XRRCrtcInfo * (*) (Display *, XRRScreenResources *, RRCrtc)) dlsym(RTLD_NEXT, "XRRGetCrtcInfo");
@@ -169,6 +201,26 @@ static void noRandRTest(Display *display) {
     X11FullscreenRect narrow = {0, 0, width - 1, height}, shorter = {0, 0, width, height - 1};
     CHECK(!X11FullscreenRectIsMonitor(display, narrow), "no RandR: one pixel narrower is not the root");
     CHECK(!X11FullscreenRectIsMonitor(display, shorter), "no RandR: one pixel shorter is not the root");
+    fake = FakeOff;
+}
+
+static void zeroCrtcsTest(Display *display) {
+    fake = FakeZeroCrtcs;
+    int screen = DefaultScreen(display);
+    unsigned width = (unsigned) DisplayWidth(display, screen), height = (unsigned) DisplayHeight(display, screen);
+    X11FullscreenRect whole = {0, 0, width, height};
+    CHECK(X11FullscreenRectIsMonitor(display, whole), "zero CRTCs: fallback to DefaultScreen monitor");
+    X11FullscreenRect shifted = {1, 0, width, height};
+    CHECK(!X11FullscreenRectIsMonitor(display, shifted), "zero CRTCs: shifted in x is not the root");
+    fake = FakeOff;
+}
+
+static void currentZeroRetryTest(Display *display) {
+    fake = FakeCurrentZeroRetrySucceeds;
+    X11FullscreenRect probed = {0, 0, 1280, 720};
+    CHECK(X11FullscreenRectIsMonitor(display, probed), "Current has 0 CRTCs: retry with XRRGetScreenResources succeeds");
+    X11FullscreenRect wrong = {0, 0, 1280, 721};
+    CHECK(!X11FullscreenRectIsMonitor(display, wrong), "retry CRTC: mismatch is not a monitor");
     fake = FakeOff;
 }
 
@@ -337,6 +389,8 @@ int main(void) {
     monitorTest(display);
     multiMonitorTest(display);
     noRandRTest(display);
+    zeroCrtcsTest(display);
+    currentZeroRetryTest(display);
     conventionTest(display);
     XCloseDisplay(display);
     if (failures) {
