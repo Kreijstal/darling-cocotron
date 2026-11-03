@@ -86,8 +86,8 @@ set(DARLING_COREDATA_SWIFT_SDK "" CACHE PATH "Public iOS SDK for Swift CoreData 
 set(DARLING_COREDATA_SWIFT_SHIMS "" CACHE PATH "Swift shims matching the iOS core module")
 set(DARLING_COREDATA_SWIFT_APINOTES "" CACHE PATH "API notes matching the iOS core module")
 if(DARLING_COREDATA_SWIFT_SUPPLEMENT)
-    if(NOT TARGET CoreData_arm64)
-        message(FATAL_ERROR "Swift CoreData supplement requires the arm64 CoreData target")
+    if(NOT TARGET CoreData OR NOT TARGET_ARM64 OR TARGET_x86_64 OR TARGET_i386)
+        message(FATAL_ERROR "Swift CoreData supplement requires an arm64-only CoreData target")
     endif()
     foreach(required IN ITEMS DARLING_SWIFT_TOOLCHAIN DARLING_SWIFT_IOS_STDLIB
             DARLING_COREDATA_SWIFT_SDK DARLING_COREDATA_SWIFT_SHIMS DARLING_COREDATA_SWIFT_APINOTES)
@@ -112,9 +112,9 @@ if(DARLING_COREDATA_SWIFT_SUPPLEMENT)
             swift/Bridge/module.modulemap "${DARLING_SWIFT_TOOLCHAIN}/bin/swiftc"
         VERBATIM COMMENT "Building source-only Swift CoreData supplement")
     add_custom_target(CoreDataSwiftSupplement_arm64 DEPENDS "${supplement}")
-    add_dependencies(CoreData_arm64 CoreDataSwiftSupplement_arm64)
-    set_property(TARGET CoreData_arm64 APPEND_STRING PROPERTY LINK_FLAGS
+    add_dependencies(CoreData CoreDataSwiftSupplement_arm64)
+    set_property(TARGET CoreData APPEND_STRING PROPERTY LINK_FLAGS
         " -Wl,-reexport_library,${supplement}")
-    set_property(TARGET CoreData_arm64 APPEND PROPERTY LINK_DEPENDS "${supplement}")
+    set_property(TARGET CoreData APPEND PROPERTY LINK_DEPENDS "${supplement}")
     install(PROGRAMS "${supplement}" DESTINATION libexec/darling/usr/lib/swift)
 endif()
