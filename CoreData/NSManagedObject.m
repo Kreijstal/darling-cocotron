@@ -25,6 +25,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <CoreData/NSAtomicStoreCacheNode.h>
 #import <CoreData/NSAttributeDescription.h>
 #import <CoreData/NSManagedObject.h>
+#import <CoreData/NSManagedObjectModel.h>
+#import <CoreData/NSPersistentStoreCoordinator.h>
+#import <CoreData/NSFetchRequest.h>
+#import "NSManagedObjectModel-Private.h"
 #import <CoreData/NSRelationshipDescription.h>
 #import <Foundation/NSRaise.h>
 
@@ -35,6 +39,28 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
 
 @implementation NSManagedObject
 
+ + (NSEntityDescription *)entity {
+    return [NSManagedObjectModel _entityForManagedClass:self];
+}
+
++ (NSFetchRequest *)fetchRequest {
+    NSFetchRequest *request = [[[NSFetchRequest alloc] init] autorelease];
+    [request setEntity:[self entity]];
+    return request;
+}
+
+- (instancetype)initWithContext:(NSManagedObjectContext *)context {
+    NSEntityDescription *match = nil;
+    for (NSEntityDescription *entity in [[[context persistentStoreCoordinator] managedObjectModel] entities]) {
+        if (NSClassFromString([entity managedObjectClassName]) == [self class]) {
+            if (match) [NSException raise:NSInvalidArgumentException format:@"Multiple entities represent this managed class."];
+            match = entity;
+        }
+    }
+    if (!match) [NSException raise:NSInvalidArgumentException format:@"No entity represents this managed class in the context."];
+    return [self initWithEntity:match insertIntoManagedObjectContext:context];
+}
+
 - init {
     NSLog(@"Error - can't initialize an NSManagedObject with -init");
     return nil;
@@ -44,16 +70,12 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
         managedObjectContext: (NSManagedObjectContext *) context
 {
     NSEntityDescription *entity = [objectID entity];
+    [entity _prepareAccessors];
     NSString *className = [entity managedObjectClassName];
     Class class = NSClassFromString(className);
 
-    if (class == Nil) {
-        NSLog(@"Unable to find class %@ specified by entity %@ in the runtime, "
-              @"using NSManagedObject,objectID=%@",
-              className, [entity name], objectID);
-
-        class = [NSManagedObject class];
-    }
+    if (class == Nil)
+        [NSException raise:NSInvalidArgumentException format:@"The managed class is unavailable."];
 
     [super dealloc];
     self = [class allocWithZone: NULL];
@@ -98,6 +120,7 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
 
     [_objectID release];
     [_changedValues release];
+    [_committedValues release];
     [super dealloc];
 }
 
@@ -395,15 +418,11 @@ NSString *const NSValidationValueErrorKey = @"NSValidationErrorValue";
     if (result == nil)
         result = [[self _committedValues] objectForKey: key];
 
-    return result;
+    return result == [NSNull null] ? nil : result;
 }
 
 - (void) setPrimitiveValue: value forKey: (NSString *) key {
-    if (value == nil)
-        [_changedValues removeObjectForKey: key];
-    else {
-        [_changedValues setObject: value forKey: key];
-    }
+    [_changedValues setObject:(value ?: [NSNull null]) forKey:key];
 }
 
 - (BOOL) validateValue: (id *) value
