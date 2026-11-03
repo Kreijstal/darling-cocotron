@@ -9,6 +9,10 @@
 @synthesize configuration = _configuration;
 @synthesize shouldAddStoreAsynchronously = _shouldAddStoreAsynchronously;
 
++ (instancetype)persistentStoreDescriptionWithURL:(NSURL *)URL {
+    return [[[self alloc] initWithURL:URL] autorelease];
+}
+
 - (instancetype)init {
     darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_DESCRIPTION_INIT_ENTER);
     self = [super init];
