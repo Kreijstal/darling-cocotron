@@ -20,6 +20,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import "NSManagedObjectModel-Private.h"
 #import "NSManagedObjectID-Private.h"
 #import "NSXMLPersistentStore.h"
+#import "NSSQLitePersistentStore.h"
+#import <CoreData/CoreDataErrors.h>
 #import <CoreData/NSManagedObject.h>
 #import <CoreData/NSManagedObjectModel.h>
 #import <CoreData/NSPersistentStoreCoordinator.h>
@@ -61,6 +63,7 @@ static NSMutableDictionary *_storeTypes = nil;
         _storeTypes = [NSMutableDictionary new];
         [_storeTypes setObject: [NSInMemoryPersistentStore class]
                         forKey: NSInMemoryStoreType];
+        [_storeTypes setObject:[NSSQLitePersistentStore class] forKey:NSSQLiteStoreType];
         [_storeTypes setObject: [NSXMLPersistentStore class]
                         forKey: NSXMLStoreType];
     }
@@ -114,6 +117,10 @@ static NSMutableDictionary *_storeTypes = nil;
     }
 
     Class class = [[[self class] registeredStoreTypes] objectForKey: storeType];
+    if (!class) {
+        if (error) *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSPersistentStoreInvalidTypeError userInfo:nil];
+        return nil;
+    }
     NSAtomicStore *store = [[[class alloc]
             initWithPersistentStoreCoordinator: self
                              configurationName: configuration
@@ -255,16 +262,10 @@ static NSMutableDictionary *_storeTypes = nil;
     for (check in _stores) {
         NSString *configurationName = [check configurationName];
 
-        if (configurationName == nil) {
-            NSArray *entities =
-                    [model entitiesForConfiguration: configurationName];
-
-            if ([entities containsObject: entity])
-                return check;
-        }
+        NSArray *entities = [model entitiesForConfiguration:configurationName];
+        if ([entities containsObject:entity]) return check;
     }
-
-    return [_stores objectAtIndex: 0];
+    return nil;
 }
 
 - (NSPersistentStore *) _persistentStoreForObject: (NSManagedObject *) object {
