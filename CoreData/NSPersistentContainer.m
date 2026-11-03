@@ -1,3 +1,4 @@
+#include <darling-boundary-diagnostics.h>
 #import <CoreData/NSPersistentContainer.h>
 #import <CoreData/NSPersistentStoreDescription.h>
 #import <CoreData/NSPersistentStoreCoordinator.h>
@@ -25,6 +26,7 @@ static NSError *ContainerError(NSInteger code, NSString *message) {
 }
 
 - (instancetype)initWithName:(NSString *)name {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_MODEL_LOAD_ENTER);
     NSBundle *bundle = [NSBundle mainBundle];
     NSURL *modelURL = [bundle URLForResource:name withExtension:@"mom"];
     if (!modelURL) {
@@ -50,12 +52,14 @@ static NSError *ContainerError(NSInteger code, NSString *message) {
             model = nil;
         }
     }
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), model ? DARLING_DIAG_MODEL_LOAD_OK : DARLING_DIAG_MODEL_LOAD_ERROR);
     self = [self initWithName:name managedObjectModel:model];
     [model release];
     return self;
 }
 
 - (instancetype)initWithName:(NSString *)name managedObjectModel:(NSManagedObjectModel *)model {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_CONTAINER_INIT_ENTER);
     self = [super init];
     if (self) {
         _name = [name copy];
@@ -73,6 +77,7 @@ static NSError *ContainerError(NSInteger code, NSString *message) {
         NSPersistentStoreDescription *description = [[NSPersistentStoreDescription alloc] initWithURL:URL];
         _persistentStoreDescriptions = [[NSArray alloc] initWithObjects:description, nil];
         [description release];
+        darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), model ? DARLING_DIAG_CONTAINER_INIT_OK : DARLING_DIAG_CONTAINER_INIT_MODEL_ERROR);
     }
     return self;
 }
@@ -105,10 +110,12 @@ static NSError *ContainerError(NSInteger code, NSString *message) {
             [_persistentStoreCoordinator unlock];
         }
     }
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), error ? DARLING_DIAG_CONTAINER_LOAD_ERROR : DARLING_DIAG_CONTAINER_LOAD_SUCCESS);
     block(description, error);
 }
 
 - (void)loadPersistentStoresWithCompletionHandler:(void (^)(NSPersistentStoreDescription *, NSError *))block {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_CONTAINER_LOAD_ENTER);
     if (!block)
         [NSException raise:NSInvalidArgumentException format:@"A persistent store completion handler is required"];
     for (NSPersistentStoreDescription *description in [[_persistentStoreDescriptions copy] autorelease]) {
