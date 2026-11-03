@@ -1,3 +1,4 @@
+#include <darling-boundary-diagnostics.h>
 /* Copyright(c)2008 Dan Knapp
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -57,6 +58,7 @@ static char ContextQueueKey;
 }
 
 - (instancetype)initWithConcurrencyType:(NSManagedObjectContextConcurrencyType)type {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_CONTEXT_INIT_ENTER);
     self = [super init];
     if (!self)
         return nil;
@@ -84,6 +86,7 @@ static char ContextQueueKey;
     _objectIdToObject = NSCreateMapTable(NSObjectMapKeyCallBacks,
                                          NSObjectMapValueCallBacks, 0);
     _requestedProcessPendingChanges = NO;
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_CONTEXT_INIT_OK);
     return self;
 }
 

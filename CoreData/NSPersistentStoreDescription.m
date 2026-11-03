@@ -1,3 +1,4 @@
+#include <darling-boundary-diagnostics.h>
 #import <CoreData/NSPersistentStoreDescription.h>
 #import <CoreData/NSPersistentStoreCoordinator.h>
 
@@ -9,12 +10,14 @@
 @synthesize shouldAddStoreAsynchronously = _shouldAddStoreAsynchronously;
 
 - (instancetype)init {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_DESCRIPTION_INIT_ENTER);
     self = [super init];
     if (self) {
         _type = [NSSQLiteStoreType copy];
         _options = [[NSMutableDictionary alloc] init];
         self.shouldMigrateStoreAutomatically = YES;
         self.shouldInferMappingModelAutomatically = YES;
+        darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_DESCRIPTION_INIT_OK);
     }
     return self;
 }
