@@ -218,3 +218,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 @end
+
+@implementation NSNumber (NSFetchRequestResult)
+@end
+
+@implementation NSDictionary (NSFetchRequestResult)
+@end
