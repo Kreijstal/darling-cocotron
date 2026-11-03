@@ -80,3 +80,41 @@ add_framework(CoreData
 		Foundation
 		sqlite3
 )
+
+option(DARLING_COREDATA_SWIFT_SUPPLEMENT "Build the arm64 Swift CoreData supplement" OFF)
+set(DARLING_COREDATA_SWIFT_SDK "" CACHE PATH "Public iOS SDK for Swift CoreData additions")
+set(DARLING_COREDATA_SWIFT_SHIMS "" CACHE PATH "Swift shims matching the iOS core module")
+set(DARLING_COREDATA_SWIFT_APINOTES "" CACHE PATH "API notes matching the iOS core module")
+if(DARLING_COREDATA_SWIFT_SUPPLEMENT)
+    if(NOT TARGET CoreData_arm64)
+        message(FATAL_ERROR "Swift CoreData supplement requires the arm64 CoreData target")
+    endif()
+    foreach(required IN ITEMS DARLING_SWIFT_TOOLCHAIN DARLING_SWIFT_IOS_STDLIB
+            DARLING_COREDATA_SWIFT_SDK DARLING_COREDATA_SWIFT_SHIMS DARLING_COREDATA_SWIFT_APINOTES)
+        if(NOT IS_DIRECTORY "${${required}}")
+            message(FATAL_ERROR "${required} must name an existing directory")
+        endif()
+    endforeach()
+    set(supplement_dir "${CMAKE_CURRENT_BINARY_DIR}/swift")
+    set(supplement "${supplement_dir}/libDarlingCoreDataSupplement.dylib")
+    add_custom_command(OUTPUT "${supplement}"
+        COMMAND ${CMAKE_COMMAND} -E env
+            "OUT=${supplement_dir}"
+            "SWIFT_TOOLCHAIN=${DARLING_SWIFT_TOOLCHAIN}"
+            "SWIFT_CORE_MODULES=${DARLING_SWIFT_IOS_STDLIB}"
+            "SWIFT_SHIMS=${DARLING_COREDATA_SWIFT_SHIMS}"
+            "SWIFT_APINOTES=${DARLING_COREDATA_SWIFT_APINOTES}"
+            "IOS_SDK=${DARLING_COREDATA_SWIFT_SDK}"
+            "LD_LIBRARY_PATH=${DARLING_SWIFT_HOST_LIBS}"
+            bash "${CMAKE_CURRENT_SOURCE_DIR}/swift/build.sh"
+        DEPENDS swift/build.sh swift/NSManagedObjectContext.swift
+            swift/Bridge/CoreDataBridge.h swift/Bridge/CoreDataBridge.m
+            swift/Bridge/module.modulemap "${DARLING_SWIFT_TOOLCHAIN}/bin/swiftc"
+        VERBATIM COMMENT "Building source-only Swift CoreData supplement")
+    add_custom_target(CoreDataSwiftSupplement_arm64 DEPENDS "${supplement}")
+    add_dependencies(CoreData_arm64 CoreDataSwiftSupplement_arm64)
+    set_property(TARGET CoreData_arm64 APPEND_STRING PROPERTY LINK_FLAGS
+        " -Wl,-reexport_library,${supplement}")
+    set_property(TARGET CoreData_arm64 APPEND PROPERTY LINK_DEPENDS "${supplement}")
+    install(PROGRAMS "${supplement}" DESTINATION libexec/darling/usr/lib/swift)
+endif()
