@@ -85,26 +85,47 @@ static NSError *ContainerError(NSInteger code, NSString *message) {
 - (void)loadDescription:(NSPersistentStoreDescription *)description
             completion:(void (^)(NSPersistentStoreDescription *, NSError *))block {
     NSError *error = _modelError;
-    if (!error && ![[NSPersistentStoreCoordinator registeredStoreTypes] objectForKey:description.type])
+    const char *endpoint = getenv("DARLING_BOUNDARY_SOCKET");
+    if (error)
+        darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_MODEL_ERROR);
+    if (!error && ![[NSPersistentStoreCoordinator registeredStoreTypes] objectForKey:description.type]) {
+        darling_boundary_emit(endpoint, [description.type isEqual:NSSQLiteStoreType] ?
+            DARLING_DIAG_CONTAINER_LOAD_UNSUPPORTED_SQLITE : DARLING_DIAG_CONTAINER_LOAD_UNSUPPORTED_TYPE);
         error = ContainerError(NSPersistentStoreInvalidTypeError, @"The requested persistent store type is unsupported.");
+    }
     if (!error && ![description.type isEqual:NSInMemoryStoreType]) {
-        if (![description.URL isFileURL])
+        if (![description.URL isFileURL]) {
+            darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_NONFILE_URL);
             error = ContainerError(NSPersistentStoreOpenError, @"A file URL is required for this persistent store.");
-        else if (description.isReadOnly && ![[NSFileManager defaultManager] fileExistsAtPath:[description.URL path]])
+        } else if (description.isReadOnly && ![[NSFileManager defaultManager] fileExistsAtPath:[description.URL path]]) {
+            darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_READONLY_MISSING);
             error = ContainerError(NSPersistentStoreOpenError, @"The read-only persistent store does not exist.");
-        else if (!description.isReadOnly && ![[NSFileManager defaultManager]
+        } else if (!description.isReadOnly) {
+            BOOL created = [[NSFileManager defaultManager]
                 createDirectoryAtURL:[description.URL URLByDeletingLastPathComponent]
-                withIntermediateDirectories:YES attributes:nil error:&error] && !error)
-            error = ContainerError(NSPersistentStoreOpenError, @"The persistent store directory could not be created.");
+                withIntermediateDirectories:YES attributes:nil error:&error];
+            if (!created) {
+                darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_DIRECTORY_ERROR);
+                if (!error)
+                    error = ContainerError(NSPersistentStoreOpenError, @"The persistent store directory could not be created.");
+            }
+        }
     }
     if (!error) {
         NSMutableDictionary *options = [[description.options mutableCopy] autorelease];
         [_persistentStoreCoordinator lock];
         @try {
-            if (![_persistentStoreCoordinator addPersistentStoreWithType:description.type
-                    configuration:description.configuration URL:description.URL options:options error:&error] && !error)
-                error = ContainerError(NSPersistentStoreOpenError, @"The persistent store could not be opened.");
+            darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_COORDINATOR_ENTER);
+            NSPersistentStore *store = [_persistentStoreCoordinator addPersistentStoreWithType:description.type
+                    configuration:description.configuration URL:description.URL options:options error:&error];
+            if (!store) {
+                darling_boundary_emit(endpoint, error ? DARLING_DIAG_CONTAINER_LOAD_COORDINATOR_ERROR :
+                    DARLING_DIAG_CONTAINER_LOAD_COORDINATOR_EMPTY_ERROR);
+                if (!error)
+                    error = ContainerError(NSPersistentStoreOpenError, @"The persistent store could not be opened.");
+            }
         } @catch (NSException *exception) {
+            darling_boundary_emit(endpoint, DARLING_DIAG_CONTAINER_LOAD_COORDINATOR_EXCEPTION);
             error = ContainerError(NSPersistentStoreOpenError, @"The persistent store could not be opened.");
         } @finally {
             [_persistentStoreCoordinator unlock];
