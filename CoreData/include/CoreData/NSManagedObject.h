@@ -21,7 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @class NSManagedObjectID, NSEntityDescription, NSManagedObjectContext,
         NSPropertyDescription, NSMutableDictionary, NSDictionary, NSError,
-        NSArray, NSMutableSet;
+        NSArray, NSMutableSet, NSFetchRequest;
 
 COREDATA_EXPORT NSString *const NSValidationKeyErrorKey;
 COREDATA_EXPORT NSString *const NSValidationObjectErrorKey;
@@ -36,6 +36,10 @@ COREDATA_EXPORT NSString *const NSValidationValueErrorKey;
     NSMutableDictionary *_changedValues;
     void *_observationInfo;
 }
+
++ (NSEntityDescription *)entity;
++ (NSFetchRequest *)fetchRequest;
+- (instancetype)initWithContext:(NSManagedObjectContext *)context;
 
 - initWithEntity: (NSEntityDescription *) entity
         insertIntoManagedObjectContext: (NSManagedObjectContext *) context;
