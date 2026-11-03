@@ -2,6 +2,7 @@
 #import <CoreData/CoreData.h>
 #include <string.h>
 #include <unistd.h>
+#include <darling-boundary-diagnostics.h>
 
 @interface AuthoredStoreError : NSAtomicStore
 @end
@@ -36,6 +37,8 @@
 @end
 
 static int checkCase(const char *selectedCase) {
+    darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_FIXTURE_CASE_ENTER);
+    int stage = 110;
     @autoreleasepool {
         NSString *directory = [NSTemporaryDirectory() stringByAppendingPathComponent:
             [NSString stringWithFormat:@"authored-coredata-branch-%ld", (long)getpid()]];
@@ -43,15 +46,24 @@ static int checkCase(const char *selectedCase) {
         if (![files createDirectoryAtPath:directory withIntermediateDirectories:YES attributes:nil error:NULL])
             return 101;
         @try {
+            stage = 111;
             [NSPersistentStoreCoordinator registerStoreClass:[AuthoredStoreError class] forStoreType:@"AuthoredPreflightStore"];
+            stage = 112;
             NSManagedObjectModel *model = [[[NSManagedObjectModel alloc] init] autorelease];
+            stage = 113;
             NSEntityDescription *entity = [[[NSEntityDescription alloc] init] autorelease];
+            stage = 114;
             entity.name = @"AuthoredRecord";
+            stage = 115;
             entity.managedObjectClassName = @"NSManagedObject";
+            stage = 116;
             entity.properties = @[];
+            stage = 117;
             model.entities = @[entity];
+            stage = 118;
             NSPersistentStoreDescription *description = [NSPersistentStoreDescription
                 persistentStoreDescriptionWithURL:[NSURL fileURLWithPath:[directory stringByAppendingPathComponent:@"store.xml"]]];
+            stage = 119;
             BOOL success = NO, retainedStore = NO;
             if (!strcmp(selectedCase, "model")) {
                 model = nil;
@@ -91,11 +103,14 @@ static int checkCase(const char *selectedCase) {
                 description.type = @"AuthoredDiagnosticStore";
                 [NSPersistentStoreCoordinator registerStoreClass:store forStoreType:description.type];
             }
+            stage = 120;
             NSPersistentContainer *container = [[[NSPersistentContainer alloc]
                 initWithName:@"AuthoredContainer" managedObjectModel:model] autorelease];
+            stage = 121;
             container.persistentStoreDescriptions = @[description];
             __block NSUInteger calls = 0;
             __block BOOL resultMatches = NO;
+            stage = 122;
             [container loadPersistentStoresWithCompletionHandler:^(NSPersistentStoreDescription *selected, NSError *error) {
                 calls++;
                 resultMatches = selected == description && ((error == nil) == success);
@@ -104,10 +119,11 @@ static int checkCase(const char *selectedCase) {
                 return 105;
             if ([[container.persistentStoreCoordinator persistentStores] count] != (retainedStore ? 1 : 0))
                 return 106;
+            darling_boundary_emit(getenv("DARLING_BOUNDARY_SOCKET"), DARLING_DIAG_FIXTURE_CASE_COMPLETE);
             return 0;
         } @catch (NSException *exception) {
             (void)exception;
-            return 107;
+            return stage;
         } @finally {
             [files removeItemAtPath:directory error:NULL];
         }
