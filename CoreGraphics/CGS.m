@@ -30,7 +30,6 @@
 static NSMutableDictionary<NSNumber*, CGSConnection*>* g_connections = nil;
 static Boolean g_denyConnections = FALSE;
 
-static CGSConnectionID g_defaultConnection = -1;
 
 static _Atomic CGSConnectionID g_nextConnectionID = 1;
 static Class g_backendClass = nil;
@@ -62,13 +61,15 @@ CGError CGSSetDenyWindowServerConnections(Boolean deny)
 	return kCGSErrorSuccess;
 }
 
+extern void _CGSResetMainConnection(void);
+
 void CGSShutdownServerConnections(void)
 {
 	@synchronized(g_connections)
 	{
 		[g_connections removeAllObjects];
 	}
-	g_defaultConnection = -1;
+	_CGSResetMainConnection();
 }
 
 __attribute__((constructor))
