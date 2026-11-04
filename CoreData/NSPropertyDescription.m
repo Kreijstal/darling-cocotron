@@ -54,6 +54,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
     _entity = [coder decodeObjectForKey: @"NSEntity"];
     _propertyName = [[coder decodeObjectForKey: @"NSPropertyName"] copy];
+    _optional = [coder decodeBoolForKey: @"NSIsOptional"];
+    _transient = [coder decodeBoolForKey: @"NSIsTransient"];
 
     return self;
 }
