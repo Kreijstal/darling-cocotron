@@ -58,6 +58,7 @@ set(QuartzCore_sources
 	#CILinearGradient.m
 	#CIVector.m
 
+	CABackdropLayer.m
 	CAConstraintLayoutManager.m
 	CAFilter.m
 	CAGradientLayer.m
