@@ -36,13 +36,13 @@ typedef CF_ENUM(int32_t, CGLineJoin) {
     kCGLineJoinBevel,
 };
 
-typedef enum {
+typedef CF_ENUM(int32_t, CGPathElementType) {
     kCGPathElementMoveToPoint,
     kCGPathElementAddLineToPoint,
     kCGPathElementAddQuadCurveToPoint,
     kCGPathElementAddCurveToPoint,
     kCGPathElementCloseSubpath,
-} CGPathElementType;
+};
 
 typedef struct {
     CGPathElementType type;
