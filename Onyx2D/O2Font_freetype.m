@@ -197,7 +197,7 @@ static NSString *filenameOfFirstScalableFace(FcFontSet *set) {
     FcDefaultSubstitute(pat);
 
     FcResult fcResult;
-    FcFontSet *set = FcFontSort(config, pat, FcTrue, NULL, &fcResult);
+    FcFontSet *set = FcFontSort(config, pat, FcFalse, NULL, &fcResult);
     FcPatternDestroy(pat);
     if (set == NULL) {
         return nil;
