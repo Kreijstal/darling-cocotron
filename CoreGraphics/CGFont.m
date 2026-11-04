@@ -158,18 +158,12 @@ bool CGFontGetGlyphBBoxes(CGFontRef self, const CGGlyph *glyphs, size_t count, C
 }
 
 /* Whether the user turned off font smoothing: the AppleFontSmoothing global default, where 0
- * means smoothing is disabled. An absent or non-numeric value leaves smoothing enabled. */
+ * means smoothing is disabled. `defaults write -g AppleFontSmoothing 0` stores a string and
+ * `-int 0` a number; both are read. An absent or unparsable value leaves smoothing enabled.
+ * Specification: client usage (WebKit declares this SPI) and the user-default convention. */
 bool CGFontRenderingGetFontSmoothingDisabled(void) {
-    bool disabled = false;
-    CFPropertyListRef value = CFPreferencesCopyAppValue(CFSTR("AppleFontSmoothing"),
-                                                        kCFPreferencesAnyApplication);
-    if (value != NULL) {
-        int smoothing = 0;
-        if (CFGetTypeID(value) == CFNumberGetTypeID() &&
-            CFNumberGetValue((CFNumberRef) value, kCFNumberIntType, &smoothing)) {
-            disabled = smoothing == 0;
-        }
-        CFRelease(value);
-    }
-    return disabled;
+    Boolean valid = false;
+    CFIndex smoothing = CFPreferencesGetAppIntegerValue(CFSTR("AppleFontSmoothing"),
+                                                        kCFPreferencesAnyApplication, &valid);
+    return valid && smoothing == 0;
 }
