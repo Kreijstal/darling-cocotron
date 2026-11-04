@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import "NSPersistentStoreCoordinator-Private.h"
 #import <CoreData/CoreDataErrors.h>
 #import <CoreData/NSAtomicStore.h>
+#import "NSBatchDeleteRequest-Private.h"
 #import <CoreData/NSAttributeDescription.h>
 #import <CoreData/NSRelationshipDescription.h>
 #import <CoreData/NSEntityDescription.h>
@@ -536,6 +537,50 @@ static char ContextQueueKey;
 {
     NSArray *result = [self executeFetchRequest:request error:error];
     return result ? [result count] : NSNotFound;
+}
+
+- (id) executeRequest: (NSPersistentStoreRequest *) request
+                error: (NSError **) error
+{
+    if (![request isKindOfClass: [NSBatchDeleteRequest class]]) {
+        if (error) *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSPersistentStoreOperationError userInfo:nil];
+        return nil;
+    }
+    NSBatchDeleteRequest *batch = (NSBatchDeleteRequest *) request;
+    // The deletes go through a context of their own and its save, so the caller's pending
+    // changes stay unsaved; contexts that merge from their siblings see them in its notification.
+    NSManagedObjectContext *context = [[[NSManagedObjectContext alloc] initWithConcurrencyType:NSConfinementConcurrencyType] autorelease];
+    [context setPersistentStoreCoordinator:_storeCoordinator];
+    NSMutableArray *deletedIDs = [NSMutableArray array];
+    @try {
+        NSArray *objects;
+        if ([batch _objectIDs]) {
+            NSMutableArray *found = [NSMutableArray array];
+            for (NSManagedObjectID *objectID in [batch _objectIDs]) [found addObject:[context objectWithID:objectID]];
+            objects = found;
+        } else {
+            NSFetchRequest *fetch = [batch fetchRequest];
+            if ([batch affectedStores]) [fetch setAffectedStores:[batch affectedStores]];
+            objects = [context executeFetchRequest:fetch error:error];
+            if (!objects) return nil;
+        }
+        for (NSManagedObject *object in objects) {
+            [deletedIDs addObject:[object objectID]];
+            [context deleteObject:object];
+        }
+        if (![context save:error]) return nil;
+    } @catch (NSException *exception) {
+        if (error) *error = [NSError errorWithDomain:NSCocoaErrorDomain code:NSPersistentStoreOperationError
+                                            userInfo:@{NSLocalizedDescriptionKey: [exception reason] ?: @"The batch delete failed."}];
+        return nil;
+    }
+    id result;
+    switch ([batch resultType]) {
+    case NSBatchDeleteResultTypeObjectIDs: result = deletedIDs; break;
+    case NSBatchDeleteResultTypeCount: result = [NSNumber numberWithUnsignedInteger:[deletedIDs count]]; break;
+    default: result = [NSNumber numberWithBool:YES]; break;
+    }
+    return [[[NSBatchDeleteResult alloc] _initWithResult:result type:[batch resultType]] autorelease];
 }
 
 - (void) insertObject: (NSManagedObject *) object {

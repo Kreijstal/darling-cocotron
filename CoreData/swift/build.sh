@@ -18,4 +18,21 @@ ln -sfn "$SWIFT_APINOTES" "$OUT/resource/apinotes"
     -ignore_auto_link -install_name /usr/lib/swift/libDarlingCoreDataSupplement.dylib \
     -o "$OUT/libDarlingCoreDataSupplement.dylib" "$OUT/CoreDataSupplement.o" "$OUT/CoreDataBridge.o" \
     -L "$IOS_SDK/usr/lib/swift" -lswiftCore -lswiftObjectiveC -lswiftDarwin -lswiftCoreFoundation -lswiftDispatch \
-    -framework CoreData -framework Foundation -lobjc -lSystem
+    -framework CoreData -framework Combine -framework Foundation -lobjc -lSystem
+# Darling's frameworks are macOS images, and its dyld refuses an iOS one in a
+# macOS process. The SDK's stubs only link for iOS, so mark the result macOS.
+python3 - "$OUT/libDarlingCoreDataSupplement.dylib" <<'PY'
+import struct, sys
+path = sys.argv[1]
+with open(path, "r+b") as f:
+    data = bytearray(f.read())
+    ncmds = struct.unpack_from("<I", data, 16)[0]
+    offset = 32
+    for _ in range(ncmds):
+        cmd, size = struct.unpack_from("<II", data, offset)
+        if cmd == 0x32:  # LC_BUILD_VERSION: platform, minos, sdk
+            struct.pack_into("<III", data, offset + 8, 1, 11 << 16, 11 << 16)
+        offset += size
+    f.seek(0)
+    f.write(data)
+PY
