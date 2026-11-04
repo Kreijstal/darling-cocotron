@@ -31,6 +31,7 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 #include <errno.h>
+#include <pthread.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <string.h>
@@ -131,6 +132,8 @@ static NSString *stringFromBytes(const uint8_t *bytes, size_t length) {
 @implementation PocketDisplay
 
 - (instancetype) init {
+    // Before any early release: -dealloc closes the socket, and descriptor 0 is not ours.
+    _socket = -1;
     const char *path = getenv("DARLING_POCKET_DISPLAY");
     if (path == NULL || *path == '\0') {
         [self release];
@@ -143,7 +146,6 @@ static NSString *stringFromBytes(const uint8_t *bytes, size_t length) {
     if (self == nil)
         return nil;
 
-    _socket = -1;
     _windows = CFArrayCreateMutable(NULL, 0, NULL);
     _pasteboards = [NSMutableDictionary new];
     // X11Display's: click counting needs a real dictionary.
@@ -180,6 +182,7 @@ static NSString *stringFromBytes(const uint8_t *bytes, size_t length) {
         return nil;
     }
     fcntl(_socket, F_SETFL, fcntl(_socket, F_GETFL) | O_NONBLOCK);
+    _nonblocking = YES;
 
     CFSocketContext context = {.version = 0, .info = self};
     _pocketSocket = CFSocketCreateWithNative(NULL, _socket, kCFSocketReadCallBack, socketCallback, &context);
@@ -236,7 +239,17 @@ static NSString *stringFromBytes(const uint8_t *bytes, size_t length) {
     [self send: type bytes: bytes length: length fd: -1];
 }
 
+// Windows may present from a queue of their own (-[PocketWindow
+// flushBufferAsync]): one message at a time goes on the socket.
+static pthread_mutex_t sendLock = PTHREAD_MUTEX_INITIALIZER;
+
 - (void) send: (uint32_t) type bytes: (const void *) bytes length: (size_t) length fd: (int) fd {
+    pthread_mutex_lock(&sendLock);
+    [self lockedSend: type bytes: bytes length: length fd: fd];
+    pthread_mutex_unlock(&sendLock);
+}
+
+- (void) lockedSend: (uint32_t) type bytes: (const void *) bytes length: (size_t) length fd: (int) fd {
     if (_socket < 0)
         return;
     uint8_t message[sizeof(struct pocket_header) + POCKET_MAX_MESSAGE];
@@ -346,7 +359,7 @@ static NSString *stringFromBytes(const uint8_t *bytes, size_t length) {
 
         // Before the connection is non-blocking (waiting for the screen),
         // one read at a time.
-        if (!(fcntl(_socket, F_GETFL) & O_NONBLOCK))
+        if (!_nonblocking)
             return YES;
     }
 }
