@@ -71,14 +71,10 @@ static const CGFloat DefaultSpacing = 8;
     return self;
 }
 
-// Nib settings and gravity areas are not decoded, so every decoded subview
-// becomes an arranged view in the leading gravity area.
+// Nib settings and arranged views are not decoded; decoded subviews stay plain subviews.
 - (instancetype) initWithCoder: (NSCoder *) coder {
-    if ((self = [super initWithCoder: coder]) != nil) {
+    if ((self = [super initWithCoder: coder]) != nil)
         [self _setUpStackView];
-        for (NSView *view in [[[self subviews] copy] autorelease])
-            [self addView: view inGravity: NSStackViewGravityLeading];
-    }
     return self;
 }
 
