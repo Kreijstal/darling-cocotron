@@ -42,6 +42,7 @@
     CFRunLoopSourceRef _pocketSource;
     uint8_t _input[POCKET_MAX_MESSAGE * 4];
     size_t _inputLength;
+    BOOL _nonblocking;
 
     struct pocket_screen _screen;
     BOOL _haveScreen;
