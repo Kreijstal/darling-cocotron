@@ -129,6 +129,7 @@ static const CGColorSpaceRangeForms rangeForms[] = {
     {&kCGColorSpaceExtendedDisplayP3, &kCGColorSpaceExtendedDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
     {&kCGColorSpaceLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
     {&kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
+    {&kCGColorSpaceExtendedLinearITUR_2020, &kCGColorSpaceExtendedLinearITUR_2020, &kCGColorSpaceExtendedLinearITUR_2020},
 };
 
 static const CGColorSpaceRangeForms *rangeFormsForSpace(CGColorSpaceRef space) {
