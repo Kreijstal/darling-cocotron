@@ -678,6 +678,30 @@ pkg_check_modules(DBUS dbus-1)
 target_include_directories(X11_backend PRIVATE ${DBUS_INCLUDE_DIRS}
 	${CMAKE_SOURCE_DIR}/src/startup/mldr/elfcalls)
 
+# Pocket backend: a phone host's display (Pocket.backend/PocketProtocol.h),
+# selected when DARLING_POCKET_DISPLAY names the host's socket.
+add_backend(Pocket
+	SOURCES
+		Pocket.backend/PocketDisplay.m
+		Pocket.backend/PocketWindow.m
+	INFO_PLIST
+		Pocket.backend/Info.plist
+	DEPENDENCIES
+		objc
+		system
+		CoreFoundation
+		Foundation
+		AppKit
+		Onyx2D
+		CoreGraphics
+		# PocketDisplay subclasses X11Display for its backend-independent parts.
+		X11_backend
+)
+target_include_directories(Pocket_backend PRIVATE
+	Pocket.backend
+	${CMAKE_SOURCE_DIR}/src/startup/mldr/elfcalls
+)
+
 # Wayland backend, selected at run time with DARLING_APPKIT_BACKEND=wayland.
 # libwayland-client and libxkbcommon are loaded with dlopen() only when it is
 # selected, so building it needs just their headers, wayland-scanner and the
