@@ -900,7 +900,8 @@ static inline void buildTransformsIfNeeded(NSView *self) {
         }
 
         [self _updateLayerVisibility];
-        [[self superview] setNeedsDisplay: YES];
+        // Only where the view is shows or hides something.
+        [[self superview] setNeedsDisplayInRect: [self frame]];
 
         if (_isHidden)
             [self viewDidHide];
