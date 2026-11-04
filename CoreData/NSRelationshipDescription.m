@@ -42,7 +42,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     _deleteRule = [coder decodeIntForKey: @"NSDeleteRule"];
     _destinationEntity = [coder decodeObjectForKey: @"NSDestinationEntity"];
     _inverseRelationship = [coder decodeObjectForKey: @"NSInverseRelationship"];
-    _optional = [coder decodeBoolForKey: @"NSIsOptional"];
     _maxCount = [coder decodeIntForKey: @"NSMaxCount"];
     _minCount = [coder decodeIntForKey: @"NSMinCount"];
 

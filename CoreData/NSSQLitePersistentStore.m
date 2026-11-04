@@ -201,6 +201,49 @@ static NSString *newIdentifier(void) {
     return YES;
 }
 
+// Lightweight migration, as Core Data infers it: the stored entities, property names, attribute types and
+// relationships must be unchanged; whether a property is optional or transient, its default value and the
+// entity's class may differ. Values of properties that became transient are dropped, and every object must
+// already have a value for each attribute that became required. Runs inside the caller's transaction.
+- (BOOL)_migrateFromDescription:(NSData *)storedDescription {
+    NSArray *old = [NSPropertyListSerialization propertyListWithData:storedDescription options:0 format:NULL error:NULL];
+    NSArray *new = [NSPropertyListSerialization propertyListWithData:_modelDescription options:0 format:NULL error:NULL];
+    if (![old isKindOfClass:[NSArray class]] || ![new isKindOfClass:[NSArray class]] || [old count] != [new count]) return NO;
+    for (NSUInteger e = 0; e < [new count]; e++) {
+        NSArray *oldEntity = [old objectAtIndex:e], *newEntity = [new objectAtIndex:e];
+        if (![oldEntity isKindOfClass:[NSArray class]] || [oldEntity count] != 3 || ![[oldEntity objectAtIndex:0] isEqual:[newEntity objectAtIndex:0]]) return NO;
+        NSString *entity = [newEntity objectAtIndex:0];
+        NSArray *oldProperties = [oldEntity objectAtIndex:2], *newProperties = [newEntity objectAtIndex:2];
+        if (![oldProperties isKindOfClass:[NSArray class]] || [oldProperties count] != [newProperties count]) return NO;
+        for (NSUInteger i = 0; i < [newProperties count]; i++) {
+            NSArray *was = [oldProperties objectAtIndex:i], *is = [newProperties objectAtIndex:i];
+            if (![was isKindOfClass:[NSArray class]] || [was count] != [is count] || ![[was objectAtIndex:0] isEqual:[is objectAtIndex:0]] ||
+                ![[was objectAtIndex:3] isEqual:[is objectAtIndex:3]]) return NO;
+            BOOL attribute = [[is objectAtIndex:3] isEqual:@"attribute"];
+            NSRange stored = attribute ? NSMakeRange(4, 1) : NSMakeRange(4, [is count] - 4);
+            if (![[was subarrayWithRange:stored] isEqual:[is subarrayWithRange:stored]]) return NO;
+            if (!attribute) continue;
+            BOOL optional = [[is objectAtIndex:1] boolValue], transient = [[is objectAtIndex:2] boolValue];
+            const char *sql = NULL;
+            if (transient && ![[was objectAtIndex:2] boolValue])
+                sql = "DELETE FROM darling_values WHERE key=?1 AND object IN (SELECT identifier FROM darling_objects WHERE entity=?2)";
+            else if (!transient && !optional)
+                sql = "SELECT count(*) FROM darling_objects WHERE entity=?2 AND identifier NOT IN (SELECT object FROM darling_values WHERE key=?1)";
+            if (!sql) continue;
+            sqlite3_stmt *statement = [self _prepare:sql];
+            int status = statement && bindString(statement, 1, [is objectAtIndex:0]) == SQLITE_OK && bindString(statement, 2, entity) == SQLITE_OK ? sqlite3_step(statement) : SQLITE_ERROR;
+            BOOL success = transient ? status == SQLITE_DONE : status == SQLITE_ROW && sqlite3_column_int64(statement, 0) == 0;
+            sqlite3_finalize(statement);
+            if (!success) return NO;
+        }
+    }
+    sqlite3_stmt *statement = [self _prepare:"UPDATE darling_metadata SET model=?"];
+    BOOL success = statement && sqlite3_bind_blob(statement, 1, [_modelDescription bytes], (int)[_modelDescription length], SQLITE_TRANSIENT) == SQLITE_OK &&
+        sqlite3_step(statement) == SQLITE_DONE && sqlite3_changes(_database) == 1;
+    sqlite3_finalize(statement);
+    return success;
+}
+
 - (BOOL)load:(NSError **)error {
     if (![self _describeModel:error]) return NO;
     if (![[self URL] isFileURL]) return storeError(error, NSPersistentStoreOpenError);
@@ -230,8 +273,17 @@ static NSString *newIdentifier(void) {
     NSString *uuid = valid ? [[columnString(statement, 2) copy] autorelease] : nil;
     NSData *description = valid ? [NSData dataWithBytes:sqlite3_column_blob(statement, 3) length:sqlite3_column_bytes(statement, 3)] : nil;
     _revision = valid ? sqlite3_column_int64(statement, 4) : 0;
-    valid = valid && [uuid length] && [description isEqual:_modelDescription] && sqlite3_step(statement) == SQLITE_DONE;
+    valid = valid && [uuid length] && sqlite3_step(statement) == SQLITE_DONE;
     sqlite3_finalize(statement);
+    if (valid && ![description isEqual:_modelDescription]) {
+        NSDictionary *options = [self options];
+        valid = !_isReadOnly && [[options objectForKey:NSMigratePersistentStoresAutomaticallyOption] boolValue] &&
+            [[options objectForKey:NSInferMappingModelAutomaticallyOption] boolValue] && [self _execute:"BEGIN IMMEDIATE"];
+        if (valid) {
+            valid = [self _migrateFromDescription:description] && [self _execute:"COMMIT"];
+            if (!valid) [self _execute:"ROLLBACK"];
+        }
+    }
     if (!valid) return storeError(error, NSPersistentStoreIncompatibleSchemaError);
     [self setIdentifier:uuid];
     [self setMetadata:@{NSStoreTypeKey:NSSQLiteStoreType, NSStoreUUIDKey:uuid}];
