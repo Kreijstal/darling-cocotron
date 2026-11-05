@@ -56,6 +56,8 @@ const CFStringRef kCGColorSpaceExtendedGray =
 const CFStringRef kCGColorSpaceLinearGray = CFSTR("kCGColorSpaceLinearGray");
 const CFStringRef kCGColorSpaceExtendedLinearGray =
         CFSTR("kCGColorSpaceExtendedLinearGray");
+const CFStringRef kCGColorSpaceExtendedLinearITUR_2020 =
+        CFSTR("kCGColorSpaceExtendedLinearITUR_2020");
 
 CGColorSpaceRef CGColorSpaceRetain(CGColorSpaceRef colorSpace) {
     return (CGColorSpaceRef)O2ColorSpaceRetain((O2ColorSpaceRef)colorSpace);
@@ -127,6 +129,7 @@ static const CGColorSpaceRangeForms rangeForms[] = {
     {&kCGColorSpaceExtendedDisplayP3, &kCGColorSpaceExtendedDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
     {&kCGColorSpaceLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
     {&kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3, &kCGColorSpaceExtendedLinearDisplayP3},
+    {&kCGColorSpaceExtendedLinearITUR_2020, &kCGColorSpaceExtendedLinearITUR_2020, &kCGColorSpaceExtendedLinearITUR_2020},
 };
 
 static const CGColorSpaceRangeForms *rangeFormsForSpace(CGColorSpaceRef space) {
