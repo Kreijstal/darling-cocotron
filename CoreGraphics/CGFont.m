@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <CoreGraphics/CGFont.h>
+#import <CoreGraphics/CoreGraphicsPrivate.h>
 #import <Onyx2D/O2Font.h>
 
 CFTypeID CGFontGetTypeID(void) {
@@ -154,4 +155,15 @@ bool CGFontGetGlyphBBoxes(CGFontRef self, const CGGlyph *glyphs, size_t count, C
         bboxes[i] = CGFontGetFontBBox(self);
     }
     return true;
+}
+
+/* Whether the user turned off font smoothing: the AppleFontSmoothing global default, where 0
+ * means smoothing is disabled. `defaults write -g AppleFontSmoothing 0` stores a string and
+ * `-int 0` a number; both are read. An absent or unparsable value leaves smoothing enabled.
+ * Specification: client usage (WebKit declares this SPI) and the user-default convention. */
+bool CGFontRenderingGetFontSmoothingDisabled(void) {
+    Boolean valid = false;
+    CFIndex smoothing = CFPreferencesGetAppIntegerValue(CFSTR("AppleFontSmoothing"),
+                                                        kCFPreferencesAnyApplication, &valid);
+    return valid && smoothing == 0;
 }
