@@ -410,8 +410,11 @@ CFStringRef _Nullable CTFontCopyName(CTFontRef font, CFStringRef nameKey)
 CFStringRef CTFontCopyLocalizedName(CTFontRef font, CFStringRef nameKey,
                                     CFStringRef  _Nullable *actualLanguage)
 {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
-    return nil;
+    // Only the canonical name is available and its language is unknown; callers
+    // such as Chromium read *actualLanguage whenever it is non-NULL.
+    if (actualLanguage) *actualLanguage = NULL;
+    if (!font || !nameKey) return NULL;
+    return CTFontCopyName(font, nameKey);
 }
 
 CFCharacterSetRef CTFontCopyCharacterSet(CTFontRef font)
