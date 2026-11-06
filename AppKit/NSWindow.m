@@ -338,8 +338,34 @@ static BOOL _allowsAutomaticWindowTabbing;
 + (NSButton *) standardWindowButton: (NSWindowButton) button
                        forStyleMask: (NSWindowStyleMask) styleMask
 {
-    NSUnimplementedMethod();
-    return nil;
+    if (!(styleMask & NSWindowStyleMaskTitled))
+        return nil;
+
+    NSInteger tag;
+    switch (button) {
+    case NSWindowCloseButton:
+        if (!(styleMask & NSWindowStyleMaskClosable))
+            return nil;
+        tag = 0;
+        break;
+    case NSWindowMiniaturizeButton:
+        if (!(styleMask & NSWindowStyleMaskMiniaturizable))
+            return nil;
+        tag = 1;
+        break;
+    case NSWindowZoomButton:
+        if (!(styleMask & NSWindowStyleMaskResizable))
+            return nil;
+        tag = 2;
+        break;
+    default:
+        return nil;
+    }
+
+    NSButton *result = [[[NSThemeFrameButton alloc] initWithFrame: NSMakeRect(0, 0, 12, 12)] autorelease];
+    [result setTag: tag];
+    [result setBordered: NO];
+    return result;
 }
 
 + (void) menuChanged: (NSMenu *) menu {
@@ -1573,13 +1599,29 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (NSButton *) standardWindowButton: (NSWindowButton) value {
+    if (!(_styleMask & NSWindowStyleMaskTitled))
+        return nil;
+
     NSInteger tag;
 
     switch (value) {
-    case NSWindowCloseButton: tag = 0; break;
-    case NSWindowMiniaturizeButton: tag = 1; break;
-    case NSWindowZoomButton: tag = 2; break;
-    default: return nil;
+    case NSWindowCloseButton:
+        if (!(_styleMask & NSWindowStyleMaskClosable))
+            return nil;
+        tag = 0;
+        break;
+    case NSWindowMiniaturizeButton:
+        if (!(_styleMask & NSWindowStyleMaskMiniaturizable))
+            return nil;
+        tag = 1;
+        break;
+    case NSWindowZoomButton:
+        if (!(_styleMask & NSWindowStyleMaskResizable))
+            return nil;
+        tag = 2;
+        break;
+    default:
+        return nil;
     }
 
     NSView *frame = [[self contentView] superview];
