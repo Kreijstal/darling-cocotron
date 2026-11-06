@@ -3157,7 +3157,13 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event {
-    return [_backgroundView performKeyEquivalent: event];
+    if ([_backgroundView performKeyEquivalent: event])
+        return YES;
+    if (_delegate != nil && [(id)_delegate respondsToSelector: @selector(performKeyEquivalent:)]) {
+        if ([(id)_delegate performKeyEquivalent: event])
+            return YES;
+    }
+    return NO;
 }
 
 #if 0
