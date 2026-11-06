@@ -223,6 +223,8 @@ static const CGFloat kTitleBarHeight = 28.0;
         return -1;
 
     for (NSInteger i = 0; i < 3; i++) {
+        if ([[self window] standardWindowButton: i] == nil)
+            continue;
         if (NSPointInRect(point, NSInsetRect(
                                   [self _trafficLightRectAtIndex: i
                                                       inTitleBar: bar],

@@ -2954,6 +2954,11 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) performClose: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskClosable)) {
+        NSBeep();
+        return;
+    }
+
     if ([_delegate respondsToSelector: @selector(windowShouldClose:)]) {
         if (![_delegate windowShouldClose: self]) {
             return;
@@ -3022,6 +3027,9 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) zoom: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskResizable))
+        return;
+
     NSRect zoomedFrame = [self zoomedFrame];
     if (NSEqualRects(_frame, zoomedFrame)) {
         zoomedFrame = _savedFrame;
@@ -3057,6 +3065,9 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) miniaturize: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskMiniaturizable))
+        return;
+
     [[self platformWindow] miniaturize];
 }
 
