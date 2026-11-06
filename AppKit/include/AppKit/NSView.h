@@ -190,7 +190,7 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 - (NSScrollView *) enclosingScrollView;
 - (NSRect) adjustScroll: (NSRect) toRect;
 
-@property (copy) NSArray<__kindof NSView *> *subviews;
+@property (copy, nonnull) NSArray<__kindof NSView *> *subviews;
 @property BOOL autoresizesSubviews;
 - (NSAutoresizingMaskOptions) autoresizingMask;
 - (NSFocusRingType) focusRingType;
@@ -382,6 +382,8 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 @property BOOL needsDisplay;
 - (void) setNeedsDisplayInRect: (NSRect) rect;
 - (void) setKeyboardFocusRingNeedsDisplayInRect: (NSRect) rect;
+@property (readonly) NSRect focusRingMaskBounds;
+- (void) drawFocusRingMask;
 - (void) translateRectsNeedingDisplayInRect: (NSRect) rect by: (NSSize) delta;
 
 - (BOOL) canDraw;

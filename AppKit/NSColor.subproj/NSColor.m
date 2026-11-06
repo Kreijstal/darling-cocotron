@@ -395,6 +395,11 @@ NSNotificationName const NSSystemColorsDidChangeNotification = @"NSSystemColorsD
     return [NSColor blackColor];
 }
 
+/* The accent colour is the system blue until a platform accent setting is read. */
++ (NSColor *) controlAccentColor {
+    return [NSColor systemBlueColor];
+}
+
 + (NSColor *) controlColor {
     return [NSColor colorWithCatalogName: @"System" colorName: @"controlColor"];
 }

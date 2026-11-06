@@ -92,6 +92,9 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 - (BOOL) accessibilityDisplayShouldInvertColors { return NO; }
 - (BOOL) accessibilityDisplayShouldReduceMotion { return NO; }
 
+// No assistive-technology client exists on this platform, so VoiceOver is never running.
+- (BOOL) isVoiceOverEnabled { return NO; }
+
 - (NSImage *) iconForFile: (NSString *) path {
     NSInvalidAbstractInvocation();
     return 0;
@@ -413,15 +416,48 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 
 @end
 
-static dispatch_once_t _initOnceNsWorkspaceOpenConfig;
-static NSWorkspaceOpenConfiguration* _singletonNsWorkspaceOpenConfig;
-
 @implementation NSWorkspaceOpenConfiguration
 + (instancetype)configuration {
-    dispatch_once(&_initOnceNsWorkspaceOpenConfig, ^{
-        _singletonNsWorkspaceOpenConfig = [[NSWorkspaceOpenConfiguration alloc] init];
-    });
-    return _singletonNsWorkspaceOpenConfig;
+    return [[[self alloc] init] autorelease];
+}
+
+// The defaults are the ones Apple documents for each property.
+- (instancetype)init {
+    if ((self = [super init]) != nil) {
+        _activates = YES;
+        _addsToRecentItems = YES;
+        _allowsRunningApplicationSubstitution = YES;
+        _promptsUserIfNeeded = YES;
+        _arguments = [[NSArray alloc] init];
+        _environment = [[NSDictionary alloc] init];
+        _architecture = CPU_TYPE_ANY;
+    }
+    return self;
+}
+
+- (id)copyWithZone:(NSZone *)zone {
+    NSWorkspaceOpenConfiguration *copy = [[[self class] allocWithZone:zone] init];
+    copy->_requiresUniversalLinks = _requiresUniversalLinks;
+    copy->_forPrinting = _forPrinting;
+    copy->_activates = _activates;
+    copy->_addsToRecentItems = _addsToRecentItems;
+    copy->_allowsRunningApplicationSubstitution = _allowsRunningApplicationSubstitution;
+    copy->_createsNewApplicationInstance = _createsNewApplicationInstance;
+    copy->_hides = _hides;
+    copy->_hidesOthers = _hidesOthers;
+    copy->_promptsUserIfNeeded = _promptsUserIfNeeded;
+    copy.appleEvent = _appleEvent;
+    copy.arguments = _arguments;
+    copy.environment = _environment;
+    copy->_architecture = _architecture;
+    return copy;
+}
+
+- (void)dealloc {
+    [_appleEvent release];
+    [_arguments release];
+    [_environment release];
+    [super dealloc];
 }
 
 @end

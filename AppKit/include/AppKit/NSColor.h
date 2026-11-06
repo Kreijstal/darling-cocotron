@@ -99,6 +99,7 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 @property(class, strong, readonly) NSColor *headerTextColor;
 @property(class, strong, readonly) NSArray<NSColor *> *alternatingContentBackgroundColors;
 
+@property(class, strong, readonly) NSColor *controlAccentColor;
 @property(class, strong, readonly) NSColor *controlColor;
 @property(class, strong, readonly) NSColor *controlBackgroundColor;
 @property(class, strong, readonly) NSColor *controlTextColor;
