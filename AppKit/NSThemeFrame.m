@@ -92,8 +92,13 @@ static const CGFloat kTitleBarHeight = 28.0;
     layingOut = YES;
     for (NSInteger i = 0; i < 3; i++) {
         NSButton *button = [[self window] standardWindowButton: i];
-        if (button == nil)
+        if (button == nil) {
+            for (NSView *view in [[_subviews copy] autorelease]) {
+                if ([view isKindOfClass: [NSThemeFrameButton class]] && [view tag] == i)
+                    [view removeFromSuperview];
+            }
             continue;
+        }
         if ([button superview] != self)
             [self addSubview: button];
         NSRect newFrame = [self _trafficLightRectAtIndex: i inTitleBar: bar];
@@ -218,6 +223,8 @@ static const CGFloat kTitleBarHeight = 28.0;
         return -1;
 
     for (NSInteger i = 0; i < 3; i++) {
+        if ([[self window] standardWindowButton: i] == nil)
+            continue;
         if (NSPointInRect(point, NSInsetRect(
                                   [self _trafficLightRectAtIndex: i
                                                       inTitleBar: bar],
@@ -247,7 +254,11 @@ static const CGFloat kTitleBarHeight = 28.0;
                                            alpha: 1.0],
     };
     NSSize size = [title sizeWithAttributes: attributes];
-    CGFloat left = NSMaxX([self _trafficLightRectAtIndex: 2 inTitleBar: bar]) + 10.0;
+    BOOL hasButtons = ([[self window] standardWindowButton: NSWindowCloseButton] != nil ||
+                       [[self window] standardWindowButton: NSWindowMiniaturizeButton] != nil ||
+                       [[self window] standardWindowButton: NSWindowZoomButton] != nil);
+    CGFloat left = hasButtons ? (NSMaxX([self _trafficLightRectAtIndex: 2 inTitleBar: bar]) + 10.0)
+                              : (NSMinX(bar) + 10.0);
     CGFloat x = NSMidX(bar) - size.width / 2.0;
     if (x < left)
         x = left;
@@ -306,15 +317,6 @@ static const CGFloat kTitleBarHeight = 28.0;
     [toolbarView layoutViews];
 
     contentFrame.size.height -= toolbarFrame.size.height;
-
-    /* The title bar lives above the content; the window's frame conversion
-     * reserves the extra height, so take it out of the content view here. */
-    CGFloat titleHeight = [NSThemeFrame titleBarHeightForStyleMask:
-                                            [[self window] styleMask]];
-    if (titleHeight > 0.0 && contentFrame.size.height > titleHeight) {
-        contentFrame.size.height -= titleHeight;
-        contentFrame.origin.y += titleHeight;
-    }
 
     [contentView setFrame: contentFrame];
     [self layoutTrafficLights];

@@ -768,6 +768,10 @@ static NSTextView *s_targetTextView = nil;
 
     // Tell the world the selection changed when the selection change is done
     if (!stillSelecting) {
+        if ([self selectedRange].length > 0) {
+            [self writeSelectionToPasteboard: [NSPasteboard pasteboardWithName: @"PRIMARY"]
+                                       types: [self writablePasteboardTypes]];
+        }
         [[NSNotificationCenter defaultCenter]
                 postNotificationName: NSTextViewDidChangeSelectionNotification
                               object: self
@@ -1159,6 +1163,8 @@ static NSTextView *s_targetTextView = nil;
 - (void) copy: sender {
     if ([self selectedRange].length > 0) {
         [self writeSelectionToPasteboard: [NSPasteboard generalPasteboard]
+                                   types: [self writablePasteboardTypes]];
+        [self writeSelectionToPasteboard: [NSPasteboard pasteboardWithName: @"PRIMARY"]
                                    types: [self writablePasteboardTypes]];
     }
 }
@@ -3328,6 +3334,36 @@ static NSTextView *s_targetTextView = nil;
     if ([self window])
         return [[self window] convertRectToScreen: r];
     return r;
+}
+
+- (BOOL) performKeyEquivalent: (NSEvent *) event {
+    if ([event type] == NSKeyDown) {
+        NSUInteger modifiers = [event modifierFlags] & (NSCommandKeyMask | NSControlKeyMask | NSAlternateKeyMask);
+        NSString *chars = [[event charactersIgnoringModifiers] lowercaseString];
+
+        BOOL isCmdOrCtrl = (modifiers & (NSCommandKeyMask | NSControlKeyMask)) != 0;
+        if (isCmdOrCtrl && !(modifiers & NSAlternateKeyMask)) {
+            if ([chars isEqualToString: @"c"] || [event keyCode] == 8) {
+                if ([self selectedRange].length > 0) {
+                    [self copy: nil];
+                    return YES;
+                }
+                return NO;
+            } else if ([chars isEqualToString: @"a"] || [event keyCode] == 0) {
+                [self selectAll: nil];
+                return YES;
+            } else if ([self isEditable]) {
+                if ([chars isEqualToString: @"v"] || [event keyCode] == 9) {
+                    [self paste: nil];
+                    return YES;
+                } else if ([chars isEqualToString: @"x"] || [event keyCode] == 7) {
+                    [self cut: nil];
+                    return YES;
+                }
+            }
+        }
+    }
+    return [super performKeyEquivalent: event];
 }
 
 - (void) keyDown: (NSEvent *) event {

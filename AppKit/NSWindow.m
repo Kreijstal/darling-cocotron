@@ -338,8 +338,34 @@ static BOOL _allowsAutomaticWindowTabbing;
 + (NSButton *) standardWindowButton: (NSWindowButton) button
                        forStyleMask: (NSWindowStyleMask) styleMask
 {
-    NSUnimplementedMethod();
-    return nil;
+    if (!(styleMask & NSWindowStyleMaskTitled))
+        return nil;
+
+    NSInteger tag;
+    switch (button) {
+    case NSWindowCloseButton:
+        if (!(styleMask & NSWindowStyleMaskClosable))
+            return nil;
+        tag = 0;
+        break;
+    case NSWindowMiniaturizeButton:
+        if (!(styleMask & NSWindowStyleMaskMiniaturizable))
+            return nil;
+        tag = 1;
+        break;
+    case NSWindowZoomButton:
+        if (!(styleMask & NSWindowStyleMaskResizable))
+            return nil;
+        tag = 2;
+        break;
+    default:
+        return nil;
+    }
+
+    NSButton *result = [[[NSThemeFrameButton alloc] initWithFrame: NSMakeRect(0, 0, 12, 12)] autorelease];
+    [result setTag: tag];
+    [result setBordered: NO];
+    return result;
 }
 
 + (void) menuChanged: (NSMenu *) menu {
@@ -1573,13 +1599,29 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (NSButton *) standardWindowButton: (NSWindowButton) value {
+    if (!(_styleMask & NSWindowStyleMaskTitled))
+        return nil;
+
     NSInteger tag;
 
     switch (value) {
-    case NSWindowCloseButton: tag = 0; break;
-    case NSWindowMiniaturizeButton: tag = 1; break;
-    case NSWindowZoomButton: tag = 2; break;
-    default: return nil;
+    case NSWindowCloseButton:
+        if (!(_styleMask & NSWindowStyleMaskClosable))
+            return nil;
+        tag = 0;
+        break;
+    case NSWindowMiniaturizeButton:
+        if (!(_styleMask & NSWindowStyleMaskMiniaturizable))
+            return nil;
+        tag = 1;
+        break;
+    case NSWindowZoomButton:
+        if (!(_styleMask & NSWindowStyleMaskResizable))
+            return nil;
+        tag = 2;
+        break;
+    default:
+        return nil;
     }
 
     NSView *frame = [[self contentView] superview];
@@ -2912,6 +2954,11 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) performClose: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskClosable)) {
+        NSBeep();
+        return;
+    }
+
     if ([_delegate respondsToSelector: @selector(windowShouldClose:)]) {
         if (![_delegate windowShouldClose: self]) {
             return;
@@ -2980,6 +3027,9 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) zoom: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskResizable))
+        return;
+
     NSRect zoomedFrame = [self zoomedFrame];
     if (NSEqualRects(_frame, zoomedFrame)) {
         zoomedFrame = _savedFrame;
@@ -3015,6 +3065,9 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (void) miniaturize: (id) sender {
+    if (!(_styleMask & NSWindowStyleMaskMiniaturizable))
+        return;
+
     [[self platformWindow] miniaturize];
 }
 
@@ -3104,7 +3157,13 @@ static BOOL _allowsAutomaticWindowTabbing;
 }
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event {
-    return [_backgroundView performKeyEquivalent: event];
+    if ([_backgroundView performKeyEquivalent: event])
+        return YES;
+    if (_delegate != nil && [(id)_delegate respondsToSelector: @selector(performKeyEquivalent:)]) {
+        if ([(id)_delegate performKeyEquivalent: event])
+            return YES;
+    }
+    return NO;
 }
 
 #if 0

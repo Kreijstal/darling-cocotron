@@ -272,7 +272,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             _currentEditor = [[cell setUpFieldEditorAttributes: editor] retain];
             [_currentEditor setDelegate: self];
             [_currentEditor registerForDraggedTypes: [self _draggedTypes]];
-            [_currentEditor becomeFirstResponder];
+            [[self window] makeFirstResponder: _currentEditor];
         }
 
         [cell selectWithFrame: [self bounds]
@@ -387,6 +387,28 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     } else {
         [super mouseDown: event];
     }
+}
+
+- (void) rightMouseDown: (NSEvent *) event {
+    if (_currentEditor) {
+        [_currentEditor rightMouseDown: event];
+    } else {
+        [super rightMouseDown: event];
+    }
+}
+
+- (void) keyDown: (NSEvent *) event {
+    if (_currentEditor) {
+        [_currentEditor keyDown: event];
+    } else {
+        [super keyDown: event];
+    }
+}
+
+- (BOOL) performKeyEquivalent: (NSEvent *) event {
+    if (_currentEditor && [_currentEditor performKeyEquivalent: event])
+        return YES;
+    return [super performKeyEquivalent: event];
 }
 
 - (BOOL) textShouldBeginEditing: (NSText *) text {

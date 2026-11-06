@@ -19,6 +19,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSAlert.h>
+#import <AppKit/NSPasteboard.h>
 #import <AppKit/NSAttributedString.h>
 #import <AppKit/NSButton.h>
 #import <AppKit/NSFont.h>
@@ -94,6 +95,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                                          styleMask: NSTitledWindowMask
                                            backing: NSBackingStoreBuffered
                                              defer: NO];
+    [_window setDelegate: (id)self];
     _suppressionButton = [[NSButton alloc] init];
     //  [_suppressionButton setButtonType:NSSwitchButton];
     [_suppressionButton
@@ -616,6 +618,37 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         [NSApp stopModalWithCode: [sender tag]];
 
     [_window close];
+}
+
+- (BOOL) performKeyEquivalent: (NSEvent *) event {
+    if ([event type] == NSKeyDown) {
+        NSUInteger modifiers = [event modifierFlags] & (NSCommandKeyMask | NSControlKeyMask | NSAlternateKeyMask);
+        NSString *chars = [[event charactersIgnoringModifiers] lowercaseString];
+        BOOL isCmdOrCtrl = (modifiers & (NSCommandKeyMask | NSControlKeyMask)) != 0;
+        if (isCmdOrCtrl && !(modifiers & NSAlternateKeyMask) &&
+            ([chars isEqualToString: @"c"] || [event keyCode] == 8)) {
+            NSString *msg = _messageText ?: @"";
+            NSString *info = _informativeText ?: @"";
+            NSString *fullText;
+            if ([msg length] > 0 && [info length] > 0)
+                fullText = [NSString stringWithFormat: @"%@\n\n%@", msg, info];
+            else if ([msg length] > 0)
+                fullText = msg;
+            else
+                fullText = info;
+
+            if ([fullText length] > 0) {
+                NSPasteboard *pb = [NSPasteboard generalPasteboard];
+                [pb declareTypes: [NSArray arrayWithObject: NSStringPboardType] owner: nil];
+                [pb setString: fullText forType: NSStringPboardType];
+                NSPasteboard *primary = [NSPasteboard pasteboardWithName: @"PRIMARY"];
+                [primary declareTypes: [NSArray arrayWithObject: NSStringPboardType] owner: nil];
+                [primary setString: fullText forType: NSStringPboardType];
+                return YES;
+            }
+        }
+    }
+    return NO;
 }
 
 @end
