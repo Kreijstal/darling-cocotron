@@ -449,7 +449,10 @@ static NSData *makeWindowIcon() {
 }
 
 + (void) removeDecorationForWindow: (Window) w onDisplay: (Display *) dpy {
-    uint32_t hints[5] = { 2, 0, 0, 0, 0 };
+    // XChangeProperty with format 32 requires an array of long (converted to
+    // 32-bit quantities by Xlib on the wire). Motif hints: flags = 2
+    // (MWM_HINTS_DECORATIONS), decorations = 0 (no decorations).
+    unsigned long hints[5] = { 2, 0, 0, 0, 0 };
     XChangeProperty(dpy, w, XInternAtom(dpy, "_MOTIF_WM_HINTS", False),
                     XInternAtom(dpy, "_MOTIF_WM_HINTS", False), 32,
                     PropModeReplace, (const unsigned char *) hints, 5);
