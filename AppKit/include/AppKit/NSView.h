@@ -192,7 +192,7 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 
 @property (copy, nonnull) NSArray<__kindof NSView *> *subviews;
 @property BOOL autoresizesSubviews;
-- (NSAutoresizingMaskOptions) autoresizingMask;
+@property NSAutoresizingMaskOptions autoresizingMask;
 - (NSFocusRingType) focusRingType;
 
 - (NSInteger) tag;
@@ -275,7 +275,6 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
                            context: (void *) context;
 - (void) didAddSubview: (NSView *) subview;
 - (void) willRemoveSubview: (NSView *) subview;
-- (void) setAutoresizingMask: (NSAutoresizingMaskOptions) mask;
 - (void) setFocusRingType: (NSFocusRingType) value;
 
 - (void) setNextKeyView: (NSView *) next;
