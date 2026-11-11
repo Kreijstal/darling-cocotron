@@ -1,3 +1,9 @@
+// The C parts for any language, the classes for Objective-C, as in Apple's CoreAnimation.h: C code
+// includes QuartzCore for CATransform3D (VLC's video_chroma/cvpx.c does).
+#import <QuartzCore/CABase.h>
+#import <QuartzCore/CATransform3D.h>
+
+#ifdef __OBJC__
 #import <QuartzCore/CAAnimation.h>
 #import <QuartzCore/CADisplayLink.h>
 #import <QuartzCore/CAFrameRateRange.h>
@@ -17,6 +23,7 @@
 #import <QuartzCore/CAScrollLayer.h>
 #import <QuartzCore/CAShapeLayer.h>
 #import <QuartzCore/CASpringAnimation.h>
+#endif
 
 /* Undocumented */
 /* End undocumented */
