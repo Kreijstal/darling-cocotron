@@ -5,6 +5,20 @@
 #include "third_party/kiwi/kiwi.h"
 #include <map>
 #include <cmath>
+#include <objc/message.h>
+
+// UIKit's (iOS) attributes past AppKit's: an edge or center measured from a view's layout
+// margins (-[UIView layoutMargins]; UIView is an NSView here).
+enum {
+    DarlingLayoutAttributeLeftMargin = 13,
+    DarlingLayoutAttributeRightMargin,
+    DarlingLayoutAttributeTopMargin,
+    DarlingLayoutAttributeBottomMargin,
+    DarlingLayoutAttributeLeadingMargin,
+    DarlingLayoutAttributeTrailingMargin,
+    DarlingLayoutAttributeCenterXWithinMargins,
+    DarlingLayoutAttributeCenterYWithinMargins,
+};
 
 // Layout guides take part as rectangles with no view; their frame is set here.
 @interface NSLayoutGuide (DarlingLayout)
@@ -34,6 +48,15 @@ class Layout {
         for (NSView *child in [view subviews]) collect(child);
     }
 
+    // -[UIView layoutMargins] (a UIEdgeInsets); layout guides and AppKit views have none.
+    struct Margins { CGFloat top, left, bottom, right; };
+    static Margins margins(id item) {
+        SEL selector = @selector(layoutMargins);
+        if ([item isKindOfClass:[NSLayoutGuide class]] || ![item respondsToSelector:selector])
+            return Margins{0, 0, 0, 0};
+        return ((Margins (*)(id, SEL))objc_msgSend)(item, selector);
+    }
+
     bool contains(id item) {
         return item != nil && geometry.find(item) != geometry.end();
     }
@@ -47,6 +70,21 @@ class Layout {
         switch (attr) {
         case NSLayoutAttributeLeading: attr = rtl ? NSLayoutAttributeRight : NSLayoutAttributeLeft; break;
         case NSLayoutAttributeTrailing: attr = rtl ? NSLayoutAttributeLeft : NSLayoutAttributeRight; break;
+        case DarlingLayoutAttributeLeadingMargin: attr = rtl ? DarlingLayoutAttributeRightMargin : DarlingLayoutAttributeLeftMargin; break;
+        case DarlingLayoutAttributeTrailingMargin: attr = rtl ? DarlingLayoutAttributeLeftMargin : DarlingLayoutAttributeRightMargin; break;
+        }
+        if (attr >= DarlingLayoutAttributeLeftMargin && attr <= DarlingLayoutAttributeCenterYWithinMargins) {
+            Margins m = margins(item);
+            switch (attr) {
+            case DarlingLayoutAttributeLeftMargin: return attribute(item, NSLayoutAttributeLeft) + m.left;
+            case DarlingLayoutAttributeRightMargin: return attribute(item, NSLayoutAttributeRight) - m.right;
+            case DarlingLayoutAttributeTopMargin: return attribute(item, NSLayoutAttributeTop) + m.top;
+            case DarlingLayoutAttributeBottomMargin: return attribute(item, NSLayoutAttributeBottom) - m.bottom;
+            case DarlingLayoutAttributeCenterXWithinMargins:
+                return attribute(item, NSLayoutAttributeCenterX) + (m.left - m.right) * 0.5;
+            default:
+                return attribute(item, NSLayoutAttributeCenterY) + (m.top - m.bottom) * 0.5;
+            }
         }
         // Auto Layout y values increase downwards in AppKit too, so an unflipped
         // root's y is measured from its top edge.
