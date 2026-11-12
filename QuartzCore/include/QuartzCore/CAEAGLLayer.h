@@ -13,6 +13,11 @@
 #import <Foundation/Foundation.h>
 
 /* OpenGLES's EAGLDrawable.h declares the same protocol. */
+/* As iOS's: EAGLDrawable comes with OpenGLES's header, its color formats and EAGLContext's
+ * drawable methods with it. A build without OpenGLES's headers declares only the protocol. */
+#if __has_include(<OpenGLES/EAGLDrawable.h>)
+#import <OpenGLES/EAGLDrawable.h>
+#endif
 #ifndef EAGL_DRAWABLE_PROTOCOL
 #define EAGL_DRAWABLE_PROTOCOL
 @protocol EAGLDrawable
