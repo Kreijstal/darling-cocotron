@@ -17,7 +17,11 @@
 #import <QuartzCore/CAGradientLayer.h>
 #import <QuartzCore/CAMetalDrawable.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/CAEAGLLayer.h>
+/* macOS only, as in Apple's: they draw with OpenGL, which iOS does not have. */
+#if !TARGET_OS_IPHONE
 #import <QuartzCore/CAOpenGLLayer.h>
+#endif
 #import <QuartzCore/CAReplicatorLayer.h>
 #import <QuartzCore/CAScrollLayer.h>
 #import <QuartzCore/CAShapeLayer.h>
