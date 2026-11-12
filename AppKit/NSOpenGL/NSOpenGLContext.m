@@ -134,13 +134,13 @@ static inline void _clearCurrentContext() {
 }
 
 - (void) updateViewParameters {
-    if (NS_EXTRA(NSOpenGLContext, self)->_view == nil || [NS_EXTRA(NSOpenGLContext, self)->_view window] == nil) return;
+    if (NS_EXTRA(NSOpenGLContext, self)->_view == nil || [NS_EXTRA(NSOpenGLContext, self)->_view _appKitWindow] == nil) return;
     NSRect rect = [NS_EXTRA(NSOpenGLContext, self)->_view bounds];
 
-    if ([NS_EXTRA(NSOpenGLContext, self)->_view window] != nil)
+    if ([NS_EXTRA(NSOpenGLContext, self)->_view _appKitWindow] != nil)
         rect = [NS_EXTRA(NSOpenGLContext, self)->_view convertRect: rect toView: nil];
     if (NS_EXTRA(NSOpenGLContext, self)->_subwindow == nil) {
-        NS_EXTRA(NSOpenGLContext, self)->_subwindow = [[[NS_EXTRA(NSOpenGLContext, self)->_view window] _createSubWindowWithFrame: rect] retain];
+        NS_EXTRA(NSOpenGLContext, self)->_subwindow = [[[NS_EXTRA(NSOpenGLContext, self)->_view _appKitWindow] _createSubWindowWithFrame: rect] retain];
         NS_EXTRA(NSOpenGLContext, self)->_cglWindow = CGLGetWindowForContext(NS_EXTRA(NSOpenGLContext, self)->_glContext, [NS_EXTRA(NSOpenGLContext, self)->_subwindow nativeWindow]);
     } else {
         [NS_EXTRA(NSOpenGLContext, self)->_subwindow setFrame: rect];

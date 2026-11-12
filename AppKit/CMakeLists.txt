@@ -609,6 +609,8 @@ add_framework(AppKit
 reexport(AppKit Foundation ${CMAKE_BINARY_DIR}/src/external/foundation/Foundation)
 reexport(AppKit ApplicationServices ${CMAKE_BINARY_DIR}/src/frameworks/ApplicationServices/ApplicationServices)
 
+target_compile_definitions(AppKit PRIVATE DARLING_APPKIT_INTERNAL_BUILD=1)
+
 target_include_directories(AppKit PRIVATE
 	private-include
 )
@@ -619,6 +621,7 @@ function(add_backend name)
 	set(DYLIB_INSTALL_NAME "${path}/MacOS/${name}")
 
 	add_darling_library(${name}_backend SHARED ${BACKEND_SOURCES})
+	target_compile_definitions(${name}_backend PRIVATE DARLING_APPKIT_INTERNAL_BUILD=1)
 	set_target_properties(${name}_backend PROPERTIES OUTPUT_NAME "${name}" SUFFIX "" PREFIX "")
 	make_fat(${name}_backend)
 

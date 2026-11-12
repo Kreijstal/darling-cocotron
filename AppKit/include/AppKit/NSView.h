@@ -97,7 +97,9 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 // Legacy ObjC ABI (i386): instance size must stay 0x50, Apple's; the ivars
 // before the extras sit at Apple's offsets. Add new state to the extra
 // struct, never as an ivar.
-@interface NSView : NSResponder <NSAnimatablePropertyContainer, NSUserInterfaceItemIdentification, NSAppearanceCustomization> {
+@interface NSView : NSResponder <NSAnimatablePropertyContainer, NSUserInterfaceItemIdentification, NSAppearanceCustomization>
+#if !(TARGET_OS_IPHONE && defined(__OBJC2__) && !defined(DARLING_APPKIT_INTERNAL_BUILD))
+{
     NSRect _frame;
     NSRect _bounds;
     NSView *_superview;
@@ -173,6 +175,7 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
         NSRect _preparedContentRect;
     NS_EXTRA_IVARS_END(NSView)
 }
+#endif
 
 // Constraints installed on this view, in the order they were added. A
 // constraint is installed on the closest common ancestor of its items, see
@@ -241,7 +244,13 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 
 - (void) scaleUnitSquareToSize: (NSSize) size;
 
+// UIKit's UIView, built on NSView, answers -window with its UIWindow as on iOS, so iOS code does
+// not see this declaration. -_appKitWindow is the AppKit window for any view.
+#if !TARGET_OS_IPHONE || defined(DARLING_APPKIT_INTERNAL_BUILD)
 @property (readonly, weak) NSWindow *window;
+#endif
+- (NSWindow *) _appKitWindow;
+- (void) _drawRectForDisplay: (NSRect) rect;
 @property (readonly, weak) NSView *superview;
 - (BOOL) isDescendantOf: (NSView *) other;
 - (NSView *) ancestorSharedWithView: (NSView *) view;
