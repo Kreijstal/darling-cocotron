@@ -91,6 +91,7 @@ set(CoreGraphics_sources
 	CGLayer.m
 	CGLPixelSurface.m
 	CGPath.m
+	CGPathDash.c
 	CGPattern.m
 	CGPDFContext.m
 	CGPDFDictionary.m

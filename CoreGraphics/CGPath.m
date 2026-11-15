@@ -24,6 +24,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <CoreGraphics/CGGeometry.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include "CGPathDash.h"
 
 void CGPathRelease(CGPathRef self) {
     O2PathRelease((O2PathRef)self);
@@ -253,4 +256,68 @@ CGPathRef CGPathCreateCopyByStrokingPath(CGPathRef path,
 {
     return (CGPathRef)O2PathCreateCopyByStrokingPath((O2PathRef)path,
         O2AffineTransformPtrFromCG(transform), width, cap, join, miterLimit);
+}
+
+CGPathRef CGPathCreateCopyByDashingPath(CGPathRef path,
+    const CGAffineTransform *transform, CGFloat phase,
+    const CGFloat *lengths, size_t count)
+{
+    const size_t limit=(size_t)1<<20;
+    if (!path||count>limit||(count&&!lengths)) return NULL;
+    O2PathRef source=(O2PathRef)path;
+    size_t elements=O2PathNumberOfElements(source),points=O2PathNumberOfPoints(source);
+    if (elements>limit||points>3*limit) return NULL;
+    CGDashCommand *input=elements?calloc(elements,sizeof(*input)):NULL;
+    double *pattern=count?malloc(count*sizeof(*pattern)):NULL;
+    if ((elements&&!input)||(count&&!pattern)) { free(input);free(pattern);return NULL; }
+    const unsigned char *ops=O2PathElements(source);
+    const O2Point *p=O2PathPoints(source);
+    if ((elements&&!ops)||(points&&!p)) goto invalid;
+    size_t used=0;
+    for (size_t i=0;i<elements;i++) {
+        unsigned char op=ops[i];
+        if (op>kO2PathElementCloseSubpath) goto invalid;
+        size_t n=op==kO2PathElementAddQuadCurveToPoint?2:op==kO2PathElementAddCurveToPoint?3:op<kO2PathElementCloseSubpath?1:0;
+        if (n>points-used) goto invalid;
+        input[i].op=op;
+        for (size_t j=0;j<n;j++) input[i].p[j]=(CGDashPoint){p[used+j].x,p[used+j].y};
+        used+=n;
+    }
+    if (used!=points) goto invalid;
+    for (size_t i=0;i<count;i++) pattern[i]=lengths[i];
+    double matrix[6]={1,0,0,1,0,0};
+    if (transform) {
+        matrix[0]=transform->a;matrix[1]=transform->b;matrix[2]=transform->c;
+        matrix[3]=transform->d;matrix[4]=transform->tx;matrix[5]=transform->ty;
+    }
+    CGDashResult dashed;
+    int success=CGDashCopy(input,elements,matrix,phase,pattern,count,&dashed,NULL);
+    free(input);free(pattern);
+    if (!success) return NULL;
+    O2MutablePathRef result=NULL;
+    O2PathRef immutable=NULL;
+    @try {
+        result=O2PathCreateMutable();
+        if (result) {
+            for (size_t i=0;i<dashed.count;i++) {
+                CGDashCommand *c=&dashed.commands[i];
+                switch (c->op) {
+                case 0:O2PathMoveToPoint(result,NULL,c->p[0].x,c->p[0].y);break;
+                case 1:O2PathAddLineToPoint(result,NULL,c->p[0].x,c->p[0].y);break;
+                case 2:O2PathAddQuadCurveToPoint(result,NULL,c->p[0].x,c->p[0].y,c->p[1].x,c->p[1].y);break;
+                case 3:O2PathAddCurveToPoint(result,NULL,c->p[0].x,c->p[0].y,c->p[1].x,c->p[1].y,c->p[2].x,c->p[2].y);break;
+                case 4:O2PathCloseSubpath(result);break;
+                }
+            }
+            immutable=O2PathCreateCopy(result);
+        }
+    } @catch (...) {
+        immutable=NULL;
+    } @finally {
+        if (result) O2PathRelease(result);
+        CGDashDestroy(&dashed,NULL);
+    }
+    return (CGPathRef)immutable;
+invalid:
+    free(input);free(pattern);return NULL;
 }

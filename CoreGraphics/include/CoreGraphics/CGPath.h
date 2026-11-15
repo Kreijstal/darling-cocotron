@@ -60,6 +60,9 @@ CF_ASSUME_NONNULL_BEGIN
 COREGRAPHICS_EXPORT CGPathRef _Nullable CGPathCreateCopyByStrokingPath(CGPathRef path,
     const CGAffineTransform * _Nullable transform, CGFloat width, CGLineCap cap,
     CGLineJoin join, CGFloat miterLimit);
+COREGRAPHICS_EXPORT CGPathRef _Nullable CGPathCreateCopyByDashingPath(CGPathRef path,
+    const CGAffineTransform * _Nullable transform, CGFloat phase,
+    const CGFloat * _Nullable lengths, size_t count);
 
 COREGRAPHICS_EXPORT void CGPathRelease(CGPathRef self);
 COREGRAPHICS_EXPORT CGPathRef CGPathRetain(CGPathRef self);
