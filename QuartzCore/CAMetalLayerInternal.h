@@ -28,6 +28,7 @@
 class CAMetalDrawableActual;
 
 @interface CAMetalLayerInternal : CAMetalLayer {
+#if DARLING_METAL_ENABLED && __OBJC2__
 	id<MTLDevice> _device;
 	MTLPixelFormat _pixelFormat;
 	CGColorSpaceRef _colorspace;
@@ -56,6 +57,7 @@ class CAMetalDrawableActual;
 	// the GL context _glImportsSemaphores was found for
 	CGLContextObj _semaphoreProbeContext;
 	BOOL _glImportsSemaphores;
+#endif
 }
 
 - (void)queuePresent: (NSUInteger)drawableID;
