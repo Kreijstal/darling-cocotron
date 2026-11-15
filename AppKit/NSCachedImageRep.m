@@ -90,7 +90,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         return nil;
     }
 
-    NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc] initWithData: tiff];
+    id bitmap = [[NSBitmapImageRep alloc] initWithData: tiff];
     if (bitmap == nil)
         [NSException raise: NSInvalidArgumentException
                     format: @"-[%@ %s]: unreadable TIFF data (%lu bytes)", [self class], sel_getName(_cmd),
