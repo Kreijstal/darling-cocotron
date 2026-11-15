@@ -25,17 +25,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSAnimation.h>
 #import <AppKit/NSGraphics.h>
 #import <AppKit/NSResponder.h>
+#import <AppKit/NSTouch.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 #import <AppKit/NSLayoutConstraint.h>
 #import <AppKit/NSAppearance.h>
 #import <AppKit/NSUserInterfaceLayoutDirection.h>
-
-typedef NS_OPTIONS(NSUInteger, NSTouchTypeMask) {
-    NSTouchTypeMaskDirect = 1 << 0,
-    NSTouchTypeMaskIndirect = 1 << 1,
-};
 
 @class CADisplayLink, NSWindow, NSMenu, NSMenuItem, NSCursor, NSClipView, NSPasteboard,
         NSTextInputContext, NSImage, NSBitmapImageRep, NSScrollView,
