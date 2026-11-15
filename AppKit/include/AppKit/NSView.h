@@ -98,7 +98,7 @@ APPKIT_EXPORT const NSViewFullScreenModeOptionKey NSFullScreenModeApplicationPre
 // before the extras sit at Apple's offsets. Add new state to the extra
 // struct, never as an ivar.
 @interface NSView : NSResponder <NSAnimatablePropertyContainer, NSUserInterfaceItemIdentification, NSAppearanceCustomization>
-#if !(TARGET_OS_IPHONE && defined(__OBJC2__) && !defined(DARLING_APPKIT_INTERNAL_BUILD))
+#if !(TARGET_OS_IPHONE && __OBJC2__ && !defined(DARLING_APPKIT_INTERNAL_BUILD))
 {
     NSRect _frame;
     NSRect _bounds;
