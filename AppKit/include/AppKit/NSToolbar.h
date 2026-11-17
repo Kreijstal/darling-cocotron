@@ -26,23 +26,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         NSMutableDictionary, NSWindow, NSView, NSToolbarItem, NSToolbarView,
         NSToolbarCustomizationPalette;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSToolbarSizeMode) {
     NSToolbarSizeModeDefault,
     NSToolbarSizeModeRegular,
     NSToolbarSizeModeSmall
-} NSToolbarSizeMode;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSToolbarDisplayMode) {
     NSToolbarDisplayModeDefault,
     NSToolbarDisplayModeIconAndLabel,
     NSToolbarDisplayModeIconOnly,
     NSToolbarDisplayModeLabelOnly
-} NSToolbarDisplayMode;
+};
 
 APPKIT_EXPORT const NSNotificationName NSToolbarWillAddItemNotification;
 APPKIT_EXPORT const NSNotificationName NSToolbarDidRemoveItemNotification;
+APPKIT_EXPORT NSString *const NSToolbarItemKey;
 
-typedef NSString *NSToolbarIdentifier;
+typedef NSString *NSToolbarIdentifier NS_SWIFT_BRIDGED_TYPEDEF;
 
 @protocol NSToolbarDelegate;
 
@@ -71,27 +72,19 @@ typedef NSString *NSToolbarIdentifier;
 - (instancetype) initWithIdentifier: (NSToolbarIdentifier) identifier;
 
 - (NSToolbarIdentifier) identifier;
-- (id<NSToolbarDelegate>) delegate;
-- (BOOL) isVisible;
-- (NSToolbarSizeMode) sizeMode;
-- (NSToolbarDisplayMode) displayMode;
-- (BOOL) showsBaselineSeparator;
+@property(nonatomic, assign) id<NSToolbarDelegate> delegate;
+@property(nonatomic, getter=isVisible) BOOL visible;
+@property(nonatomic) NSToolbarSizeMode sizeMode;
+@property(nonatomic) NSToolbarDisplayMode displayMode;
+@property(nonatomic) BOOL showsBaselineSeparator;
 - (NSArray *) items;
 - (NSArray *) visibleItems;
 - (NSDictionary *) configurationDictionary;
-- (BOOL) autosavesConfiguration;
-- (BOOL) allowsUserCustomization;
-- (NSString *) selectedItemIdentifier;
+@property(nonatomic) BOOL autosavesConfiguration;
+@property(nonatomic) BOOL allowsUserCustomization;
+@property(nonatomic, copy) NSString *selectedItemIdentifier;
 
-- (void) setDelegate: (id<NSToolbarDelegate>) delegate;
-- (void) setVisible: (BOOL) flag;
-- (void) setSizeMode: (NSToolbarSizeMode) mode;
-- (void) setDisplayMode: (NSToolbarDisplayMode) mode;
-- (void) setShowsBaselineSeparator: (BOOL) value;
 - (void) setConfigurationFromDictionary: (NSDictionary *) dictionary;
-- (void) setAutosavesConfiguration: (BOOL) flag;
-- (void) setAllowsUserCustomization: (BOOL) flag;
-- (void) setSelectedItemIdentifier: (NSString *) identifier;
 
 - (void) insertItemWithItemIdentifier: (NSToolbarItemIdentifier) identifier
                               atIndex: (NSInteger) index;

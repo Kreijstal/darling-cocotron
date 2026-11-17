@@ -17,6 +17,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #import <CoreGraphics/CGDataConsumer.h>
 #import <CoreGraphics/CGDataProvider.h>
 #import <CoreGraphics/CGDirectDisplay.h>
+#import <CoreGraphics/CGDirectPalette.h>
 #import <CoreGraphics/CGDisplayFade.h>
 #import <CoreGraphics/CGDisplayConfiguration.h>
 #import <CoreGraphics/CGDisplayStream.h>
@@ -41,6 +42,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #import <CoreGraphics/CGRemoteOperation.h>
 
 #include <CoreGraphics/CGEvent.h>
+#include <CoreGraphics/CGEventSource.h>
 #include <CoreGraphics/CGPDFContext.h>
 
 #endif /* COREGRAPHICS_H */

@@ -1,0 +1,3582 @@
+---
+# Swift API notes for Darling's AppKit: the Swift names and importer behaviour the AppKit overlay
+# (and applications written against the public AppKit API) rely on. This file covers the declarations the
+# overlay uses; the rest of the public AppKit surface is added as it is declared in these headers.
+Name: AppKit
+
+# Types that Swift nests in the class they belong to.
+Typedefs:
+- Name: NSFontWeight
+  SwiftName: NSFont.Weight
+- Name: NSStackViewVisibilityPriority
+  SwiftName: NSStackView.VisibilityPriority
+- Name: NSToolbarItemVisibilityPriority
+  SwiftName: NSToolbarItem.VisibilityPriority
+- Name: NSTouchBarItemPriority
+  SwiftName: NSTouchBarItem.Priority
+- Name: NSWindowLevel
+  SwiftName: NSWindow.Level
+
+# Enums and option sets that Swift nests in the class they belong to (grouped by that class).
+- Name: NSAboutPanelOptionKey
+  SwiftName: NSApplication.AboutPanelOptionKey
+- Name: NSFontTextStyle
+  SwiftName: NSFont.TextStyle
+- Name: NSPrintInfoAttributeKey
+  SwiftName: NSPrintInfo.AttributeKey
+- Name: NSAnimationProgress
+  SwiftName: NSAnimation.Progress
+- Name: NSAppearanceName
+  SwiftName: NSAppearance.Name
+- Name: NSModalResponse
+  SwiftName: NSApplication.ModalResponse
+- Name: NSModalSession
+  SwiftName: NSApplication.ModalSession
+- Name: NSAttributedStringDocumentAttributeKey
+  SwiftName: NSAttributedString.DocumentAttributeKey
+- Name: NSAttributedStringDocumentReadingOptionKey
+  SwiftName: NSAttributedString.DocumentReadingOptionKey
+- Name: NSAttributedStringDocumentType
+  SwiftName: NSAttributedString.DocumentType
+- Name: NSTextLayoutSectionKey
+  SwiftName: NSAttributedString.TextLayoutSectionKey
+- Name: NSBitmapImageRepPropertyKey
+  SwiftName: NSBitmapImageRep.PropertyKey
+- Name: NSCollectionViewDecorationElementKind
+  SwiftName: NSCollectionView.DecorationElementKind
+- Name: NSCollectionViewSupplementaryElementKind
+  SwiftName: NSCollectionView.SupplementaryElementKind
+- Name: NSColorName
+  SwiftName: NSColor.Name
+- Name: NSColorListName
+  SwiftName: NSColorList.Name
+- Name: NSDraggingImageComponentKey
+  SwiftName: NSDraggingItem.ImageComponentKey
+- Name: NSFontDescriptorAttributeName
+  SwiftName: NSFontDescriptor.AttributeName
+- Name: NSFontDescriptorFeatureKey
+  SwiftName: NSFontDescriptor.FeatureKey
+- Name: NSFontDescriptorSystemDesign
+  SwiftName: NSFontDescriptor.SystemDesign
+- Name: NSFontDescriptorTraitKey
+  SwiftName: NSFontDescriptor.TraitKey
+- Name: NSImageName
+  SwiftName: NSImage.Name
+- Name: NSImageHintKey
+  SwiftName: NSImageRep.HintKey
+- Name: NSLayoutPriority
+  SwiftName: NSLayoutConstraint.Priority
+- Name: NSNibName
+  SwiftName: NSNib.Name
+- Name: NSPasteboardName
+  SwiftName: NSPasteboard.Name
+- Name: NSPasteboardType
+  SwiftName: NSPasteboard.PasteboardType
+- Name: NSPasteboardReadingOptionKey
+  SwiftName: NSPasteboard.ReadingOptionKey
+- Name: NSPrintJobDispositionValue
+  SwiftName: NSPrintInfo.JobDisposition
+- Name: NSSharingServiceName
+  SwiftName: NSSharingService.Name
+- Name: NSSpeechPropertyKey
+  SwiftName: NSSpeechSynthesizer.SpeechPropertyKey
+- Name: NSVoiceAttributeKey
+  SwiftName: NSSpeechSynthesizer.VoiceAttributeKey
+- Name: NSVoiceGenderName
+  SwiftName: NSSpeechSynthesizer.VoiceGender
+- Name: NSStoryboardName
+  SwiftName: NSStoryboard.Name
+- Name: NSStoryboardSceneIdentifier
+  SwiftName: NSStoryboard.SceneIdentifier
+- Name: NSTextTabOptionKey
+  SwiftName: NSTextTab.OptionKey
+- Name: NSToolbarIdentifier
+  SwiftName: NSToolbar.Identifier
+- Name: NSToolbarItemIdentifier
+  SwiftName: NSToolbarItem.Identifier
+- Name: NSTouchBarItemIdentifier
+  SwiftName: NSTouchBarItem.Identifier
+- Name: NSViewFullScreenModeOptionKey
+  SwiftName: NSView.FullScreenModeOptionKey
+- Name: NSToolTipTag
+  SwiftName: NSView.ToolTipTag
+- Name: NSTrackingRectTag
+  SwiftName: NSView.TrackingRectTag
+- Name: NSWindowFrameAutosaveName
+  SwiftName: NSWindow.FrameAutosaveName
+
+
+
+- Name: NSWindowTabbingIdentifier
+  SwiftName: NSWindow.TabbingIdentifier
+
+Tags:
+- Name: NSAlertStyle
+  SwiftName: NSAlert.Style
+- Name: NSAnimationBlockingMode
+  SwiftName: NSAnimation.BlockingMode
+- Name: NSAnimationCurve
+  SwiftName: NSAnimation.Curve
+- Name: NSApplicationActivationOptions
+  SwiftName: NSApplication.ActivationOptions
+- Name: NSApplicationActivationPolicy
+  SwiftName: NSApplication.ActivationPolicy
+- Name: NSApplicationDelegateReply
+  SwiftName: NSApplication.DelegateReply
+- Name: NSApplicationPresentationOptions
+  SwiftName: NSApplication.PresentationOptions
+- Name: NSApplicationPrintReply
+  SwiftName: NSApplication.PrintReply
+- Name: NSRequestUserAttentionType
+  SwiftName: NSApplication.RequestUserAttentionType
+- Name: NSApplicationTerminateReply
+  SwiftName: NSApplication.TerminateReply
+- Name: NSWindowListOptions
+  SwiftName: NSApplication.WindowListOptions
+- Name: NSBezierPathElement
+  SwiftName: NSBezierPath.ElementType
+- Name: NSLineCapStyle
+  SwiftName: NSBezierPath.LineCapStyle
+- Name: NSLineJoinStyle
+  SwiftName: NSBezierPath.LineJoinStyle
+- Name: NSWindingRule
+  SwiftName: NSBezierPath.WindingRule
+- Name: NSBitmapImageFileType
+  SwiftName: NSBitmapImageRep.FileType
+- Name: NSBitmapFormat
+  SwiftName: NSBitmapImageRep.Format
+- Name: NSTIFFCompression
+  SwiftName: NSBitmapImageRep.TIFFCompression
+- Name: NSBoxType
+  SwiftName: NSBox.BoxType
+- Name: NSTitlePosition
+  SwiftName: NSBox.TitlePosition
+- Name: NSBezelStyle
+  SwiftName: NSButton.BezelStyle
+- Name: NSButtonType
+  SwiftName: NSButton.ButtonType
+- Name: NSGradientType
+  SwiftName: NSButton.GradientType
+- Name: NSCellType
+  SwiftName: NSCell.CellType
+- Name: NSColorType
+  SwiftName: NSColor.ColorType
+- Name: NSColorPanelMode
+  SwiftName: NSColorPanel.Mode
+- Name: NSControlSize
+  SwiftName: NSControl.ControlSize
+- Name: NSCellImagePosition
+  SwiftName: NSControl.ImagePosition
+- Name: NSDatePickerElementFlags
+  SwiftName: NSDatePicker.ElementFlags
+- Name: NSDatePickerMode
+  SwiftName: NSDatePicker.Mode
+- Name: NSDatePickerStyle
+  SwiftName: NSDatePicker.Style
+- Name: NSDocumentChangeType
+  SwiftName: NSDocument.ChangeType
+- Name: NSSaveOperationType
+  SwiftName: NSDocument.SaveOperationType
+- Name: NSDrawerState
+  SwiftName: NSDrawer.State
+- Name: NSEventSubtype
+  SwiftName: NSEvent.EventSubtype
+- Name: NSEventType
+  SwiftName: NSEvent.EventType
+- Name: NSEventMask
+  SwiftName: NSEvent.EventTypeMask
+- Name: NSEventModifierFlags
+  SwiftName: NSEvent.ModifierFlags
+- Name: NSEventPhase
+  SwiftName: NSEvent.Phase
+- Name: NSGestureRecognizerState
+  SwiftName: NSGestureRecognizer.State
+- Name: NSGlyphInscription
+  Availability: nonswift
+- Name: NSGradientDrawingOptions
+  SwiftName: NSGradient.DrawingOptions
+- Name: NSHapticFeedbackPattern
+  SwiftName: NSHapticFeedbackManager.FeedbackPattern
+- Name: NSHapticFeedbackPerformanceTime
+  SwiftName: NSHapticFeedbackManager.PerformanceTime
+- Name: NSImageCacheMode
+  SwiftName: NSImage.CacheMode
+- Name: NSImageResizingMode
+  SwiftName: NSImage.ResizingMode
+- Name: NSImageFrameStyle
+  SwiftName: NSImageView.FrameStyle
+- Name: NSLayoutAttribute
+  SwiftName: NSLayoutConstraint.Attribute
+- Name: NSLayoutFormatOptions
+  SwiftName: NSLayoutConstraint.FormatOptions
+- Name: NSLayoutConstraintOrientation
+  SwiftName: NSLayoutConstraint.Orientation
+- Name: NSLayoutRelation
+  SwiftName: NSLayoutConstraint.Relation
+- Name: NSTextLayoutOrientation
+  SwiftName: NSLayoutManager.TextLayoutOrientation
+- Name: NSTypesetterBehavior
+  SwiftName: NSLayoutManager.TypesetterBehavior
+- Name: NSLevelIndicatorStyle
+  SwiftName: NSLevelIndicator.Style
+- Name: NSLineMovementDirection
+  Availability: nonswift
+- Name: NSLineSweepDirection
+  Availability: nonswift
+- Name: NSMatrixMode
+  SwiftName: NSMatrix.Mode
+- Name: NSOpenGLContextParameter
+  SwiftName: NSOpenGLContext.Parameter
+- Name: NSOpenGLGlobalOption
+  EnumKind: NSEnum
+- Name: NSLineBreakStrategy
+  SwiftName: NSParagraphStyle.LineBreakStrategy
+- Name: NSTextTabType
+  SwiftName: NSParagraphStyle.TextTabType
+- Name: NSPathStyle
+  SwiftName: NSPathControl.Style
+- Name: NSPopUpArrowPosition
+  SwiftName: NSPopUpButton.ArrowPosition
+- Name: NSPopoverBehavior
+  SwiftName: NSPopover.Behavior
+- Name: NSPrintingOrientation
+  SwiftName: NSPrintInfo.Orientation
+- Name: NSPrintingPaginationMode
+  SwiftName: NSPrintInfo.PaginationMode
+- Name: NSPrintPanelOptions
+  SwiftName: NSPrintPanel.Options
+- Name: NSProgressIndicatorStyle
+  SwiftName: NSProgressIndicator.Style
+- Name: NSRulerOrientation
+  SwiftName: NSRulerView.Orientation
+- Name: NSScrollElasticity
+  SwiftName: NSScrollView.Elasticity
+- Name: NSScrollerArrow
+  SwiftName: NSScroller.Arrow
+- Name: NSScrollArrowPosition
+  SwiftName: NSScroller.ArrowPosition
+- Name: NSScrollerKnobStyle
+  SwiftName: NSScroller.KnobStyle
+- Name: NSScrollerPart
+  SwiftName: NSScroller.Part
+- Name: NSScrollerStyle
+  SwiftName: NSScroller.Style
+- Name: NSUsableScrollerParts
+  SwiftName: NSScroller.UsableParts
+- Name: NSSegmentStyle
+  SwiftName: NSSegmentedControl.Style
+- Name: NSSegmentSwitchTracking
+  SwiftName: NSSegmentedControl.SwitchTracking
+- Name: NSSliderType
+  SwiftName: NSSlider.SliderType
+- Name: NSTickMarkPosition
+  SwiftName: NSSlider.TickMarkPosition
+- Name: NSCorrectionIndicatorType
+  SwiftName: NSSpellChecker.CorrectionIndicatorType
+- Name: NSCorrectionResponse
+  SwiftName: NSSpellChecker.CorrectionResponse
+- Name: NSSplitViewDividerStyle
+  SwiftName: NSSplitView.DividerStyle
+- Name: NSSplitViewItemBehavior
+  SwiftName: NSSplitViewItem.Behavior
+- Name: NSStackViewDistribution
+  SwiftName: NSStackView.Distribution
+- Name: NSStackViewGravity
+  SwiftName: NSStackView.Gravity
+- Name: NSStatusItemBehavior
+  SwiftName: NSStatusItem.Behavior
+- Name: NSStringDrawingOptions
+  SwiftName: NSString.DrawingOptions
+- Name: NSTabPosition
+  SwiftName: NSTabView.TabPosition
+- Name: NSTabViewType
+  SwiftName: NSTabView.TabType
+- Name: NSTabState
+  SwiftName: NSTabViewItem.State
+- Name: NSTableColumnResizingOptions
+  SwiftName: NSTableColumn.ResizingOptions
+- Name: NSTableViewAnimationOptions
+  SwiftName: NSTableView.AnimationOptions
+- Name: NSTableViewDropOperation
+  SwiftName: NSTableView.DropOperation
+- Name: NSTableViewGridLineStyle
+  SwiftName: NSTableView.GridLineStyle
+- Name: NSTableViewRowSizeStyle
+  SwiftName: NSTableView.RowSizeStyle
+- Name: NSTableViewSelectionHighlightStyle
+  SwiftName: NSTableView.SelectionHighlightStyle
+- Name: NSTableViewStyle
+  SwiftName: NSTableView.Style
+- Name: NSTextBlockDimension
+  SwiftName: NSTextBlock.Dimension
+- Name: NSTextBlockLayer
+  SwiftName: NSTextBlock.Layer
+- Name: NSTextBlockValueType
+  SwiftName: NSTextBlock.ValueType
+- Name: NSTextBlockVerticalAlignment
+  SwiftName: NSTextBlock.VerticalAlignment
+- Name: NSTextFieldBezelStyle
+  SwiftName: NSTextField.BezelStyle
+- Name: NSTextTableLayoutAlgorithm
+  SwiftName: NSTextTable.LayoutAlgorithm
+- Name: NSTextViewSelectionAffinity
+  SwiftName: NSTextView.SelectionAffinity
+- Name: NSTextViewSelectionGranularity
+  SwiftName: NSTextView.SelectionGranularity
+- Name: NSTokenStyle
+  SwiftName: NSTokenField.TokenStyle
+- Name: NSToolbarDisplayMode
+  SwiftName: NSToolbar.DisplayMode
+- Name: NSToolbarSizeMode
+  SwiftName: NSToolbar.SizeMode
+- Name: NSTrackingAreaOptions
+  SwiftName: NSTrackingArea.Options
+- Name: NSAutoresizingMaskOptions
+  SwiftName: NSView.AutoresizingMask
+- Name: NSBackgroundStyle
+  SwiftName: NSView.BackgroundStyle
+- Name: NSViewLayerContentsPlacement
+  SwiftName: NSView.LayerContentsPlacement
+- Name: NSViewLayerContentsRedrawPolicy
+  SwiftName: NSView.LayerContentsRedrawPolicy
+- Name: NSVisualEffectBlendingMode
+  SwiftName: NSVisualEffectView.BlendingMode
+- Name: NSVisualEffectMaterial
+  SwiftName: NSVisualEffectView.Material
+- Name: NSVisualEffectState
+  SwiftName: NSVisualEffectView.State
+- Name: NSWindowAnimationBehavior
+  SwiftName: NSWindow.AnimationBehavior
+- Name: NSWindowBackingLocation
+  SwiftName: NSWindow.BackingLocation
+- Name: NSBackingStoreType
+  SwiftName: NSWindow.BackingStoreType
+- Name: NSWindowButton
+  SwiftName: NSWindow.ButtonType
+- Name: NSWindowCollectionBehavior
+  SwiftName: NSWindow.CollectionBehavior
+- Name: NSWindowDepth
+  SwiftName: NSWindow.Depth
+- Name: NSWindowNumberListOptions
+  SwiftName: NSWindow.NumberListOptions
+- Name: NSWindowOcclusionState
+  SwiftName: NSWindow.OcclusionState
+- Name: NSWindowOrderingMode
+  SwiftName: NSWindow.OrderingMode
+- Name: NSSelectionDirection
+  SwiftName: NSWindow.SelectionDirection
+- Name: NSWindowSharingType
+  SwiftName: NSWindow.SharingType
+- Name: NSWindowStyleMask
+  SwiftName: NSWindow.StyleMask
+- Name: NSWindowTabbingMode
+  SwiftName: NSWindow.TabbingMode
+- Name: NSWindowTitleVisibility
+  SwiftName: NSWindow.TitleVisibility
+- Name: NSWindowToolbarStyle
+  SwiftName: NSWindow.ToolbarStyle
+- Name: NSWorkspaceIconCreationOptions
+  SwiftName: NSWorkspace.IconCreationOptions
+- Name: NSWorkspaceLaunchOptions
+  SwiftName: NSWorkspace.LaunchOptions
+
+# Constants of the typed enums whose C names do not start with the type name
+# (and NSColorSpaceName, whose Swift names drop the "ColorSpace" suffix).
+- Name: NSApplicationOcclusionState
+  SwiftName: NSApplication.OcclusionState
+- Name: NSBrowserColumnResizingType
+  SwiftName: NSBrowser.ColumnResizingType
+- Name: NSBrowserDropOperation
+  SwiftName: NSBrowser.DropOperation
+- Name: NSCollectionUpdateAction
+  SwiftName: NSCollectionView.UpdateAction
+- Name: NSCollectionViewDropOperation
+  SwiftName: NSCollectionView.DropOperation
+- Name: NSCollectionViewItemHighlightState
+  SwiftName: NSCollectionViewItem.HighlightState
+- Name: NSCollectionViewScrollDirection
+  SwiftName: NSCollectionView.ScrollDirection
+- Name: NSCollectionViewScrollPosition
+  SwiftName: NSCollectionView.ScrollPosition
+- Name: NSColorSpaceModel
+  SwiftName: NSColorSpace.Model
+- Name: NSColorSystemEffect
+  SwiftName: NSColor.SystemEffect
+- Name: NSControlCharacterAction
+  SwiftName: NSLayoutManager.ControlCharacterAction
+- Name: NSEventButtonMask
+  SwiftName: NSEvent.ButtonMask
+- Name: NSEventGestureAxis
+  SwiftName: NSEvent.GestureAxis
+- Name: NSEventSwipeTrackingOptions
+  SwiftName: NSEvent.SwipeTrackingOptions
+- Name: NSFontCollectionVisibility
+  SwiftName: NSFontCollection.Visibility
+- Name: NSFontDescriptorSymbolicTraits
+  SwiftName: NSFontDescriptor.SymbolicTraits
+- Name: NSFontPanelModeMask
+  SwiftName: NSFontPanel.ModeMask
+- Name: NSGlyphProperty
+  SwiftName: NSLayoutManager.GlyphProperty
+- Name: NSImageLayoutDirection
+  SwiftName: NSImage.LayoutDirection
+- Name: NSImageLoadStatus
+  SwiftName: NSImage.LoadStatus
+- Name: NSImageRepLoadStatus
+  SwiftName: NSBitmapImageRep.LoadStatus
+- Name: NSLevelIndicatorPlaceholderVisibility
+  SwiftName: NSLevelIndicator.PlaceholderVisibility
+- Name: NSMenuProperties
+  SwiftName: NSMenu.Properties
+- Name: NSPageControllerTransitionStyle
+  SwiftName: NSPageController.TransitionStyle
+- Name: NSPaperOrientation
+  SwiftName: NSPrintInfo.PaperOrientation
+- Name: NSPasteboardContentsOptions
+  SwiftName: NSPasteboard.ContentsOptions
+- Name: NSPasteboardReadingOptions
+  SwiftName: NSPasteboard.ReadingOptions
+- Name: NSPasteboardWritingOptions
+  SwiftName: NSPasteboard.WritingOptions
+- Name: NSPointingDeviceType
+  SwiftName: NSEvent.PointingDeviceType
+- Name: NSPopoverAppearance
+  SwiftName: NSPopover.Appearance
+- Name: NSPrintRenderingQuality
+  SwiftName: NSPrintOperation.RenderingQuality
+- Name: NSPrinterTableStatus
+  SwiftName: NSPrinter.TableStatus
+- Name: NSPrintingPageOrder
+  SwiftName: NSPrintOperation.PageOrder
+- Name: NSProgressIndicatorThickness
+  SwiftName: NSProgressIndicator.Thickness
+  Availability: nonswift
+  AvailabilityMsg: "Use 'NSProgressIndicator.sizeToFit()' instead"
+- Name: NSRemoteNotificationType
+  SwiftName: NSApplication.RemoteNotificationType
+- Name: NSRuleEditorNestingMode
+  SwiftName: NSRuleEditor.NestingMode
+- Name: NSRuleEditorRowType
+  SwiftName: NSRuleEditor.RowType
+- Name: NSScrollViewFindBarPosition
+  SwiftName: NSScrollView.FindBarPosition
+- Name: NSScrubberAlignment
+  SwiftName: NSScrubber.Alignment
+- Name: NSScrubberMode
+  SwiftName: NSScrubber.Mode
+- Name: NSSegmentDistribution
+  SwiftName: NSSegmentedControl.Distribution
+- Name: NSSharingContentScope
+  SwiftName: NSSharingService.SharingContentScope
+- Name: NSSplitViewItemCollapseBehavior
+  SwiftName: NSSplitViewItem.CollapseBehavior
+- Name: NSTabViewBorderType
+  SwiftName: NSTabView.TabViewBorderType
+- Name: NSTabViewControllerTabStyle
+  SwiftName: NSTabViewController.TabStyle
+- Name: NSTableRowActionEdge
+  SwiftName: NSTableView.RowActionEdge
+- Name: NSTableViewColumnAutoresizingStyle
+  SwiftName: NSTableView.ColumnAutoresizingStyle
+- Name: NSTableViewDraggingDestinationFeedbackStyle
+  SwiftName: NSTableView.DraggingDestinationFeedbackStyle
+- Name: NSTableViewRowActionStyle
+  SwiftName: NSTableViewRowAction.Style
+- Name: NSTextFinderAction
+  SwiftName: NSTextFinder.Action
+- Name: NSTextFinderMatchingType
+  SwiftName: NSTextFinder.MatchingType
+- Name: NSToolbarItemGroupControlRepresentation
+  SwiftName: NSToolbarItemGroup.ControlRepresentation
+- Name: NSToolbarItemGroupSelectionMode
+  SwiftName: NSToolbarItemGroup.SelectionMode
+- Name: NSViewControllerTransitionOptions
+  SwiftName: NSViewController.TransitionOptions
+- Name: NSWindowUserTabbingPreference
+  SwiftName: NSWindow.UserTabbingPreference
+- Name: NSWorkspaceAuthorizationType
+  SwiftName: NSWorkspace.AuthorizationType
+- Name: NSControlStateValue
+  SwiftName: NSControl.StateValue
+
+# Constants of the typed enums whose C names do not start with the type name
+# (and NSColorSpaceName, whose Swift names drop the "ColorSpace" suffix).
+Globals:
+- Name: NSCalibratedBlackColorSpace
+  SwiftName: calibratedBlack
+- Name: NSCalibratedRGBColorSpace
+  SwiftName: calibratedRGB
+- Name: NSCalibratedWhiteColorSpace
+  SwiftName: calibratedWhite
+- Name: NSCustomColorSpace
+  SwiftName: custom
+- Name: NSDeviceBlackColorSpace
+  SwiftName: deviceBlack
+- Name: NSDeviceCMYKColorSpace
+  SwiftName: deviceCMYK
+- Name: NSDeviceRGBColorSpace
+  SwiftName: deviceRGB
+- Name: NSDeviceWhiteColorSpace
+  SwiftName: deviceWhite
+- Name: NSNamedColorSpace
+  SwiftName: named
+- Name: NSPatternColorSpace
+  SwiftName: pattern
+- Name: NSAppKitVersionNumber
+  SwiftName: current
+- Name: NSFloatingWindowLevel
+  SwiftName: floating
+- Name: NSMainMenuWindowLevel
+  SwiftName: mainMenu
+- Name: NSModalPanelWindowLevel
+  SwiftName: modalPanel
+- Name: NSNormalWindowLevel
+  SwiftName: normal
+- Name: NSPopUpMenuWindowLevel
+  SwiftName: popUpMenu
+- Name: NSScreenSaverWindowLevel
+  SwiftName: screenSaver
+- Name: NSStatusWindowLevel
+  SwiftName: statusBar
+- Name: NSSubmenuWindowLevel
+  SwiftName: submenu
+- Name: NSTornOffMenuWindowLevel
+  SwiftName: tornOffMenu
+
+# Enumerators whose C names do not reduce to the Swift case names by prefix removal.
+- Name: NSApplicationDidChangeOcclusionStateNotification
+  SwiftName: NSApplication.didChangeOcclusionStateNotification
+- Name: NSBackingPropertyOldColorSpaceKey
+  SwiftName: NSWindow.oldColorSpaceUserInfoKey
+- Name: NSFontCollectionDidChangeNotification
+  SwiftName: NSFontCollection.didChangeNotification
+- Name: NSImageNameTouchBarAddDetailTemplate
+  SwiftName: "NSImage.touchBarAddDetailTemplateName"
+- Name: NSImageNameTouchBarAddTemplate
+  SwiftName: "NSImage.touchBarAddTemplateName"
+- Name: NSImageNameTouchBarAlarmTemplate
+  SwiftName: "NSImage.touchBarAlarmTemplateName"
+- Name: NSImageNameTouchBarAudioInputMuteTemplate
+  SwiftName: "NSImage.touchBarAudioInputMuteTemplateName"
+- Name: NSImageNameTouchBarAudioInputTemplate
+  SwiftName: "NSImage.touchBarAudioInputTemplateName"
+- Name: NSImageNameTouchBarAudioOutputMuteTemplate
+  SwiftName: "NSImage.touchBarAudioOutputMuteTemplateName"
+- Name: NSImageNameTouchBarAudioOutputVolumeHighTemplate
+  SwiftName: "NSImage.touchBarAudioOutputVolumeHighTemplateName"
+- Name: NSImageNameTouchBarAudioOutputVolumeLowTemplate
+  SwiftName: "NSImage.touchBarAudioOutputVolumeLowTemplateName"
+- Name: NSImageNameTouchBarAudioOutputVolumeMediumTemplate
+  SwiftName: "NSImage.touchBarAudioOutputVolumeMediumTemplateName"
+- Name: NSImageNameTouchBarAudioOutputVolumeOffTemplate
+  SwiftName: "NSImage.touchBarAudioOutputVolumeOffTemplateName"
+- Name: NSImageNameTouchBarBookmarksTemplate
+  SwiftName: "NSImage.touchBarBookmarksTemplateName"
+- Name: NSImageNameTouchBarColorPickerFill
+  SwiftName: "NSImage.touchBarColorPickerFillName"
+- Name: NSImageNameTouchBarColorPickerFont
+  SwiftName: "NSImage.touchBarColorPickerFontName"
+- Name: NSImageNameTouchBarColorPickerStroke
+  SwiftName: "NSImage.touchBarColorPickerStrokeName"
+- Name: NSImageNameTouchBarCommunicationAudioTemplate
+  SwiftName: "NSImage.touchBarCommunicationAudioTemplateName"
+- Name: NSImageNameTouchBarCommunicationVideoTemplate
+  SwiftName: "NSImage.touchBarCommunicationVideoTemplateName"
+- Name: NSImageNameTouchBarComposeTemplate
+  SwiftName: "NSImage.touchBarComposeTemplateName"
+- Name: NSImageNameTouchBarDownloadTemplate
+  SwiftName: "NSImage.touchBarDownloadTemplateName"
+- Name: NSImageNameTouchBarEnterFullScreenTemplate
+  SwiftName: "NSImage.touchBarEnterFullScreenTemplateName"
+- Name: NSImageNameTouchBarExitFullScreenTemplate
+  SwiftName: "NSImage.touchBarExitFullScreenTemplateName"
+- Name: NSImageNameTouchBarFastForwardTemplate
+  SwiftName: "NSImage.touchBarFastForwardTemplateName"
+- Name: NSImageNameTouchBarFolderCopyToTemplate
+  SwiftName: "NSImage.touchBarFolderCopyToTemplateName"
+- Name: NSImageNameTouchBarFolderMoveToTemplate
+  SwiftName: "NSImage.touchBarFolderMoveToTemplateName"
+- Name: NSImageNameTouchBarFolderTemplate
+  SwiftName: "NSImage.touchBarFolderTemplateName"
+- Name: NSImageNameTouchBarGetInfoTemplate
+  SwiftName: "NSImage.touchBarGetInfoTemplateName"
+- Name: NSImageNameTouchBarGoBackTemplate
+  SwiftName: "NSImage.touchBarGoBackTemplateName"
+- Name: NSImageNameTouchBarGoDownTemplate
+  SwiftName: "NSImage.touchBarGoDownTemplateName"
+- Name: NSImageNameTouchBarGoForwardTemplate
+  SwiftName: "NSImage.touchBarGoForwardTemplateName"
+- Name: NSImageNameTouchBarGoUpTemplate
+  SwiftName: "NSImage.touchBarGoUpTemplateName"
+- Name: NSImageNameTouchBarHistoryTemplate
+  SwiftName: "NSImage.touchBarHistoryTemplateName"
+- Name: NSImageNameTouchBarIconViewTemplate
+  SwiftName: "NSImage.touchBarIconViewTemplateName"
+- Name: NSImageNameTouchBarListViewTemplate
+  SwiftName: "NSImage.touchBarListViewTemplateName"
+- Name: NSImageNameTouchBarMailTemplate
+  SwiftName: "NSImage.touchBarMailTemplateName"
+- Name: NSImageNameTouchBarNewFolderTemplate
+  SwiftName: "NSImage.touchBarNewFolderTemplateName"
+- Name: NSImageNameTouchBarNewMessageTemplate
+  SwiftName: "NSImage.touchBarNewMessageTemplateName"
+- Name: NSImageNameTouchBarOpenInBrowserTemplate
+  SwiftName: "NSImage.touchBarOpenInBrowserTemplateName"
+- Name: NSImageNameTouchBarPlayPauseTemplate
+  SwiftName: "NSImage.touchBarPlayPauseTemplateName"
+- Name: NSImageNameTouchBarPlayheadTemplate
+  SwiftName: "NSImage.touchBarPlayheadTemplateName"
+- Name: NSImageNameTouchBarQuickLookTemplate
+  SwiftName: "NSImage.touchBarQuickLookTemplateName"
+- Name: NSImageNameTouchBarRecordStartTemplate
+  SwiftName: "NSImage.touchBarRecordStartTemplateName"
+- Name: NSImageNameTouchBarRefreshTemplate
+  SwiftName: "NSImage.touchBarRefreshTemplateName"
+- Name: NSImageNameTouchBarRemoveTemplate
+  SwiftName: "NSImage.touchBarRemoveTemplateName"
+- Name: NSImageNameTouchBarRewindTemplate
+  SwiftName: "NSImage.touchBarRewindTemplateName"
+- Name: NSImageNameTouchBarRotateLeftTemplate
+  SwiftName: "NSImage.touchBarRotateLeftTemplateName"
+- Name: NSImageNameTouchBarRotateRightTemplate
+  SwiftName: "NSImage.touchBarRotateRightTemplateName"
+- Name: NSImageNameTouchBarSearchTemplate
+  SwiftName: "NSImage.touchBarSearchTemplateName"
+- Name: NSImageNameTouchBarShareTemplate
+  SwiftName: "NSImage.touchBarShareTemplateName"
+- Name: NSImageNameTouchBarSidebarTemplate
+  SwiftName: "NSImage.touchBarSidebarTemplateName"
+- Name: NSImageNameTouchBarSkipAhead15SecondsTemplate
+  SwiftName: "NSImage.touchBarSkipAhead15SecondsTemplateName"
+- Name: NSImageNameTouchBarSkipAhead30SecondsTemplate
+  SwiftName: "NSImage.touchBarSkipAhead30SecondsTemplateName"
+- Name: NSImageNameTouchBarSkipAheadTemplate
+  SwiftName: "NSImage.touchBarSkipAheadTemplateName"
+- Name: NSImageNameTouchBarSkipBack15SecondsTemplate
+  SwiftName: "NSImage.touchBarSkipBack15SecondsTemplateName"
+- Name: NSImageNameTouchBarSkipBack30SecondsTemplate
+  SwiftName: "NSImage.touchBarSkipBack30SecondsTemplateName"
+- Name: NSImageNameTouchBarSkipBackTemplate
+  SwiftName: "NSImage.touchBarSkipBackTemplateName"
+- Name: NSImageNameTouchBarSkipToEndTemplate
+  SwiftName: "NSImage.touchBarSkipToEndTemplateName"
+- Name: NSImageNameTouchBarSkipToStartTemplate
+  SwiftName: "NSImage.touchBarSkipToStartTemplateName"
+- Name: NSImageNameTouchBarSlideshowTemplate
+  SwiftName: "NSImage.touchBarSlideshowTemplateName"
+- Name: NSImageNameTouchBarTagIconTemplate
+  SwiftName: "NSImage.touchBarTagIconTemplateName"
+- Name: NSImageNameTouchBarTextBoldTemplate
+  SwiftName: "NSImage.touchBarTextBoldTemplateName"
+- Name: NSImageNameTouchBarTextBoxTemplate
+  SwiftName: "NSImage.touchBarTextBoxTemplateName"
+- Name: NSImageNameTouchBarTextCenterAlignTemplate
+  SwiftName: "NSImage.touchBarTextCenterAlignTemplateName"
+- Name: NSImageNameTouchBarTextItalicTemplate
+  SwiftName: "NSImage.touchBarTextItalicTemplateName"
+- Name: NSImageNameTouchBarTextJustifiedAlignTemplate
+  SwiftName: "NSImage.touchBarTextJustifiedAlignTemplateName"
+- Name: NSImageNameTouchBarTextLeftAlignTemplate
+  SwiftName: "NSImage.touchBarTextLeftAlignTemplateName"
+- Name: NSImageNameTouchBarTextListTemplate
+  SwiftName: "NSImage.touchBarTextListTemplateName"
+- Name: NSImageNameTouchBarTextRightAlignTemplate
+  SwiftName: "NSImage.touchBarTextRightAlignTemplateName"
+- Name: NSImageNameTouchBarTextStrikethroughTemplate
+  SwiftName: "NSImage.touchBarTextStrikethroughTemplateName"
+- Name: NSImageNameTouchBarTextUnderlineTemplate
+  SwiftName: "NSImage.touchBarTextUnderlineTemplateName"
+- Name: NSImageNameTouchBarUserAddTemplate
+  SwiftName: "NSImage.touchBarUserAddTemplateName"
+- Name: NSImageNameTouchBarUserGroupTemplate
+  SwiftName: "NSImage.touchBarUserGroupTemplateName"
+- Name: NSImageNameTouchBarUserTemplate
+  SwiftName: "NSImage.touchBarUserTemplateName"
+- Name: NSImageNameTouchBarVolumeDownTemplate
+  SwiftName: "NSImage.touchBarVolumeDownTemplateName"
+- Name: NSImageNameTouchBarVolumeUpTemplate
+  SwiftName: "NSImage.touchBarVolumeUpTemplateName"
+- Name: NSPasteboardTypeFindPanelSearchOptions
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.textFinderOptions'"
+- Name: NSPopoverCloseReasonKey
+  SwiftName: NSPopover.closeReasonUserInfoKey
+- Name: NSPreferredScrollerStyleDidChangeNotification
+  SwiftName: NSScroller.preferredScrollerStyleDidChangeNotification
+- Name: NSScrollViewDidEndLiveMagnifyNotification
+  SwiftName: NSScrollView.didEndLiveMagnifyNotification
+- Name: NSScrollViewWillStartLiveMagnifyNotification
+  SwiftName: NSScrollView.willStartLiveMagnifyNotification
+- Name: NSSoundPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.sound'"
+- Name: NSTextMovementUserInfoKey
+  SwiftName: NSText.movementUserInfoKey
+- Name: NSWindowDidChangeBackingPropertiesNotification
+  SwiftName: NSWindow.didChangeBackingPropertiesNotification
+- Name: NSWorkspaceDidChangeFileLabelsNotification
+  SwiftName: NSWorkspace.didChangeFileLabelsNotification
+- Name: NSWorkspaceDidHideApplicationNotification
+  SwiftName: NSWorkspace.didHideApplicationNotification
+- Name: NSWorkspaceDidRenameVolumeNotification
+  SwiftName: NSWorkspace.didRenameVolumeNotification
+- Name: NSWorkspaceDidUnhideApplicationNotification
+  SwiftName: NSWorkspace.didUnhideApplicationNotification
+- Name: NSWorkspaceVolumeLocalizedNameKey
+  SwiftName: NSWorkspace.localizedVolumeNameUserInfoKey
+- Name: NSWorkspaceVolumeOldLocalizedNameKey
+  SwiftName: NSWorkspace.oldLocalizedVolumeNameUserInfoKey
+- Name: NSWorkspaceVolumeOldURLKey
+  SwiftName: NSWorkspace.oldVolumeURLUserInfoKey
+- Name: NSWorkspaceVolumeURLKey
+  SwiftName: NSWorkspace.volumeURLUserInfoKey
+- Name: NSAllowsEditingMultipleValuesSelectionBindingOption
+  SwiftName: allowsEditingMultipleValuesSelection
+- Name: NSAlphaFirstBitmapFormat
+  Availability: nonswift
+- Name: NSAlphaNonpremultipliedBitmapFormat
+  Availability: nonswift
+- Name: NSAlphaShiftKeyMask
+  Availability: nonswift
+- Name: NSAlternateKeyMask
+  Availability: nonswift
+- Name: NSAnimateBinding
+  SwiftName: animate
+- Name: NSAnimationProgressMarkNotification
+  SwiftName: NSAnimation.progressMarkNotification
+- Name: NSAntialiasThresholdChangedNotification
+  SwiftName: NSFont.antialiasThresholdChangedNotification
+- Name: NSAnyEventMask
+  Availability: nonswift
+- Name: NSAppKitDefined
+  Availability: nonswift
+- Name: NSAppKitDefinedMask
+  Availability: nonswift
+- Name: NSAppearanceDocumentAttribute
+  SwiftName: appearance
+- Name: NSApplicationDefined
+  Availability: nonswift
+- Name: NSApplicationDefinedMask
+  Availability: nonswift
+- Name: NSApplicationDidBecomeActiveNotification
+  SwiftName: NSApplication.didBecomeActiveNotification
+- Name: NSApplicationDidChangeScreenParametersNotification
+  SwiftName: NSApplication.didChangeScreenParametersNotification
+- Name: NSApplicationDidFinishLaunchingNotification
+  SwiftName: NSApplication.didFinishLaunchingNotification
+- Name: NSApplicationDidFinishRestoringWindowsNotification
+  SwiftName: NSApplication.didFinishRestoringWindowsNotification
+- Name: NSApplicationDidHideNotification
+  SwiftName: NSApplication.didHideNotification
+- Name: NSApplicationDidResignActiveNotification
+  SwiftName: NSApplication.didResignActiveNotification
+- Name: NSApplicationDidUnhideNotification
+  SwiftName: NSApplication.didUnhideNotification
+- Name: NSApplicationDidUpdateNotification
+  SwiftName: NSApplication.didUpdateNotification
+- Name: NSApplicationLaunchIsDefaultLaunchKey
+  SwiftName: NSApplication.launchIsDefaultUserInfoKey
+- Name: NSApplicationLaunchUserNotificationKey
+  SwiftName: NSApplication.launchUserNotificationUserInfoKey
+- Name: NSApplicationWillBecomeActiveNotification
+  SwiftName: NSApplication.willBecomeActiveNotification
+- Name: NSApplicationWillFinishLaunchingNotification
+  SwiftName: NSApplication.willFinishLaunchingNotification
+- Name: NSApplicationWillHideNotification
+  SwiftName: NSApplication.willHideNotification
+- Name: NSApplicationWillResignActiveNotification
+  SwiftName: NSApplication.willResignActiveNotification
+- Name: NSApplicationWillTerminateNotification
+  SwiftName: NSApplication.willTerminateNotification
+- Name: NSApplicationWillUnhideNotification
+  SwiftName: NSApplication.willUnhideNotification
+- Name: NSApplicationWillUpdateNotification
+  SwiftName: NSApplication.willUpdateNotification
+- Name: NSAttachmentAttributeName
+  SwiftName: attachment
+- Name: NSAuthorDocumentAttribute
+  SwiftName: author
+- Name: NSAutoPagination
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'automatic'"
+- Name: NSBMPFileType
+  Availability: nonswift
+- Name: NSBackgroundColorAttributeName
+  SwiftName: backgroundColor
+- Name: NSBackgroundColorDocumentAttribute
+  SwiftName: backgroundColor
+- Name: NSBackgroundStyleDark
+  SwiftName: NSBackgroundStyle.dark
+- Name: NSBackgroundStyleLight
+  SwiftName: NSBackgroundStyle.light
+- Name: NSBackingPropertyOldScaleFactorKey
+  SwiftName: NSWindow.oldScaleFactorUserInfoKey
+- Name: NSBaseURLDocumentOption
+  SwiftName: baseURL
+- Name: NSBaselineOffsetAttributeName
+  SwiftName: baselineOffset
+- Name: NSBevelLineJoinStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'bevel'"
+- Name: NSBlack
+  Availability: nonswift
+- Name: NSBorderlessWindowMask
+  Availability: nonswift
+- Name: NSBottomMarginDocumentAttribute
+  SwiftName: bottomMargin
+- Name: NSBoxOldStyle
+  SwiftName: NSBoxType.oldStyle
+- Name: NSBoxSecondary
+  SwiftName: NSBoxType.secondary
+- Name: NSButtLineCapStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'butt'"
+- Name: NSCMYKModeColorPanel
+  Availability: nonswift
+- Name: NSCategoryDocumentAttribute
+  SwiftName: category
+- Name: NSCenterTextAlignment
+  Availability: nonswift
+- Name: NSCharacterEncodingDocumentAttribute
+  SwiftName: characterEncoding
+- Name: NSCharacterEncodingDocumentOption
+  SwiftName: characterEncoding
+- Name: NSCircularBezelStyle
+  Availability: nonswift
+- Name: NSCircularSlider
+  Availability: nonswift
+- Name: NSClipPagination
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'clip'"
+- Name: NSClockAndCalendarDatePickerStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'clockAndCalendar'"
+- Name: NSClosableWindowMask
+  Availability: nonswift
+- Name: NSClosePathBezierPathElement
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'closePath'"
+- Name: NSCocoaVersionDocumentAttribute
+  SwiftName: cocoaVersion
+- Name: NSCollectionElementKindInterItemGapIndicator
+  SwiftName: "NSCollectionView.elementKindInterItemGapIndicator"
+- Name: NSCollectionElementKindSectionFooter
+  SwiftName: "NSCollectionView.elementKindSectionFooter"
+- Name: NSCollectionElementKindSectionHeader
+  SwiftName: "NSCollectionView.elementKindSectionHeader"
+- Name: NSColorListDidChangeNotification
+  SwiftName: NSColorList.didChangeNotification
+- Name: NSColorListModeColorPanel
+  Availability: nonswift
+- Name: NSColorPanelColorDidChangeNotification
+  SwiftName: NSColorPanel.colorDidChangeNotification
+- Name: NSColorPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.color'"
+- Name: NSComboBoxSelectionDidChangeNotification
+  SwiftName: NSComboBox.selectionDidChangeNotification
+- Name: NSComboBoxSelectionIsChangingNotification
+  SwiftName: NSComboBox.selectionIsChangingNotification
+- Name: NSComboBoxWillDismissNotification
+  SwiftName: NSComboBox.willDismissNotification
+- Name: NSComboBoxWillPopUpNotification
+  SwiftName: NSComboBox.willPopUpNotification
+- Name: NSCommandKeyMask
+  Availability: nonswift
+- Name: NSCommentDocumentAttribute
+  SwiftName: comment
+- Name: NSCompanyDocumentAttribute
+  SwiftName: company
+- Name: NSCompositeClear
+  Availability: nonswift
+- Name: NSCompositeCopy
+  Availability: nonswift
+- Name: NSCompositeDestinationAtop
+  Availability: nonswift
+- Name: NSCompositeDestinationIn
+  Availability: nonswift
+- Name: NSCompositeDestinationOut
+  Availability: nonswift
+- Name: NSCompositeDestinationOver
+  Availability: nonswift
+- Name: NSCompositePlusDarker
+  Availability: nonswift
+- Name: NSCompositePlusLighter
+  Availability: nonswift
+- Name: NSCompositeSourceAtop
+  Availability: nonswift
+- Name: NSCompositeSourceIn
+  Availability: nonswift
+- Name: NSCompositeSourceOut
+  Availability: nonswift
+- Name: NSCompositeSourceOver
+  Availability: nonswift
+- Name: NSCompositeXOR
+  Availability: nonswift
+- Name: NSConditionallySetsEditableBindingOption
+  SwiftName: conditionallySetsEditable
+- Name: NSConditionallySetsEnabledBindingOption
+  SwiftName: conditionallySetsEnabled
+- Name: NSContentArrayBinding
+  SwiftName: contentArray
+- Name: NSContentBinding
+  SwiftName: content
+- Name: NSContentObjectBinding
+  SwiftName: contentObject
+- Name: NSContentObjectsBinding
+  SwiftName: contentObjects
+- Name: NSContentSetBinding
+  SwiftName: contentSet
+- Name: NSContentValuesBinding
+  SwiftName: contentValues
+- Name: NSContextHelpModeDidActivateNotification
+  SwiftName: NSHelpManager.contextHelpModeDidActivateNotification
+- Name: NSContextHelpModeDidDeactivateNotification
+  SwiftName: NSHelpManager.contextHelpModeDidDeactivateNotification
+- Name: NSContinuousCapacityLevelIndicatorStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.continuousCapacity' instead"
+- Name: NSContinuouslyUpdatesValueBindingOption
+  SwiftName: continuouslyUpdatesValue
+- Name: NSControlKeyMask
+  Availability: nonswift
+- Name: NSControlTextDidBeginEditingNotification
+  SwiftName: NSControl.textDidBeginEditingNotification
+- Name: NSControlTextDidChangeNotification
+  SwiftName: NSControl.textDidChangeNotification
+- Name: NSControlTextDidEndEditingNotification
+  SwiftName: NSControl.textDidEndEditingNotification
+- Name: NSControlTintDidChangeNotification
+  SwiftName: NSColor.currentControlTintDidChangeNotification
+- Name: NSConvertedDocumentAttribute
+  SwiftName: converted
+- Name: NSCopyrightDocumentAttribute
+  SwiftName: copyright
+- Name: NSCrayonModeColorPanel
+  Availability: nonswift
+- Name: NSCreatesSortDescriptorBindingOption
+  SwiftName: createsSortDescriptor
+- Name: NSCreationTimeDocumentAttribute
+  SwiftName: creationTime
+- Name: NSCriticalAlertStyle
+  Availability: nonswift
+- Name: NSCursorAttributeName
+  SwiftName: cursor
+- Name: NSCursorUpdate
+  Availability: nonswift
+- Name: NSCursorUpdateMask
+  Availability: nonswift
+- Name: NSCurveToBezierPathElement
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'curveTo'"
+- Name: NSCustomPaletteModeColorPanel
+  Availability: nonswift
+- Name: NSDarkGray
+  Availability: nonswift
+- Name: NSDefaultAttributesDocumentAttribute
+  SwiftName: defaultAttributes
+- Name: NSDefaultAttributesDocumentOption
+  SwiftName: defaultAttributes
+- Name: NSDefaultTabIntervalDocumentAttribute
+  SwiftName: defaultTabInterval
+- Name: NSDefaultTokenStyle
+  Availability: nonswift
+- Name: NSDeviceIndependentModifierFlagsMask
+  Availability: nonswift
+- Name: NSDisclosureBezelStyle
+  Availability: nonswift
+- Name: NSDiscreteCapacityLevelIndicatorStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.discreteCapacity' instead"
+- Name: NSDisplayPatternBindingOption
+  SwiftName: displayPattern
+- Name: NSDocFormatTextDocumentType
+  SwiftName: docFormat
+- Name: NSDocModalWindowMask
+  Availability: nonswift
+- Name: NSDocumentTypeDocumentAttribute
+  SwiftName: documentType
+- Name: NSDocumentTypeDocumentOption
+  SwiftName: documentType
+- Name: NSDoubleClickTargetBinding
+  SwiftName: doubleClickTarget
+- Name: NSDraggingImageComponentIconKey
+  SwiftName: icon
+- Name: NSDraggingImageComponentLabelKey
+  SwiftName: label
+- Name: NSDrawerDidCloseNotification
+  SwiftName: NSDrawer.didCloseNotification
+- Name: NSDrawerDidOpenNotification
+  SwiftName: NSDrawer.didOpenNotification
+- Name: NSDrawerWillCloseNotification
+  SwiftName: NSDrawer.willCloseNotification
+- Name: NSDrawerWillOpenNotification
+  SwiftName: NSDrawer.willOpenNotification
+- Name: NSEditableBinding
+  SwiftName: editable
+- Name: NSEditorDocumentAttribute
+  SwiftName: editor
+- Name: NSEnabledBinding
+  SwiftName: enabled
+- Name: NSEraDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'era'"
+- Name: NSEvenOddWindingRule
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'evenOdd'"
+- Name: NSEventTrackingRunLoopMode
+  SwiftName: eventTracking
+- Name: NSExcludedElementsDocumentAttribute
+  SwiftName: excludedElements
+- Name: NSExpansionAttributeName
+  SwiftName: expansion
+- Name: NSFileContentsPboardType
+  SwiftName: fileContents
+- Name: NSFileTypeDocumentAttribute
+  SwiftName: fileType
+- Name: NSFileTypeDocumentOption
+  SwiftName: fileType
+- Name: NSFilenamesPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.fileURL'"
+- Name: NSFilesPromisePboardType
+  SwiftName: filePromise
+- Name: NSFitPagination
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'fit'"
+- Name: NSFlagsChanged
+  Availability: nonswift
+- Name: NSFlagsChangedMask
+  Availability: nonswift
+- Name: NSFloatingPointSamplesBitmapFormat
+  Availability: nonswift
+- Name: NSFontAttributeName
+  SwiftName: font
+- Name: NSFontBoldBinding
+  SwiftName: fontBold
+- Name: NSFontCascadeListAttribute
+  SwiftName: cascadeList
+- Name: NSFontCharacterSetAttribute
+  SwiftName: characterSet
+- Name: NSFontFaceAttribute
+  SwiftName: face
+- Name: NSFontFamilyAttribute
+  SwiftName: family
+- Name: NSFontFeatureSelectorIdentifierKey
+  SwiftName: selectorIdentifier
+- Name: NSFontFeatureSettingsAttribute
+  SwiftName: featureSettings
+- Name: NSFontFeatureTypeIdentifierKey
+  SwiftName: typeIdentifier
+- Name: NSFontFixedAdvanceAttribute
+  SwiftName: fixedAdvance
+- Name: NSFontItalicBinding
+  SwiftName: fontItalic
+- Name: NSFontMatrixAttribute
+  SwiftName: matrix
+- Name: NSFontNameAttribute
+  SwiftName: name
+- Name: NSFontPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.font'"
+- Name: NSFontSetChangedNotification
+  SwiftName: NSFont.fontSetChangedNotification
+- Name: NSFontSizeAttribute
+  SwiftName: size
+- Name: NSFontSlantTrait
+  SwiftName: slant
+- Name: NSFontSymbolicTrait
+  SwiftName: symbolic
+- Name: NSFontTraitsAttribute
+  SwiftName: traits
+- Name: NSFontVariationAttribute
+  SwiftName: variation
+- Name: NSFontVisibleNameAttribute
+  SwiftName: visibleName
+- Name: NSFontWeightBlack
+  SwiftName: black
+- Name: NSFontWeightBold
+  SwiftName: bold
+- Name: NSFontWeightHeavy
+  SwiftName: heavy
+- Name: NSFontWeightLight
+  SwiftName: light
+- Name: NSFontWeightMedium
+  SwiftName: medium
+- Name: NSFontWeightRegular
+  SwiftName: regular
+- Name: NSFontWeightSemibold
+  SwiftName: semibold
+- Name: NSFontWeightThin
+  SwiftName: thin
+- Name: NSFontWeightTrait
+  SwiftName: weight
+- Name: NSFontWeightUltraLight
+  SwiftName: ultraLight
+- Name: NSFontWidthTrait
+  SwiftName: width
+- Name: NSForegroundColorAttributeName
+  SwiftName: foregroundColor
+- Name: NSFunctionKeyMask
+  Availability: nonswift
+- Name: NSGIFFileType
+  Availability: nonswift
+- Name: NSGlyphInfoAttributeName
+  SwiftName: glyphInfo
+- Name: NSGrayModeColorPanel
+  Availability: nonswift
+- Name: NSHSBModeColorPanel
+  Availability: nonswift
+- Name: NSHTMLPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.html'"
+- Name: NSHTMLTextDocumentType
+  SwiftName: html
+- Name: NSHelpButtonBezelStyle
+  Availability: nonswift
+- Name: NSHelpKeyMask
+  Availability: nonswift
+- Name: NSHiddenBinding
+  SwiftName: hidden
+- Name: NSHourMinuteDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'hourMinute'"
+- Name: NSHourMinuteSecondDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'hourMinuteSecond'"
+- Name: NSHyphenationFactorDocumentAttribute
+  SwiftName: hyphenationFactor
+- Name: NSImageBinding
+  SwiftName: image
+- Name: NSImageColorSyncProfileData
+  SwiftName: colorSyncProfileData
+- Name: NSImageCompressionFactor
+  SwiftName: compressionFactor
+- Name: NSImageCompressionMethod
+  SwiftName: compressionMethod
+- Name: NSImageCurrentFrame
+  SwiftName: currentFrame
+- Name: NSImageCurrentFrameDuration
+  SwiftName: currentFrameDuration
+- Name: NSImageDitherTransparency
+  SwiftName: ditherTransparency
+- Name: NSImageEXIFData
+  SwiftName: exifData
+- Name: NSImageFallbackBackgroundColor
+  SwiftName: fallbackBackgroundColor
+- Name: NSImageFrameCount
+  SwiftName: frameCount
+- Name: NSImageGamma
+  SwiftName: gamma
+- Name: NSImageHintCTM
+  SwiftName: ctm
+- Name: NSImageInterlaced
+  SwiftName: interlaced
+- Name: NSImageLoopCount
+  SwiftName: loopCount
+- Name: NSImageNameActionTemplate
+  SwiftName: "NSImage.actionTemplateName"
+- Name: NSImageNameAddTemplate
+  SwiftName: "NSImage.addTemplateName"
+- Name: NSImageNameAdvanced
+  SwiftName: "NSImage.advancedName"
+- Name: NSImageNameApplicationIcon
+  SwiftName: "NSImage.applicationIconName"
+- Name: NSImageNameBluetoothTemplate
+  SwiftName: "NSImage.bluetoothTemplateName"
+- Name: NSImageNameBonjour
+  SwiftName: "NSImage.bonjourName"
+- Name: NSImageNameBookmarksTemplate
+  SwiftName: "NSImage.bookmarksTemplateName"
+- Name: NSImageNameCaution
+  SwiftName: "NSImage.cautionName"
+- Name: NSImageNameColorPanel
+  SwiftName: "NSImage.colorPanelName"
+- Name: NSImageNameColumnViewTemplate
+  SwiftName: "NSImage.columnViewTemplateName"
+- Name: NSImageNameComputer
+  SwiftName: "NSImage.computerName"
+- Name: NSImageNameEnterFullScreenTemplate
+  SwiftName: "NSImage.enterFullScreenTemplateName"
+- Name: NSImageNameEveryone
+  SwiftName: "NSImage.everyoneName"
+- Name: NSImageNameExitFullScreenTemplate
+  SwiftName: "NSImage.exitFullScreenTemplateName"
+- Name: NSImageNameFlowViewTemplate
+  SwiftName: "NSImage.flowViewTemplateName"
+- Name: NSImageNameFolder
+  SwiftName: "NSImage.folderName"
+- Name: NSImageNameFolderBurnable
+  SwiftName: "NSImage.folderBurnableName"
+- Name: NSImageNameFolderSmart
+  SwiftName: "NSImage.folderSmartName"
+- Name: NSImageNameFollowLinkFreestandingTemplate
+  SwiftName: "NSImage.followLinkFreestandingTemplateName"
+- Name: NSImageNameFontPanel
+  SwiftName: "NSImage.fontPanelName"
+- Name: NSImageNameGoBackTemplate
+  SwiftName: "NSImage.goBackTemplateName"
+- Name: NSImageNameGoForwardTemplate
+  SwiftName: "NSImage.goForwardTemplateName"
+- Name: NSImageNameGoLeftTemplate
+  SwiftName: "NSImage.goLeftTemplateName"
+- Name: NSImageNameGoRightTemplate
+  SwiftName: "NSImage.goRightTemplateName"
+- Name: NSImageNameHomeTemplate
+  SwiftName: "NSImage.homeTemplateName"
+- Name: NSImageNameIChatTheaterTemplate
+  SwiftName: "NSImage.iChatTheaterTemplateName"
+- Name: NSImageNameIconViewTemplate
+  SwiftName: "NSImage.iconViewTemplateName"
+- Name: NSImageNameInfo
+  SwiftName: "NSImage.infoName"
+- Name: NSImageNameInvalidDataFreestandingTemplate
+  SwiftName: "NSImage.invalidDataFreestandingTemplateName"
+- Name: NSImageNameLeftFacingTriangleTemplate
+  SwiftName: "NSImage.leftFacingTriangleTemplateName"
+- Name: NSImageNameListViewTemplate
+  SwiftName: "NSImage.listViewTemplateName"
+- Name: NSImageNameLockLockedTemplate
+  SwiftName: "NSImage.lockLockedTemplateName"
+- Name: NSImageNameLockUnlockedTemplate
+  SwiftName: "NSImage.lockUnlockedTemplateName"
+- Name: NSImageNameMenuMixedStateTemplate
+  SwiftName: "NSImage.menuMixedStateTemplateName"
+- Name: NSImageNameMenuOnStateTemplate
+  SwiftName: "NSImage.menuOnStateTemplateName"
+- Name: NSImageNameMobileMe
+  SwiftName: "NSImage.mobileMeName"
+- Name: NSImageNameMultipleDocuments
+  SwiftName: "NSImage.multipleDocumentsName"
+- Name: NSImageNameNetwork
+  SwiftName: "NSImage.networkName"
+- Name: NSImageNamePathTemplate
+  SwiftName: "NSImage.pathTemplateName"
+- Name: NSImageNamePreferencesGeneral
+  SwiftName: "NSImage.preferencesGeneralName"
+- Name: NSImageNameQuickLookTemplate
+  SwiftName: "NSImage.quickLookTemplateName"
+- Name: NSImageNameRefreshFreestandingTemplate
+  SwiftName: "NSImage.refreshFreestandingTemplateName"
+- Name: NSImageNameRefreshTemplate
+  SwiftName: "NSImage.refreshTemplateName"
+- Name: NSImageNameRemoveTemplate
+  SwiftName: "NSImage.removeTemplateName"
+- Name: NSImageNameRevealFreestandingTemplate
+  SwiftName: "NSImage.revealFreestandingTemplateName"
+- Name: NSImageNameRightFacingTriangleTemplate
+  SwiftName: "NSImage.rightFacingTriangleTemplateName"
+- Name: NSImageNameShareTemplate
+  SwiftName: "NSImage.shareTemplateName"
+- Name: NSImageNameSlideshowTemplate
+  SwiftName: "NSImage.slideshowTemplateName"
+- Name: NSImageNameSmartBadgeTemplate
+  SwiftName: "NSImage.smartBadgeTemplateName"
+- Name: NSImageNameStatusAvailable
+  SwiftName: "NSImage.statusAvailableName"
+- Name: NSImageNameStatusNone
+  SwiftName: "NSImage.statusNoneName"
+- Name: NSImageNameStatusPartiallyAvailable
+  SwiftName: "NSImage.statusPartiallyAvailableName"
+- Name: NSImageNameStatusUnavailable
+  SwiftName: "NSImage.statusUnavailableName"
+- Name: NSImageNameStopProgressFreestandingTemplate
+  SwiftName: "NSImage.stopProgressFreestandingTemplateName"
+- Name: NSImageNameStopProgressTemplate
+  SwiftName: "NSImage.stopProgressTemplateName"
+- Name: NSImageNameTouchBarDeleteTemplate
+  SwiftName: "NSImage.touchBarDeleteTemplateName"
+- Name: NSImageNameTouchBarPauseTemplate
+  SwiftName: "NSImage.touchBarPauseTemplateName"
+- Name: NSImageNameTouchBarPlayTemplate
+  SwiftName: "NSImage.touchBarPlayTemplateName"
+- Name: NSImageNameTouchBarRecordStopTemplate
+  SwiftName: "NSImage.touchBarRecordStopTemplateName"
+- Name: NSImageNameTrashEmpty
+  SwiftName: "NSImage.trashEmptyName"
+- Name: NSImageNameTrashFull
+  SwiftName: "NSImage.trashFullName"
+- Name: NSImageNameUser
+  SwiftName: "NSImage.userName"
+- Name: NSImageNameUserAccounts
+  SwiftName: "NSImage.userAccountsName"
+- Name: NSImageNameUserGroup
+  SwiftName: "NSImage.userGroupName"
+- Name: NSImageNameUserGuest
+  SwiftName: "NSImage.userGuestName"
+- Name: NSImageProgressive
+  SwiftName: progressive
+- Name: NSImageRGBColorTable
+  SwiftName: rgbColorTable
+- Name: NSInformationalAlertStyle
+  Availability: nonswift
+- Name: NSInkTextPboardType
+  SwiftName: inkText
+- Name: NSInlineBezelStyle
+  Availability: nonswift
+- Name: NSInsertsNullPlaceholderBindingOption
+  SwiftName: insertsNullPlaceholder
+- Name: NSJPEG2000FileType
+  Availability: nonswift
+- Name: NSJPEGFileType
+  Availability: nonswift
+  AvailabilityMsg: "Use NSBitmapImageRep.FileType.jpeg"
+- Name: NSJustifiedTextAlignment
+  Availability: nonswift
+- Name: NSKernAttributeName
+  SwiftName: kern
+- Name: NSKeyDown
+  Availability: nonswift
+- Name: NSKeyDownMask
+  Availability: nonswift
+- Name: NSKeyUp
+  Availability: nonswift
+- Name: NSKeyUpMask
+  Availability: nonswift
+- Name: NSKeywordsDocumentAttribute
+  SwiftName: keywords
+- Name: NSLeftMarginDocumentAttribute
+  SwiftName: leftMargin
+- Name: NSLeftMouseDown
+  Availability: nonswift
+- Name: NSLeftMouseDownMask
+  Availability: nonswift
+- Name: NSLeftMouseDragged
+  Availability: nonswift
+- Name: NSLeftMouseDraggedMask
+  Availability: nonswift
+- Name: NSLeftMouseUp
+  Availability: nonswift
+- Name: NSLeftMouseUpMask
+  Availability: nonswift
+- Name: NSLeftTextAlignment
+  Availability: nonswift
+- Name: NSLigatureAttributeName
+  SwiftName: ligature
+- Name: NSLightGray
+  Availability: nonswift
+- Name: NSLineToBezierPathElement
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'lineTo'"
+- Name: NSLinearSlider
+  Availability: nonswift
+- Name: NSLinkAttributeName
+  SwiftName: link
+- Name: NSMacSimpleTextDocumentType
+  SwiftName: macSimpleText
+- Name: NSManagerDocumentAttribute
+  SwiftName: manager
+- Name: NSMarkedClauseSegmentAttributeName
+  SwiftName: markedClauseSegment
+- Name: NSMenuDidAddItemNotification
+  SwiftName: NSMenu.didAddItemNotification
+- Name: NSMenuDidBeginTrackingNotification
+  SwiftName: NSMenu.didBeginTrackingNotification
+- Name: NSMenuDidChangeItemNotification
+  SwiftName: NSMenu.didChangeItemNotification
+- Name: NSMenuDidEndTrackingNotification
+  SwiftName: NSMenu.didEndTrackingNotification
+- Name: NSMenuDidRemoveItemNotification
+  SwiftName: NSMenu.didRemoveItemNotification
+- Name: NSMenuDidSendActionNotification
+  SwiftName: NSMenu.didSendActionNotification
+- Name: NSMenuWillSendActionNotification
+  SwiftName: NSMenu.willSendActionNotification
+- Name: NSMiniControlSize
+  Availability: nonswift
+- Name: NSMiniaturizableWindowMask
+  Availability: nonswift
+- Name: NSMiterLineJoinStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'miter'"
+- Name: NSMixedState
+  Availability: nonswift
+  AvailabilityMsg: "Use NSControl.StateValue.mixed"
+- Name: NSModalPanelRunLoopMode
+  SwiftName: modalPanel
+- Name: NSModificationTimeDocumentAttribute
+  SwiftName: modificationTime
+- Name: NSMomentaryChangeButton
+  Availability: nonswift
+- Name: NSMomentaryLightButton
+  Availability: nonswift
+- Name: NSMomentaryPushInButton
+  Availability: nonswift
+- Name: NSMouseEntered
+  Availability: nonswift
+- Name: NSMouseEnteredMask
+  Availability: nonswift
+- Name: NSMouseEventSubtype
+  Availability: nonswift
+- Name: NSMouseExited
+  Availability: nonswift
+- Name: NSMouseExitedMask
+  Availability: nonswift
+- Name: NSMouseMoved
+  Availability: nonswift
+- Name: NSMouseMovedMask
+  Availability: nonswift
+- Name: NSMoveToBezierPathElement
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'moveTo'"
+- Name: NSMultipleTextSelectionPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.multipleTextSelection'"
+- Name: NSMultipleValuesPlaceholderBindingOption
+  SwiftName: multipleValuesPlaceholder
+- Name: NSNaturalTextAlignment
+  Availability: nonswift
+- Name: NSNoModeColorPanel
+  Availability: nonswift
+- Name: NSNoSelectionPlaceholderBindingOption
+  SwiftName: noSelectionPlaceholder
+- Name: NSNonZeroWindingRule
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'nonZero'"
+- Name: NSNotApplicablePlaceholderBindingOption
+  SwiftName: notApplicablePlaceholder
+- Name: NSNullPlaceholderBindingOption
+  SwiftName: nullPlaceholder
+- Name: NSNumericPadKeyMask
+  Availability: nonswift
+- Name: NSObliquenessAttributeName
+  SwiftName: obliqueness
+- Name: NSObservedKeyPathKey
+  SwiftName: observedKeyPath
+- Name: NSObservedObjectKey
+  SwiftName: observedObject
+- Name: NSOffState
+  Availability: nonswift
+  AvailabilityMsg: "Use NSControl.StateValue.off"
+- Name: NSOfficeOpenXMLTextDocumentType
+  SwiftName: officeOpenXML
+- Name: NSOnOffButton
+  Availability: nonswift
+- Name: NSOnState
+  Availability: nonswift
+  AvailabilityMsg: "Use NSControl.StateValue.on"
+- Name: NSOpenDocumentTextDocumentType
+  SwiftName: openDocument
+- Name: NSOpenGLCPRasterizationEnable
+  Availability: nonswift
+- Name: NSOpenGLCPStateValidation
+  Availability: nonswift
+- Name: NSOpenGLCPSurfaceOpacity
+  Availability: nonswift
+- Name: NSOpenGLCPSurfaceOrder
+  Availability: nonswift
+- Name: NSOpenGLCPSwapInterval
+  Availability: nonswift
+- Name: NSOpenGLCPSwapRectangle
+  Availability: nonswift
+- Name: NSOpenGLCPSwapRectangleEnable
+  Availability: nonswift
+- Name: NSOptionsKey
+  SwiftName: options
+- Name: NSOtherMouseDown
+  Availability: nonswift
+- Name: NSOtherMouseDownMask
+  Availability: nonswift
+- Name: NSOtherMouseDragged
+  Availability: nonswift
+- Name: NSOtherMouseDraggedMask
+  Availability: nonswift
+- Name: NSOtherMouseUp
+  Availability: nonswift
+- Name: NSOtherMouseUpMask
+  Availability: nonswift
+- Name: NSOutlineViewColumnDidMoveNotification
+  SwiftName: NSOutlineView.columnDidMoveNotification
+- Name: NSOutlineViewColumnDidResizeNotification
+  SwiftName: NSOutlineView.columnDidResizeNotification
+- Name: NSOutlineViewDisclosureButtonKey
+  SwiftName: NSOutlineView.disclosureButtonIdentifier
+- Name: NSOutlineViewItemDidCollapseNotification
+  SwiftName: NSOutlineView.itemDidCollapseNotification
+- Name: NSOutlineViewItemDidExpandNotification
+  SwiftName: NSOutlineView.itemDidExpandNotification
+- Name: NSOutlineViewItemWillCollapseNotification
+  SwiftName: NSOutlineView.itemWillCollapseNotification
+- Name: NSOutlineViewItemWillExpandNotification
+  SwiftName: NSOutlineView.itemWillExpandNotification
+- Name: NSOutlineViewSelectionDidChangeNotification
+  SwiftName: NSOutlineView.selectionDidChangeNotification
+- Name: NSOutlineViewSelectionIsChangingNotification
+  SwiftName: NSOutlineView.selectionIsChangingNotification
+- Name: NSPDFPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.pdf'"
+- Name: NSPNGFileType
+  Availability: nonswift
+  AvailabilityMsg: "Use NSBitmapImageRep.FileType.png"
+- Name: NSPaperSizeDocumentAttribute
+  SwiftName: paperSize
+- Name: NSParagraphStyleAttributeName
+  SwiftName: paragraphStyle
+- Name: NSPasteboardTypeHTML
+  SwiftName: html
+- Name: NSPasteboardTypePDF
+  SwiftName: pdf
+- Name: NSPasteboardTypePNG
+  SwiftName: png
+- Name: NSPasteboardTypeRTF
+  SwiftName: rtf
+- Name: NSPasteboardTypeRTFD
+  SwiftName: rtfd
+- Name: NSPasteboardTypeTIFF
+  SwiftName: tiff
+- Name: NSPasteboardURLReadingContentsConformToTypesKey
+  SwiftName: urlReadingContentsConformToTypes
+- Name: NSPasteboardURLReadingFileURLsOnlyKey
+  SwiftName: urlReadingFileURLsOnly
+- Name: NSPeriodic
+  Availability: nonswift
+- Name: NSPeriodicMask
+  Availability: nonswift
+- Name: NSPlainTextDocumentType
+  SwiftName: plain
+- Name: NSPlainTextTokenStyle
+  Availability: nonswift
+- Name: NSPopUpButtonWillPopUpNotification
+  SwiftName: NSPopUpButton.willPopUpNotification
+- Name: NSPopoverDidCloseNotification
+  SwiftName: NSPopover.didCloseNotification
+- Name: NSPopoverDidShowNotification
+  SwiftName: NSPopover.didShowNotification
+- Name: NSPopoverWillCloseNotification
+  SwiftName: NSPopover.willCloseNotification
+- Name: NSPopoverWillShowNotification
+  SwiftName: NSPopover.willShowNotification
+- Name: NSPostScriptPboardType
+  SwiftName: postScript
+- Name: NSPredicateFormatBindingOption
+  SwiftName: predicateFormat
+- Name: NSPrefixSpacesDocumentAttribute
+  SwiftName: prefixSpaces
+- Name: NSPrintCancelJob
+  SwiftName: cancel
+- Name: NSPrintPreviewJob
+  SwiftName: preview
+- Name: NSPrintSaveJob
+  SwiftName: save
+- Name: NSPrintSpoolJob
+  SwiftName: spool
+- Name: NSProgressIndicatorBarStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.bar' instead"
+- Name: NSProgressIndicatorSpinningStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.spinning' instead"
+- Name: NSPushOnPushOffButton
+  Availability: nonswift
+- Name: NSRGBModeColorPanel
+  Availability: nonswift
+- Name: NSRTFDPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.rtfd'"
+- Name: NSRTFDTextDocumentType
+  SwiftName: rtfd
+- Name: NSRTFPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.rtf'"
+- Name: NSRTFTextDocumentType
+  SwiftName: rtf
+- Name: NSRadioButton
+  Availability: nonswift
+- Name: NSRaisesForNotApplicableKeysBindingOption
+  SwiftName: raisesForNotApplicableKeys
+- Name: NSRangeDateMode
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'range'"
+- Name: NSRatingLevelIndicatorStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.rating' instead"
+- Name: NSReadOnlyDocumentAttribute
+  SwiftName: readOnly
+- Name: NSRecessedBezelStyle
+  Availability: nonswift
+- Name: NSRegularControlSize
+  Availability: nonswift
+- Name: NSRegularSquareBezelStyle
+  Availability: nonswift
+- Name: NSRelevancyLevelIndicatorStyle
+  Availability: nonswift
+  AvailabilityMsg: "Use '.relevancy' instead"
+- Name: NSResizableWindowMask
+  Availability: nonswift
+- Name: NSRightMarginDocumentAttribute
+  SwiftName: rightMargin
+- Name: NSRightMouseDown
+  Availability: nonswift
+- Name: NSRightMouseDownMask
+  Availability: nonswift
+- Name: NSRightMouseDragged
+  Availability: nonswift
+- Name: NSRightMouseDraggedMask
+  Availability: nonswift
+- Name: NSRightMouseUp
+  Availability: nonswift
+- Name: NSRightMouseUpMask
+  Availability: nonswift
+- Name: NSRightTextAlignment
+  Availability: nonswift
+- Name: NSRoundLineCapStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'round'"
+- Name: NSRoundLineJoinStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'round'"
+- Name: NSRoundRectBezelStyle
+  Availability: nonswift
+- Name: NSRoundedBezelStyle
+  Availability: nonswift
+- Name: NSRoundedDisclosureBezelStyle
+  Availability: nonswift
+- Name: NSRoundedTokenStyle
+  Availability: nonswift
+- Name: NSRuleEditorRowsDidChangeNotification
+  SwiftName: NSRuleEditor.rowsDidChangeNotification
+- Name: NSRulerPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.ruler'"
+- Name: NSScreenColorSpaceDidChangeNotification
+  SwiftName: NSScreen.colorSpaceDidChangeNotification
+- Name: NSScrollViewDidEndLiveScrollNotification
+  SwiftName: NSScrollView.didEndLiveScrollNotification
+- Name: NSScrollViewDidLiveScrollNotification
+  SwiftName: NSScrollView.didLiveScrollNotification
+- Name: NSScrollViewWillStartLiveScrollNotification
+  SwiftName: NSScrollView.willStartLiveScrollNotification
+- Name: NSScrollWheel
+  Availability: nonswift
+- Name: NSScrollWheelMask
+  Availability: nonswift
+- Name: NSSearchFieldClearRecentsMenuItemTag
+  SwiftName: NSSearchField.clearRecentsMenuItemTag
+- Name: NSSearchFieldNoRecentsMenuItemTag
+  SwiftName: NSSearchField.noRecentsMenuItemTag
+- Name: NSSearchFieldRecentsMenuItemTag
+  SwiftName: NSSearchField.recentsMenuItemTag
+- Name: NSSearchFieldRecentsTitleMenuItemTag
+  SwiftName: NSSearchField.recentsTitleMenuItemTag
+- Name: NSSelectedIndexBinding
+  SwiftName: selectedIndex
+- Name: NSSelectedObjectBinding
+  SwiftName: selectedObject
+- Name: NSSelectedObjectsBinding
+  SwiftName: selectedObjects
+- Name: NSSelectedTagBinding
+  SwiftName: selectedTag
+- Name: NSSelectedValueBinding
+  SwiftName: selectedValue
+- Name: NSSelectionIndexesBinding
+  SwiftName: selectionIndexes
+- Name: NSShadowAttributeName
+  SwiftName: shadow
+- Name: NSShadowlessSquareBezelStyle
+  Availability: nonswift
+- Name: NSShiftKeyMask
+  Availability: nonswift
+- Name: NSSingleDateMode
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'single'"
+- Name: NSSmallControlSize
+  Availability: nonswift
+- Name: NSSmallSquareBezelStyle
+  Availability: nonswift
+- Name: NSSpeechPitchBaseProperty
+  SwiftName: pitchBase
+- Name: NSSpeechRateProperty
+  SwiftName: rate
+- Name: NSSpeechVolumeProperty
+  SwiftName: volume
+- Name: NSSpellCheckerDidChangeAutomaticSpellingCorrectionNotification
+  SwiftName: NSSpellChecker.didChangeAutomaticSpellingCorrectionNotification
+- Name: NSSpellCheckerDidChangeAutomaticTextReplacementNotification
+  SwiftName: NSSpellChecker.didChangeAutomaticTextReplacementNotification
+- Name: NSSpellingStateAttributeName
+  SwiftName: spellingState
+- Name: NSSplitViewDidResizeSubviewsNotification
+  SwiftName: NSSplitView.didResizeSubviewsNotification
+- Name: NSSplitViewWillResizeSubviewsNotification
+  SwiftName: NSSplitView.willResizeSubviewsNotification
+- Name: NSSquareLineCapStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'square'"
+- Name: NSSquareStatusItemLength
+  SwiftName: NSStatusItem.squareLength
+- Name: NSStackViewSpacingUseDefault
+  SwiftName: NSStackView.useDefaultSpacing
+- Name: NSStrikethroughColorAttributeName
+  SwiftName: strikethroughColor
+- Name: NSStrikethroughStyleAttributeName
+  SwiftName: strikethroughStyle
+- Name: NSStringPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.string'"
+- Name: NSStrokeColorAttributeName
+  SwiftName: strokeColor
+- Name: NSStrokeWidthAttributeName
+  SwiftName: strokeWidth
+- Name: NSSubjectDocumentAttribute
+  SwiftName: subject
+- Name: NSSuperscriptAttributeName
+  SwiftName: superscript
+- Name: NSSwitchButton
+  Availability: nonswift
+- Name: NSSystemColorsDidChangeNotification
+  SwiftName: NSColor.systemColorsDidChangeNotification
+- Name: NSSystemDefined
+  Availability: nonswift
+- Name: NSTIFFFileType
+  Availability: nonswift
+- Name: NSTIFFPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.tiff'"
+- Name: NSTabColumnTerminatorsAttributeName
+  SwiftName: columnTerminators
+- Name: NSTableViewColumnDidMoveNotification
+  SwiftName: NSTableView.columnDidMoveNotification
+- Name: NSTableViewColumnDidResizeNotification
+  SwiftName: NSTableView.columnDidResizeNotification
+- Name: NSTableViewRowViewKey
+  SwiftName: NSTableView.rowViewIdentifier
+- Name: NSTableViewSelectionDidChangeNotification
+  SwiftName: NSTableView.selectionDidChangeNotification
+- Name: NSTableViewSelectionIsChangingNotification
+  SwiftName: NSTableView.selectionIsChangingNotification
+- Name: NSTabletPointEventSubtype
+  Availability: nonswift
+- Name: NSTabletProximityEventSubtype
+  Availability: nonswift
+- Name: NSTabularTextPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.tabularText'"
+- Name: NSTextAlternativesAttributeName
+  SwiftName: textAlternatives
+- Name: NSTextDidBeginEditingNotification
+  SwiftName: NSText.didBeginEditingNotification
+- Name: NSTextDidChangeNotification
+  SwiftName: NSText.didChangeNotification
+- Name: NSTextDidEndEditingNotification
+  SwiftName: NSText.didEndEditingNotification
+- Name: NSTextEffectAttributeName
+  SwiftName: textEffect
+- Name: NSTextEncodingNameDocumentAttribute
+  SwiftName: textEncodingName
+- Name: NSTextEncodingNameDocumentOption
+  SwiftName: textEncodingName
+- Name: NSTextFieldAndStepperDatePickerStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'textFieldAndStepper'"
+- Name: NSTextFieldDatePickerStyle
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'textField'"
+- Name: NSTextInputContextKeyboardSelectionDidChangeNotification
+  SwiftName: NSTextInputContext.keyboardSelectionDidChangeNotification
+- Name: NSTextLayoutSectionsAttribute
+  SwiftName: textLayoutSections
+- Name: NSTextSizeMultiplierDocumentOption
+  SwiftName: textSizeMultiplier
+- Name: NSTextStorageDidProcessEditingNotification
+  SwiftName: NSTextStorage.didProcessEditingNotification
+- Name: NSTextStorageWillProcessEditingNotification
+  SwiftName: NSTextStorage.willProcessEditingNotification
+- Name: NSTextViewDidChangeSelectionNotification
+  SwiftName: NSTextView.didChangeSelectionNotification
+- Name: NSTextViewDidChangeTypingAttributesNotification
+  SwiftName: NSTextView.didChangeTypingAttributesNotification
+- Name: NSTexturedBackgroundWindowMask
+  Availability: nonswift
+- Name: NSTexturedRoundedBezelStyle
+  Availability: nonswift
+- Name: NSTexturedSquareBezelStyle
+  Availability: nonswift
+- Name: NSThickSquareBezelStyle
+  Availability: nonswift
+- Name: NSThickerSquareBezelStyle
+  Availability: nonswift
+- Name: NSTickMarkAbove
+  Availability: nonswift
+- Name: NSTickMarkBelow
+  Availability: nonswift
+- Name: NSTickMarkLeft
+  Availability: nonswift
+- Name: NSTickMarkRight
+  Availability: nonswift
+- Name: NSTimeZoneDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'timeZone'"
+- Name: NSTimeoutDocumentOption
+  SwiftName: timeout
+- Name: NSTitleBinding
+  SwiftName: title
+- Name: NSTitleDocumentAttribute
+  SwiftName: title
+- Name: NSTitledWindowMask
+  Availability: nonswift
+- Name: NSToggleButton
+  Availability: nonswift
+- Name: NSToolTipAttributeName
+  SwiftName: toolTip
+- Name: NSToolTipBinding
+  SwiftName: toolTip
+- Name: NSToolbarCustomizeToolbarItemIdentifier
+  SwiftName: customizeToolbar
+- Name: NSToolbarDidRemoveItemNotification
+  SwiftName: NSToolbar.didRemoveItemNotification
+- Name: NSToolbarFlexibleSpaceItemIdentifier
+  SwiftName: flexibleSpace
+- Name: NSToolbarPrintItemIdentifier
+  SwiftName: print
+- Name: NSToolbarSeparatorItemIdentifier
+  SwiftName: separator
+- Name: NSToolbarShowColorsItemIdentifier
+  SwiftName: showColors
+- Name: NSToolbarShowFontsItemIdentifier
+  SwiftName: showFonts
+- Name: NSToolbarSpaceItemIdentifier
+  SwiftName: space
+- Name: NSToolbarWillAddItemNotification
+  SwiftName: NSToolbar.willAddItemNotification
+- Name: NSTopMarginDocumentAttribute
+  SwiftName: topMargin
+
+- Name: NSTouchEventSubtype
+  Availability: nonswift
+- Name: NSURLPboardType
+  Availability: nonswift
+  AvailabilityMsg: "use 'PasteboardType.url'"
+- Name: NSUnderlineByWordMask
+  Availability: nonswift
+- Name: NSUnderlineColorAttributeName
+  SwiftName: underlineColor
+- Name: NSUnderlinePatternDash
+  Availability: nonswift
+- Name: NSUnderlinePatternDashDot
+  Availability: nonswift
+- Name: NSUnderlinePatternDashDotDot
+  Availability: nonswift
+- Name: NSUnderlinePatternDot
+  Availability: nonswift
+- Name: NSUnderlinePatternSolid
+  Availability: nonswift
+- Name: NSUnderlineStyleAttributeName
+  SwiftName: underlineStyle
+- Name: NSUtilityWindowMask
+  Availability: nonswift
+- Name: NSVCardPboardType
+  SwiftName: vCard
+- Name: NSValidatesImmediatelyBindingOption
+  SwiftName: validatesImmediately
+- Name: NSValueBinding
+  SwiftName: value
+- Name: NSValueTransformerBindingOption
+  SwiftName: valueTransformer
+- Name: NSValueTransformerNameBindingOption
+  SwiftName: valueTransformerName
+- Name: NSVariableStatusItemLength
+  SwiftName: NSStatusItem.variableLength
+- Name: NSVerticalGlyphFormAttributeName
+  SwiftName: verticalGlyphForm
+- Name: NSViewBoundsDidChangeNotification
+  SwiftName: NSView.boundsDidChangeNotification
+- Name: NSViewFocusDidChangeNotification
+  SwiftName: NSView.focusDidChangeNotification
+- Name: NSViewFrameDidChangeNotification
+  SwiftName: NSView.frameDidChangeNotification
+- Name: NSViewGlobalFrameDidChangeNotification
+  SwiftName: NSView.globalFrameDidChangeNotification
+- Name: NSViewModeDocumentAttribute
+  SwiftName: viewMode
+- Name: NSViewNoInstrinsicMetric
+  Availability: nonswift
+  AvailabilityMsg: "Use 'NSViewNoIntrinsicMetric' instead"
+- Name: NSViewNoIntrinsicMetric
+  SwiftName: NSView.noIntrinsicMetric
+- Name: NSViewSizeDocumentAttribute
+  SwiftName: viewSize
+- Name: NSViewZoomDocumentAttribute
+  SwiftName: viewZoom
+- Name: NSVisibleBinding
+  SwiftName: visible
+- Name: NSWarningAlertStyle
+  Availability: nonswift
+- Name: NSWebArchiveTextDocumentType
+  SwiftName: webArchive
+- Name: NSWebPreferencesDocumentOption
+  SwiftName: webPreferences
+- Name: NSWebResourceLoadDelegateDocumentOption
+  SwiftName: webResourceLoadDelegate
+- Name: NSWheelModeColorPanel
+  Availability: nonswift
+- Name: NSWhite
+  Availability: nonswift
+- Name: NSWindowDidBecomeKeyNotification
+  SwiftName: NSWindow.didBecomeKeyNotification
+- Name: NSWindowDidBecomeMainNotification
+  SwiftName: NSWindow.didBecomeMainNotification
+- Name: NSWindowDidChangeOcclusionStateNotification
+  SwiftName: NSWindow.didChangeOcclusionStateNotification
+- Name: NSWindowDidChangeScreenNotification
+  SwiftName: NSWindow.didChangeScreenNotification
+- Name: NSWindowDidChangeScreenProfileNotification
+  SwiftName: NSWindow.didChangeScreenProfileNotification
+- Name: NSWindowDidDeminiaturizeNotification
+  SwiftName: NSWindow.didDeminiaturizeNotification
+- Name: NSWindowDidEndLiveResizeNotification
+  SwiftName: NSWindow.didEndLiveResizeNotification
+- Name: NSWindowDidEndSheetNotification
+  SwiftName: NSWindow.didEndSheetNotification
+- Name: NSWindowDidEnterFullScreenNotification
+  SwiftName: NSWindow.didEnterFullScreenNotification
+- Name: NSWindowDidEnterVersionBrowserNotification
+  SwiftName: NSWindow.didEnterVersionBrowserNotification
+- Name: NSWindowDidExitFullScreenNotification
+  SwiftName: NSWindow.didExitFullScreenNotification
+- Name: NSWindowDidExitVersionBrowserNotification
+  SwiftName: NSWindow.didExitVersionBrowserNotification
+- Name: NSWindowDidExposeNotification
+  SwiftName: NSWindow.didExposeNotification
+- Name: NSWindowDidMiniaturizeNotification
+  SwiftName: NSWindow.didMiniaturizeNotification
+- Name: NSWindowDidMoveNotification
+  SwiftName: NSWindow.didMoveNotification
+- Name: NSWindowDidResignKeyNotification
+  SwiftName: NSWindow.didResignKeyNotification
+- Name: NSWindowDidResignMainNotification
+  SwiftName: NSWindow.didResignMainNotification
+- Name: NSWindowDidResizeNotification
+  SwiftName: NSWindow.didResizeNotification
+- Name: NSWindowDidUpdateNotification
+  SwiftName: NSWindow.didUpdateNotification
+- Name: NSWindowWillBeginSheetNotification
+  SwiftName: NSWindow.willBeginSheetNotification
+- Name: NSWindowWillCloseNotification
+  SwiftName: NSWindow.willCloseNotification
+- Name: NSWindowWillEnterFullScreenNotification
+  SwiftName: NSWindow.willEnterFullScreenNotification
+- Name: NSWindowWillEnterVersionBrowserNotification
+  SwiftName: NSWindow.willEnterVersionBrowserNotification
+- Name: NSWindowWillExitFullScreenNotification
+  SwiftName: NSWindow.willExitFullScreenNotification
+- Name: NSWindowWillExitVersionBrowserNotification
+  SwiftName: NSWindow.willExitVersionBrowserNotification
+- Name: NSWindowWillMiniaturizeNotification
+  SwiftName: NSWindow.willMiniaturizeNotification
+- Name: NSWindowWillMoveNotification
+  SwiftName: NSWindow.willMoveNotification
+- Name: NSWindowWillStartLiveResizeNotification
+  SwiftName: NSWindow.willStartLiveResizeNotification
+- Name: NSWordMLTextDocumentType
+  SwiftName: wordML
+- Name: NSWorkspaceActiveSpaceDidChangeNotification
+  SwiftName: NSWorkspace.activeSpaceDidChangeNotification
+- Name: NSWorkspaceApplicationKey
+  SwiftName: NSWorkspace.applicationUserInfoKey
+- Name: NSWorkspaceDidActivateApplicationNotification
+  SwiftName: NSWorkspace.didActivateApplicationNotification
+- Name: NSWorkspaceDidDeactivateApplicationNotification
+  SwiftName: NSWorkspace.didDeactivateApplicationNotification
+- Name: NSWorkspaceDidLaunchApplicationNotification
+  SwiftName: NSWorkspace.didLaunchApplicationNotification
+- Name: NSWorkspaceDidMountNotification
+  SwiftName: NSWorkspace.didMountNotification
+- Name: NSWorkspaceDidTerminateApplicationNotification
+  SwiftName: NSWorkspace.didTerminateApplicationNotification
+- Name: NSWorkspaceDidUnmountNotification
+  SwiftName: NSWorkspace.didUnmountNotification
+- Name: NSWorkspaceDidWakeNotification
+  SwiftName: NSWorkspace.didWakeNotification
+- Name: NSWorkspaceScreensDidSleepNotification
+  SwiftName: NSWorkspace.screensDidSleepNotification
+- Name: NSWorkspaceScreensDidWakeNotification
+  SwiftName: NSWorkspace.screensDidWakeNotification
+- Name: NSWorkspaceSessionDidBecomeActiveNotification
+  SwiftName: NSWorkspace.sessionDidBecomeActiveNotification
+- Name: NSWorkspaceWillPowerOffNotification
+  SwiftName: NSWorkspace.willPowerOffNotification
+- Name: NSWorkspaceWillSleepNotification
+  SwiftName: NSWorkspace.willSleepNotification
+- Name: NSWorkspaceWillUnmountNotification
+  SwiftName: NSWorkspace.willUnmountNotification
+- Name: NSWritingDirectionAttributeName
+  SwiftName: writingDirection
+- Name: NSYearMonthDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'yearMonth'"
+- Name: NSYearMonthDayDatePickerElementFlag
+  Availability: nonswift
+  AvailabilityMsg: "prefer 'yearMonthDay'"
+
+
+Enumerators:
+- Name: NSBitmapImageFileTypeBMP
+  SwiftName: bmp
+- Name: NSBitmapImageFileTypeGIF
+  SwiftName: gif
+- Name: NSBitmapImageFileTypeJPEG
+  SwiftName: jpeg
+- Name: NSBitmapImageFileTypeJPEG2000
+  SwiftName: jpeg2000
+- Name: NSBitmapImageFileTypePNG
+  SwiftName: png
+- Name: NSBitmapImageFileTypeTIFF
+  SwiftName: tiff
+- Name: NSCompositingOperationXOR
+  SwiftName: xor
+- Name: NSExclude10_4ElementsIconCreationOption
+  SwiftName: exclude10_4Elements
+- Name: NSExcludeQuickDrawElementsIconCreationOption
+  SwiftName: excludeQuickDrawElements
+- Name: NSLayoutAttributeBaseline
+  Availability: nonswift
+  AvailabilityMsg: "Use '.lastBaseline' instead"
+- Name: NSLayoutFormatAlignAllBaseline
+  Availability: nonswift
+  AvailabilityMsg: "Use '.alignAllLastBaseline' instead"
+- Name: NSLayoutFormatDirectionLeadingToTrailing
+  SwiftName: directionLeadingToTrailing
+- Name: NSOpenGLGOClearFormatCache
+  SwiftName: "NSOpenGLGlobalOption.clearFormatCache"
+- Name: NSOpenGLGOFormatCacheSize
+  SwiftName: "NSOpenGLGlobalOption.formatCacheSize"
+- Name: NSOpenGLGORetainRenderers
+  SwiftName: "NSOpenGLGlobalOption.retainRenderers"
+- Name: NSOpenGLGOUseBuildCache
+  SwiftName: "NSOpenGLGlobalOption.useBuildCache"
+- Name: NSPrintingPaginationModeAutomatic
+  SwiftName: automatic
+- Name: NSPrintingPaginationModeClip
+  SwiftName: clip
+- Name: NSPrintingPaginationModeFit
+  SwiftName: fit
+- Name: NSSpellingStateGrammarFlag
+  SwiftName: grammar
+- Name: NSSpellingStateSpellingFlag
+  SwiftName: spelling
+- Name: NSTIFFCompressionCCITTFAX3
+  SwiftName: ccittfax3
+- Name: NSTIFFCompressionCCITTFAX4
+  SwiftName: ccittfax4
+- Name: NSTIFFCompressionJPEG
+  SwiftName: jpeg
+- Name: NSTIFFCompressionLZW
+  SwiftName: lzw
+- Name: NSTIFFCompressionNEXT
+  SwiftName: next
+- Name: NSUnderlineStyleDouble
+  SwiftName: double
+- Name: NSUnderlineStyleSingle
+  SwiftName: single
+- Name: NSUnderlineStyleThick
+  SwiftName: thick
+- Name: NSViewHeightSizable
+  SwiftName: height
+- Name: NSViewMaxXMargin
+  SwiftName: maxXMargin
+- Name: NSViewMaxYMargin
+  SwiftName: maxYMargin
+- Name: NSViewMinXMargin
+  SwiftName: minXMargin
+- Name: NSViewMinYMargin
+  SwiftName: minYMargin
+- Name: NSViewNotSizable
+  SwiftName: none
+- Name: NSViewWidthSizable
+  SwiftName: width
+- Name: NSWindowStyleMaskBorderless
+  SwiftName: borderless
+
+# Function-key and separator characters: the Swift overlay declares them as NSEvent.SpecialKey members.
+- Name: NSAttachmentCharacter
+  SwiftName: NSTextAttachment.character
+- Name: NSBackTabCharacter
+  SwiftName: NSEvent.SpecialKey.backTab.rawValue
+- Name: NSBackspaceCharacter
+  SwiftName: NSEvent.SpecialKey.backspace.rawValue
+- Name: NSBeginFunctionKey
+  SwiftName: NSEvent.SpecialKey.begin.rawValue
+- Name: NSBreakFunctionKey
+  SwiftName: NSEvent.SpecialKey.`break`.rawValue
+- Name: NSCarriageReturnCharacter
+  SwiftName: NSEvent.SpecialKey.carriageReturn.rawValue
+- Name: NSClearDisplayFunctionKey
+  SwiftName: NSEvent.SpecialKey.clearDisplay.rawValue
+- Name: NSClearLineFunctionKey
+  SwiftName: NSEvent.SpecialKey.clearLine.rawValue
+- Name: NSDeleteCharFunctionKey
+  SwiftName: NSEvent.SpecialKey.deleteCharacter.rawValue
+- Name: NSDeleteCharacter
+  SwiftName: NSEvent.SpecialKey.delete.rawValue
+- Name: NSDeleteFunctionKey
+  SwiftName: NSEvent.SpecialKey.deleteForward.rawValue
+- Name: NSDeleteLineFunctionKey
+  SwiftName: NSEvent.SpecialKey.deleteLine.rawValue
+- Name: NSDownArrowFunctionKey
+  SwiftName: NSEvent.SpecialKey.downArrow.rawValue
+- Name: NSEndFunctionKey
+  SwiftName: NSEvent.SpecialKey.end.rawValue
+- Name: NSEnterCharacter
+  SwiftName: NSEvent.SpecialKey.enter.rawValue
+- Name: NSExecuteFunctionKey
+  SwiftName: NSEvent.SpecialKey.execute.rawValue
+- Name: NSF10FunctionKey
+  SwiftName: NSEvent.SpecialKey.f10.rawValue
+- Name: NSF11FunctionKey
+  SwiftName: NSEvent.SpecialKey.f11.rawValue
+- Name: NSF12FunctionKey
+  SwiftName: NSEvent.SpecialKey.f12.rawValue
+- Name: NSF13FunctionKey
+  SwiftName: NSEvent.SpecialKey.f13.rawValue
+- Name: NSF14FunctionKey
+  SwiftName: NSEvent.SpecialKey.f14.rawValue
+- Name: NSF15FunctionKey
+  SwiftName: NSEvent.SpecialKey.f15.rawValue
+- Name: NSF16FunctionKey
+  SwiftName: NSEvent.SpecialKey.f16.rawValue
+- Name: NSF17FunctionKey
+  SwiftName: NSEvent.SpecialKey.f17.rawValue
+- Name: NSF18FunctionKey
+  SwiftName: NSEvent.SpecialKey.f18.rawValue
+- Name: NSF19FunctionKey
+  SwiftName: NSEvent.SpecialKey.f19.rawValue
+- Name: NSF1FunctionKey
+  SwiftName: NSEvent.SpecialKey.f1.rawValue
+- Name: NSF20FunctionKey
+  SwiftName: NSEvent.SpecialKey.f20.rawValue
+- Name: NSF21FunctionKey
+  SwiftName: NSEvent.SpecialKey.f21.rawValue
+- Name: NSF22FunctionKey
+  SwiftName: NSEvent.SpecialKey.f22.rawValue
+- Name: NSF23FunctionKey
+  SwiftName: NSEvent.SpecialKey.f23.rawValue
+- Name: NSF24FunctionKey
+  SwiftName: NSEvent.SpecialKey.f24.rawValue
+- Name: NSF25FunctionKey
+  SwiftName: NSEvent.SpecialKey.f25.rawValue
+- Name: NSF26FunctionKey
+  SwiftName: NSEvent.SpecialKey.f26.rawValue
+- Name: NSF27FunctionKey
+  SwiftName: NSEvent.SpecialKey.f27.rawValue
+- Name: NSF28FunctionKey
+  SwiftName: NSEvent.SpecialKey.f28.rawValue
+- Name: NSF29FunctionKey
+  SwiftName: NSEvent.SpecialKey.f29.rawValue
+- Name: NSF2FunctionKey
+  SwiftName: NSEvent.SpecialKey.f2.rawValue
+- Name: NSF30FunctionKey
+  SwiftName: NSEvent.SpecialKey.f30.rawValue
+- Name: NSF31FunctionKey
+  SwiftName: NSEvent.SpecialKey.f31.rawValue
+- Name: NSF32FunctionKey
+  SwiftName: NSEvent.SpecialKey.f32.rawValue
+- Name: NSF33FunctionKey
+  SwiftName: NSEvent.SpecialKey.f33.rawValue
+- Name: NSF34FunctionKey
+  SwiftName: NSEvent.SpecialKey.f34.rawValue
+- Name: NSF35FunctionKey
+  SwiftName: NSEvent.SpecialKey.f35.rawValue
+- Name: NSF3FunctionKey
+  SwiftName: NSEvent.SpecialKey.f3.rawValue
+- Name: NSF4FunctionKey
+  SwiftName: NSEvent.SpecialKey.f4.rawValue
+- Name: NSF5FunctionKey
+  SwiftName: NSEvent.SpecialKey.f5.rawValue
+- Name: NSF6FunctionKey
+  SwiftName: NSEvent.SpecialKey.f6.rawValue
+- Name: NSF7FunctionKey
+  SwiftName: NSEvent.SpecialKey.f7.rawValue
+- Name: NSF8FunctionKey
+  SwiftName: NSEvent.SpecialKey.f8.rawValue
+- Name: NSF9FunctionKey
+  SwiftName: NSEvent.SpecialKey.f9.rawValue
+- Name: NSFindFunctionKey
+  SwiftName: NSEvent.SpecialKey.find.rawValue
+- Name: NSFormFeedCharacter
+  SwiftName: NSEvent.SpecialKey.formFeed.rawValue
+- Name: NSHelpFunctionKey
+  SwiftName: NSEvent.SpecialKey.help.rawValue
+- Name: NSHomeFunctionKey
+  SwiftName: NSEvent.SpecialKey.home.rawValue
+- Name: NSInsertCharFunctionKey
+  SwiftName: NSEvent.SpecialKey.insertCharacter.rawValue
+- Name: NSInsertFunctionKey
+  SwiftName: NSEvent.SpecialKey.insert.rawValue
+- Name: NSInsertLineFunctionKey
+  SwiftName: NSEvent.SpecialKey.insertLine.rawValue
+- Name: NSLeftArrowFunctionKey
+  SwiftName: NSEvent.SpecialKey.leftArrow.rawValue
+- Name: NSLineSeparatorCharacter
+  SwiftName: NSEvent.SpecialKey.lineSeparator.rawValue
+- Name: NSMenuFunctionKey
+  SwiftName: NSEvent.SpecialKey.menu.rawValue
+- Name: NSModeSwitchFunctionKey
+  SwiftName: NSEvent.SpecialKey.modeSwitch.rawValue
+- Name: NSNewlineCharacter
+  SwiftName: NSEvent.SpecialKey.newline.rawValue
+- Name: NSNextFunctionKey
+  SwiftName: NSEvent.SpecialKey.next.rawValue
+- Name: NSPageDownFunctionKey
+  SwiftName: NSEvent.SpecialKey.pageDown.rawValue
+- Name: NSPageUpFunctionKey
+  SwiftName: NSEvent.SpecialKey.pageUp.rawValue
+- Name: NSParagraphSeparatorCharacter
+  SwiftName: NSEvent.SpecialKey.paragraphSeparator.rawValue
+- Name: NSPauseFunctionKey
+  SwiftName: NSEvent.SpecialKey.pause.rawValue
+- Name: NSPrevFunctionKey
+  SwiftName: NSEvent.SpecialKey.prev.rawValue
+- Name: NSPrintFunctionKey
+  SwiftName: NSEvent.SpecialKey.print.rawValue
+- Name: NSPrintScreenFunctionKey
+  SwiftName: NSEvent.SpecialKey.printScreen.rawValue
+- Name: NSRedoFunctionKey
+  SwiftName: NSEvent.SpecialKey.redo.rawValue
+- Name: NSResetFunctionKey
+  SwiftName: NSEvent.SpecialKey.reset.rawValue
+- Name: NSRightArrowFunctionKey
+  SwiftName: NSEvent.SpecialKey.rightArrow.rawValue
+- Name: NSScrollLockFunctionKey
+  SwiftName: NSEvent.SpecialKey.scrollLock.rawValue
+- Name: NSSelectFunctionKey
+  SwiftName: NSEvent.SpecialKey.select.rawValue
+- Name: NSStopFunctionKey
+  SwiftName: NSEvent.SpecialKey.stop.rawValue
+- Name: NSSysReqFunctionKey
+  SwiftName: NSEvent.SpecialKey.sysReq.rawValue
+- Name: NSSystemFunctionKey
+  SwiftName: NSEvent.SpecialKey.system.rawValue
+- Name: NSTabCharacter
+  SwiftName: NSEvent.SpecialKey.tab.rawValue
+- Name: NSUndoFunctionKey
+  SwiftName: NSEvent.SpecialKey.undo.rawValue
+- Name: NSUpArrowFunctionKey
+  SwiftName: NSEvent.SpecialKey.upArrow.rawValue
+- Name: NSUserFunctionKey
+  SwiftName: NSEvent.SpecialKey.user.rawValue
+
+# SwiftPrivate functions are imported with a "__" prefix; the AppKit overlay wraps them in the Swift API
+# (NSRect.fill(), NSWindow.Depth.bestDepth, NSSound.beep(), ...).
+- Name: NSColorSpaceModelCMYK
+  SwiftName: cmyk
+- Name: NSColorSpaceModelLAB
+  SwiftName: lab
+- Name: NSColorSpaceModelRGB
+  SwiftName: rgb
+- Name: NSDisplayGamutP3
+  SwiftName: p3
+- Name: NSDisplayGamutSRGB
+  SwiftName: sRGB
+- Name: NSFontDescriptorTraitBold
+  SwiftName: bold
+- Name: NSFontDescriptorTraitCondensed
+  SwiftName: condensed
+- Name: NSFontDescriptorTraitExpanded
+  SwiftName: expanded
+- Name: NSFontDescriptorTraitItalic
+  SwiftName: italic
+- Name: NSFontDescriptorTraitLooseLeading
+  SwiftName: looseLeading
+- Name: NSFontDescriptorTraitMonoSpace
+  SwiftName: monoSpace
+- Name: NSFontDescriptorTraitTightLeading
+  SwiftName: tightLeading
+- Name: NSFontDescriptorTraitUIOptimized
+  SwiftName: UIOptimized
+- Name: NSFontDescriptorTraitVertical
+  SwiftName: vertical
+- Name: NSFontPanelModeMaskAllEffects
+  SwiftName: allEffects
+- Name: NSFontPanelModeMaskCollection
+  SwiftName: collection
+- Name: NSFontPanelModeMaskDocumentColorEffect
+  SwiftName: documentColorEffect
+- Name: NSFontPanelModeMaskFace
+  SwiftName: face
+- Name: NSFontPanelModeMaskShadowEffect
+  SwiftName: shadowEffect
+- Name: NSFontPanelModeMaskSize
+  SwiftName: size
+- Name: NSFontPanelModeMaskStrikethroughEffect
+  SwiftName: strikethroughEffect
+- Name: NSFontPanelModeMaskTextColorEffect
+  SwiftName: textColorEffect
+- Name: NSFontPanelModeMaskUnderlineEffect
+  SwiftName: underlineEffect
+- Name: NSFontPanelModesMaskAllModes
+  SwiftName: allModes
+- Name: NSFontPanelModesMaskStandardModes
+  SwiftName: standardModes
+- Name: NSPasteboardReadingAsData
+  SwiftName: asData
+- Name: NSPopoverAppearanceHUD
+  SwiftName: hud
+- Name: NSPrinterTableOK
+  SwiftName: ok
+- Name: NSSpringLoadingDisabled
+  SwiftName: disabled
+- Name: NSTextMovementBacktab
+  SwiftName: backtab
+- Name: NSTextMovementCancel
+  SwiftName: cancel
+- Name: NSTextMovementDown
+  SwiftName: down
+- Name: NSTextMovementLeft
+  SwiftName: left
+- Name: NSTextMovementOther
+  SwiftName: other
+- Name: NSTextMovementReturn
+  SwiftName: return
+- Name: NSTextMovementRight
+  SwiftName: right
+- Name: NSTextMovementTab
+  SwiftName: tab
+- Name: NSTextMovementUp
+  SwiftName: up
+- Name: NSTextScalingStandard
+  SwiftName: standard
+- Name: NSTextScalingiOS
+  SwiftName: iOS
+
+# SwiftPrivate functions are imported with a "__" prefix; the AppKit overlay wraps them in the Swift API
+# (NSRect.fill(), NSWindow.Depth.bestDepth, NSSound.beep(), ...).
+Functions:
+- Name: NSApplicationLoad
+  SwiftPrivate: true
+- Name: NSApplicationMain
+  SwiftPrivate: true
+- Name: NSAvailableWindowDepths
+  SwiftPrivate: true
+- Name: NSBeep
+  SwiftPrivate: true
+- Name: NSBestDepth
+  SwiftPrivate: true
+- Name: NSBitsPerPixelFromDepth
+  SwiftName: 'getter:NSWindowDepth.bitsPerPixel(self:)'
+- Name: NSBitsPerSampleFromDepth
+  SwiftName: 'getter:NSWindowDepth.bitsPerSample(self:)'
+- Name: NSColorSpaceFromDepth
+  SwiftName: 'getter:NSWindowDepth.colorSpaceName(self:)'
+- Name: NSFrameRect
+  SwiftPrivate: true
+- Name: NSFrameRectWithWidth
+  SwiftPrivate: true
+- Name: NSFrameRectWithWidthUsingOperation
+  SwiftPrivate: true
+- Name: NSOpenGLGetOption
+  SwiftPrivate: true
+- Name: NSOpenGLGetVersion
+  SwiftPrivate: true
+- Name: NSOpenGLSetOption
+  SwiftPrivate: true
+- Name: NSPlanarFromDepth
+  SwiftName: 'getter:NSWindowDepth.isPlanar(self:)'
+- Name: NSRectClip
+  SwiftPrivate: true
+- Name: NSRectClipList
+  SwiftPrivate: true
+- Name: NSRectFill
+  SwiftPrivate: true
+- Name: NSRectFillList
+  SwiftPrivate: true
+- Name: NSRectFillListUsingOperation
+  SwiftPrivate: true
+- Name: NSRectFillListWithColors
+  SwiftPrivate: true
+- Name: NSRectFillListWithColorsUsingOperation
+  SwiftPrivate: true
+- Name: NSRectFillListWithGrays
+  SwiftPrivate: true
+- Name: NSRectFillUsingOperation
+  SwiftPrivate: true
+- Name: NSShowAnimationEffect
+  SwiftPrivate: true
+
+# Method, property and initializer spellings of the classes (grouped by class).
+Classes:
+- Name: NSATSTypesetter
+  Methods:
+  - Selector: "getGlyphsInRange:glyphs:characterIndexes:glyphInscriptions:elasticBits:"
+    MethodKind: Instance
+    SwiftName: getGlyphs(in:glyphs:characterIndexes:glyphInscriptions:elasticBits:)
+- Name: NSAppearance
+  Methods:
+  - Selector: "bestMatchFromAppearancesWithNames:"
+    MethodKind: Instance
+    SwiftName: bestMatch(from:)
+  - Selector: "performAsCurrentDrawingAppearance:"
+    MethodKind: Instance
+    SwiftName: performAsCurrentDrawingAppearance(_:)
+  - Selector: "setCurrentAppearance:"
+    MethodKind: Class
+    SwiftName: setCurrent(_:)
+  - Selector: currentDrawingAppearance
+    MethodKind: Class
+    ResultType: "NSAppearance * _Nonnull"
+  Properties:
+  - Name: currentDrawingAppearance
+    PropertyKind: Class
+    SwiftImportAsAccessors: true
+- Name: NSApplication
+  Methods:
+  - Selector: "activateIgnoringOtherApps:"
+    MethodKind: Instance
+    SwiftName: activate(ignoringOtherApps:)
+  - Selector: "endModalSession:"
+    MethodKind: Instance
+    SwiftName: endModalSession(_:)
+  - Selector: "postEvent:atStart:"
+    MethodKind: Instance
+    SwiftName: postEvent(_:atStart:)
+  - Selector: "reportException:"
+    MethodKind: Instance
+    SwiftName: reportException(_:)
+  - Selector: "runModalSession:"
+    MethodKind: Instance
+    SwiftName: runModalSession(_:)
+  - Selector: "sendEvent:"
+    MethodKind: Instance
+    SwiftName: sendEvent(_:)
+- Name: NSArrayController
+  Methods:
+  - Selector: "addObjects:"
+    MethodKind: Instance
+    SwiftName: add(contentsOf:)
+  - Selector: "insertObjects:atArrangedObjectIndexes:"
+    MethodKind: Instance
+    SwiftName: insert(contentsOf:atArrangedObjectIndexes:)
+  - Selector: "removeObjectAtArrangedObjectIndex:"
+    MethodKind: Instance
+    SwiftName: remove(atArrangedObjectIndex:)
+  - Selector: "removeObjects:"
+    MethodKind: Instance
+    SwiftName: remove(contentsOf:)
+  - Selector: "removeObjectsAtArrangedObjectIndexes:"
+    MethodKind: Instance
+    SwiftName: remove(atArrangedObjectIndexes:)
+- Name: NSBezierPath
+  Methods:
+  - Selector: "appendBezierPathWithArcFromPoint:toPoint:radius:"
+    MethodKind: Instance
+    SwiftName: appendArc(from:to:radius:)
+  - Selector: "appendBezierPathWithArcWithCenter:radius:startAngle:endAngle:"
+    MethodKind: Instance
+    SwiftName: appendArc(withCenter:radius:startAngle:endAngle:)
+  - Selector: "appendBezierPathWithArcWithCenter:radius:startAngle:endAngle:clockwise:"
+    MethodKind: Instance
+    SwiftName: appendArc(withCenter:radius:startAngle:endAngle:clockwise:)
+  - Selector: "appendBezierPathWithGlyph:inFont:"
+    MethodKind: Instance
+    SwiftName: appendGlyph(_:in:)
+  - Selector: "appendBezierPathWithGlyphs:count:inFont:"
+    MethodKind: Instance
+    SwiftName: appendGlyphs(_:count:in:)
+  - Selector: "appendBezierPathWithOvalInRect:"
+    MethodKind: Instance
+    SwiftName: appendOval(in:)
+  - Selector: "appendBezierPathWithPackedGlyphs:"
+    MethodKind: Instance
+    SwiftName: appendPackedGlyphs(_:)
+  - Selector: "appendBezierPathWithPoints:count:"
+    MethodKind: Instance
+    SwiftName: appendPoints(_:count:)
+  - Selector: "appendBezierPathWithRect:"
+    MethodKind: Instance
+    SwiftName: appendRect(_:)
+  - Selector: "appendBezierPathWithRoundedRect:xRadius:yRadius:"
+    MethodKind: Instance
+    SwiftName: appendRoundedRect(_:xRadius:yRadius:)
+  - Selector: "clipRect:"
+    MethodKind: Class
+    SwiftName: clip(_:)
+  Properties:
+  - Name: bezierPathByFlatteningPath
+    PropertyKind: Instance
+    SwiftName: flattened
+  - Name: bezierPathByReversingPath
+    PropertyKind: Instance
+    SwiftName: reversed
+- Name: NSBrowser
+  Methods:
+  - Selector: "frameOfInsideOfColumn:"
+    MethodKind: Instance
+    SwiftName: frame(ofInsideOfColumn:)
+- Name: NSBundle
+  Methods:
+  - Selector: "pathForImageResource:"
+    MethodKind: Instance
+    SwiftName: pathForImageResource(_:)
+- Name: NSButton
+  Methods:
+  - Selector: "checkboxWithTitle:target:action:"
+    MethodKind: Class
+    SwiftName: init(checkboxWithTitle:target:action:)
+  - Selector: "mouseEntered:"
+    MethodKind: Instance
+    SwiftName: mouseEntered(with:)
+  - Selector: "mouseExited:"
+    MethodKind: Instance
+    SwiftName: mouseExited(with:)
+  - Selector: "radioButtonWithTitle:target:action:"
+    MethodKind: Class
+    SwiftName: init(radioButtonWithTitle:target:action:)
+- Name: NSButtonCell
+  Methods:
+  - Selector: "mouseEntered:"
+    MethodKind: Instance
+    SwiftName: mouseEntered(with:)
+  - Selector: "mouseExited:"
+    MethodKind: Instance
+    SwiftName: mouseExited(with:)
+- Name: NSCell
+  Methods:
+  - Selector: "continueTracking:at:inView:"
+    MethodKind: Instance
+    SwiftName: continueTracking(last:current:in:)
+  - Selector: "stopTracking:at:inView:mouseIsUp:"
+    MethodKind: Instance
+    SwiftName: stopTracking(last:current:in:mouseIsUp:)
+  - Selector: "trackMouse:inRect:ofView:untilMouseUp:"
+    MethodKind: Instance
+    SwiftName: trackMouse(with:in:of:untilMouseUp:)
+- Name: NSClipView
+  Methods:
+  - Selector: "autoscroll:"
+    MethodKind: Instance
+    SwiftName: autoscroll(with:)
+- Name: NSColor
+  Methods:
+  - Selector: "blendedColorWithFraction:ofColor:"
+    MethodKind: Instance
+    SwiftName: blended(withFraction:of:)
+  Properties:
+  - Name: alternateSelectedControlColor
+    PropertyKind: Class
+    SwiftName: alternateSelectedControlColor
+  - Name: alternateSelectedControlTextColor
+    PropertyKind: Class
+    SwiftName: alternateSelectedControlTextColor
+  - Name: controlAccentColor
+    PropertyKind: Class
+    SwiftName: controlAccentColor
+  - Name: controlBackgroundColor
+    PropertyKind: Class
+    SwiftName: controlBackgroundColor
+  - Name: controlColor
+    PropertyKind: Class
+    SwiftName: controlColor
+  - Name: controlDarkShadowColor
+    PropertyKind: Class
+    SwiftName: controlDarkShadowColor
+  - Name: controlHighlightColor
+    PropertyKind: Class
+    SwiftName: controlHighlightColor
+  - Name: controlLightHighlightColor
+    PropertyKind: Class
+    SwiftName: controlLightHighlightColor
+  - Name: controlShadowColor
+    PropertyKind: Class
+    SwiftName: controlShadowColor
+  - Name: controlTextColor
+    PropertyKind: Class
+    SwiftName: controlTextColor
+  - Name: disabledControlTextColor
+    PropertyKind: Class
+    SwiftName: disabledControlTextColor
+  - Name: gridColor
+    PropertyKind: Class
+    SwiftName: gridColor
+  - Name: headerColor
+    PropertyKind: Class
+    SwiftName: headerColor
+  - Name: headerTextColor
+    PropertyKind: Class
+    SwiftName: headerTextColor
+  - Name: highlightColor
+    PropertyKind: Class
+    SwiftName: highlightColor
+  - Name: keyboardFocusIndicatorColor
+    PropertyKind: Class
+    SwiftName: keyboardFocusIndicatorColor
+  - Name: knobColor
+    PropertyKind: Class
+    SwiftName: knobColor
+  - Name: labelColor
+    PropertyKind: Class
+    SwiftName: labelColor
+  - Name: linkColor
+    PropertyKind: Class
+    SwiftName: linkColor
+  - Name: quaternaryLabelColor
+    PropertyKind: Class
+    SwiftName: quaternaryLabelColor
+  - Name: scrollBarColor
+    PropertyKind: Class
+    SwiftName: scrollBarColor
+  - Name: secondaryLabelColor
+    PropertyKind: Class
+    SwiftName: secondaryLabelColor
+  - Name: secondarySelectedControlColor
+    PropertyKind: Class
+    SwiftName: secondarySelectedControlColor
+  - Name: selectedContentBackgroundColor
+    PropertyKind: Class
+    SwiftName: selectedContentBackgroundColor
+  - Name: selectedControlColor
+    PropertyKind: Class
+    SwiftName: selectedControlColor
+  - Name: selectedControlTextColor
+    PropertyKind: Class
+    SwiftName: selectedControlTextColor
+  - Name: selectedKnobColor
+    PropertyKind: Class
+    SwiftName: selectedKnobColor
+  - Name: selectedMenuItemColor
+    PropertyKind: Class
+    SwiftName: selectedMenuItemColor
+  - Name: selectedMenuItemTextColor
+    PropertyKind: Class
+    SwiftName: selectedMenuItemTextColor
+  - Name: selectedTextBackgroundColor
+    PropertyKind: Class
+    SwiftName: selectedTextBackgroundColor
+  - Name: selectedTextColor
+    PropertyKind: Class
+    SwiftName: selectedTextColor
+  - Name: separatorColor
+    PropertyKind: Class
+    SwiftName: separatorColor
+  - Name: shadowColor
+    PropertyKind: Class
+    SwiftName: shadowColor
+  - Name: tertiaryLabelColor
+    PropertyKind: Class
+    SwiftName: tertiaryLabelColor
+  - Name: textBackgroundColor
+    PropertyKind: Class
+    SwiftName: textBackgroundColor
+  - Name: textColor
+    PropertyKind: Class
+    SwiftName: textColor
+  - Name: textInsertionPointColor
+    PropertyKind: Class
+    SwiftName: textInsertionPointColor
+  - Name: unemphasizedSelectedContentBackgroundColor
+    PropertyKind: Class
+    SwiftName: unemphasizedSelectedContentBackgroundColor
+  - Name: unemphasizedSelectedTextBackgroundColor
+    PropertyKind: Class
+    SwiftName: unemphasizedSelectedTextBackgroundColor
+  - Name: unemphasizedSelectedTextColor
+    PropertyKind: Class
+    SwiftName: unemphasizedSelectedTextColor
+  - Name: windowBackgroundColor
+    PropertyKind: Class
+    SwiftName: windowBackgroundColor
+  - Name: windowFrameColor
+    PropertyKind: Class
+    SwiftName: windowFrameColor
+  - Name: windowFrameTextColor
+    PropertyKind: Class
+    SwiftName: windowFrameTextColor
+- Name: NSColorList
+  Methods:
+  - Selector: "insertColor:key:atIndex:"
+    MethodKind: Instance
+    SwiftName: insertColor(_:key:at:)
+- Name: NSColorPanel
+  Methods:
+  - Selector: "attachColorList:"
+    MethodKind: Instance
+    SwiftName: attachColorList(_:)
+  - Selector: "detachColorList:"
+    MethodKind: Instance
+    SwiftName: detachColorList(_:)
+  - Selector: "dragColor:withEvent:fromView:"
+    MethodKind: Class
+    SwiftName: dragColor(_:with:from:)
+- Name: NSColorWell
+  Methods:
+  - Selector: "drawWellInside:"
+    MethodKind: Instance
+    SwiftName: drawWell(inside:)
+- Name: NSComboBox
+  Methods:
+  - Selector: "addItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: addItem(withObjectValue:)
+  - Selector: "addItemsWithObjectValues:"
+    MethodKind: Instance
+    SwiftName: addItems(withObjectValues:)
+  - Selector: "indexOfItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: indexOfItem(withObjectValue:)
+  - Selector: "insertItemWithObjectValue:atIndex:"
+    MethodKind: Instance
+    SwiftName: insertItem(withObjectValue:at:)
+  - Selector: "removeItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: removeItem(withObjectValue:)
+  - Selector: "scrollItemAtIndexToTop:"
+    MethodKind: Instance
+    SwiftName: scrollItemAtIndexToTop(_:)
+  - Selector: "selectItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: selectItem(withObjectValue:)
+- Name: NSComboBoxCell
+  Methods:
+  - Selector: "addItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: addItem(withObjectValue:)
+  - Selector: "addItemsWithObjectValues:"
+    MethodKind: Instance
+    SwiftName: addItems(withObjectValues:)
+  - Selector: "indexOfItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: indexOfItem(withObjectValue:)
+  - Selector: "insertItemWithObjectValue:atIndex:"
+    MethodKind: Instance
+    SwiftName: insertItem(withObjectValue:at:)
+  - Selector: "removeItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: removeItem(withObjectValue:)
+  - Selector: "scrollItemAtIndexToTop:"
+    MethodKind: Instance
+    SwiftName: scrollItemAtIndexToTop(_:)
+  - Selector: "selectItemWithObjectValue:"
+    MethodKind: Instance
+    SwiftName: selectItem(withObjectValue:)
+- Name: NSControl
+  Methods:
+  - Selector: "drawCellInside:"
+    MethodKind: Instance
+    SwiftName: drawCellInside(_:)
+  - Selector: "initWithFrame:"
+    MethodKind: Instance
+    DesignatedInit: true
+  - Selector: "mouseDown:"
+    MethodKind: Instance
+    SwiftName: mouseDown(with:)
+  - Selector: "updateCellInside:"
+    MethodKind: Instance
+    SwiftName: updateCellInside(_:)
+- Name: NSCursor
+  Methods:
+  - Selector: "mouseEntered:"
+    MethodKind: Instance
+    SwiftName: mouseEntered(with:)
+  - Selector: "mouseExited:"
+    MethodKind: Instance
+    SwiftName: mouseExited(with:)
+- Name: NSDocument
+  Methods:
+  - Selector: "browseDocumentVersions:"
+    MethodKind: Instance
+    SwiftName: browseVersions(_:)
+  - Selector: "preparePageLayout:"
+    MethodKind: Instance
+    SwiftName: preparePageLayout(_:)
+  - Selector: "prepareSavePanel:"
+    MethodKind: Instance
+    SwiftName: prepareSavePanel(_:)
+  - Selector: "printDocument:"
+    MethodKind: Instance
+    SwiftName: printDocument(_:)
+  - Selector: "revertDocumentToSaved:"
+    MethodKind: Instance
+    SwiftName: revertToSaved(_:)
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSDocumentController
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSFont
+  Methods:
+  - Selector: "labelFontOfSize:"
+    MethodKind: Class
+    SwiftName: labelFont(ofSize:)
+  - Selector: "setInContext:"
+    MethodKind: Instance
+    SwiftName: set(in:)
+  - Selector: labelFontSize
+    MethodKind: Class
+    SwiftName: labelFontSize()
+  Properties:
+  - Name: labelFontSize
+    PropertyKind: Class
+    SwiftName: labelFontSize
+- Name: NSFontManager
+  Methods:
+  - Selector: "availableFontNamesWithTraits:"
+    MethodKind: Instance
+    SwiftName: availableFontNames(with:)
+- Name: NSFontPanel
+  Methods:
+  - Selector: "panelConvertFont:"
+    MethodKind: Instance
+    SwiftName: convert(_:)
+- Name: NSGestureRecognizer
+  Methods:
+  - Selector: "flagsChanged:"
+    MethodKind: Instance
+    SwiftName: flagsChanged(with:)
+  - Selector: "keyDown:"
+    MethodKind: Instance
+    SwiftName: keyDown(with:)
+  - Selector: "keyUp:"
+    MethodKind: Instance
+    SwiftName: keyUp(with:)
+  - Selector: "mouseDown:"
+    MethodKind: Instance
+    SwiftName: mouseDown(with:)
+  - Selector: "mouseDragged:"
+    MethodKind: Instance
+    SwiftName: mouseDragged(with:)
+  - Selector: "mouseUp:"
+    MethodKind: Instance
+    SwiftName: mouseUp(with:)
+  - Selector: "otherMouseDown:"
+    MethodKind: Instance
+    SwiftName: otherMouseDown(with:)
+  - Selector: "otherMouseDragged:"
+    MethodKind: Instance
+    SwiftName: otherMouseDragged(with:)
+  - Selector: "otherMouseUp:"
+    MethodKind: Instance
+    SwiftName: otherMouseUp(with:)
+  - Selector: "rightMouseDown:"
+    MethodKind: Instance
+    SwiftName: rightMouseDown(with:)
+  - Selector: "rightMouseDragged:"
+    MethodKind: Instance
+    SwiftName: rightMouseDragged(with:)
+  - Selector: "rightMouseUp:"
+    MethodKind: Instance
+    SwiftName: rightMouseUp(with:)
+- Name: NSGraphicsContext
+  Methods:
+  - Selector: "setCurrentContext:"
+    MethodKind: Class
+    SwiftName: setCurrent(_:)
+- Name: NSGroupTouchBarItem
+  Methods:
+  - Selector: "alertStyleGroupItemWithIdentifier:"
+    MethodKind: Class
+    SwiftName: init(alertStyleWithIdentifier:)
+- Name: NSImageRep
+  Methods:
+  - Selector: "imageRepClassForData:"
+    MethodKind: Class
+    SwiftName: class(for:)
+  - Selector: "imageRepClassForFileType:"
+    MethodKind: Class
+    SwiftName: class(forFileType:)
+  - Selector: "imageRepClassForPasteboardType:"
+    MethodKind: Class
+    SwiftName: class(forPasteboardType:)
+  - Selector: "unregisterImageRepClass:"
+    MethodKind: Class
+    SwiftName: unregisterClass(_:)
+  - Selector: registeredImageRepClasses
+    MethodKind: Class
+    SwiftName: registeredClasses()
+  Properties:
+  - Name: registeredImageRepClasses
+    PropertyKind: Class
+    SwiftName: registeredClasses
+- Name: NSLayoutAnchor
+  Methods:
+  - Selector: "constraintEqualToAnchor:"
+    MethodKind: Instance
+    SwiftName: constraint(equalTo:)
+  - Selector: "constraintEqualToAnchor:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(equalTo:constant:)
+  - Selector: "constraintGreaterThanOrEqualToAnchor:"
+    MethodKind: Instance
+    SwiftName: constraint(greaterThanOrEqualTo:)
+  - Selector: "constraintGreaterThanOrEqualToAnchor:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(greaterThanOrEqualTo:constant:)
+  - Selector: "constraintLessThanOrEqualToAnchor:"
+    MethodKind: Instance
+    SwiftName: constraint(lessThanOrEqualTo:)
+  - Selector: "constraintLessThanOrEqualToAnchor:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(lessThanOrEqualTo:constant:)
+- Name: NSLayoutDimension
+  Methods:
+  - Selector: "constraintEqualToAnchor:multiplier:"
+    MethodKind: Instance
+    SwiftName: constraint(equalTo:multiplier:)
+  - Selector: "constraintEqualToAnchor:multiplier:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(equalTo:multiplier:constant:)
+  - Selector: "constraintEqualToConstant:"
+    MethodKind: Instance
+    SwiftName: constraint(equalToConstant:)
+  - Selector: "constraintGreaterThanOrEqualToAnchor:multiplier:"
+    MethodKind: Instance
+    SwiftName: constraint(greaterThanOrEqualTo:multiplier:)
+  - Selector: "constraintGreaterThanOrEqualToAnchor:multiplier:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(greaterThanOrEqualTo:multiplier:constant:)
+  - Selector: "constraintGreaterThanOrEqualToConstant:"
+    MethodKind: Instance
+    SwiftName: constraint(greaterThanOrEqualToConstant:)
+  - Selector: "constraintLessThanOrEqualToAnchor:multiplier:"
+    MethodKind: Instance
+    SwiftName: constraint(lessThanOrEqualTo:multiplier:)
+  - Selector: "constraintLessThanOrEqualToAnchor:multiplier:constant:"
+    MethodKind: Instance
+    SwiftName: constraint(lessThanOrEqualTo:multiplier:constant:)
+  - Selector: "constraintLessThanOrEqualToConstant:"
+    MethodKind: Instance
+    SwiftName: constraint(lessThanOrEqualToConstant:)
+- Name: NSLayoutManager
+  Methods:
+  - Selector: "getGlyphsInRange:glyphs:characterIndexes:glyphInscriptions:elasticBits:"
+    MethodKind: Instance
+    SwiftName: getGlyphs(in:glyphs:characterIndexes:glyphInscriptions:elasticBits:)
+  - Selector: "getGlyphsInRange:glyphs:characterIndexes:glyphInscriptions:elasticBits:bidiLevels:"
+    MethodKind: Instance
+    SwiftName: getGlyphs(in:glyphs:characterIndexes:glyphInscriptions:elasticBits:bidiLevels:)
+  - Selector: "lineFragmentRectForGlyphAtIndex:effectiveRange:"
+    MethodKind: Instance
+    SwiftName: lineFragmentRect(forGlyphAt:effectiveRange:)
+  - Selector: "lineFragmentUsedRectForGlyphAtIndex:effectiveRange:"
+    MethodKind: Instance
+    SwiftName: lineFragmentUsedRect(forGlyphAt:effectiveRange:)
+  - Selector: "locationForGlyphAtIndex:"
+    MethodKind: Instance
+    SwiftName: location(forGlyphAt:)
+  - Selector: "textContainerForGlyphAtIndex:effectiveRange:"
+    MethodKind: Instance
+    SwiftName: textContainer(forGlyphAt:effectiveRange:)
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSMatrix
+  Methods:
+  - Selector: "acceptsFirstMouse:"
+    MethodKind: Instance
+    SwiftName: acceptsFirstMouse(for:)
+  - Selector: "mouseDown:"
+    MethodKind: Instance
+    SwiftName: mouseDown(with:)
+  - Selector: "performKeyEquivalent:"
+    MethodKind: Instance
+    SwiftName: performKeyEquivalent(with:)
+- Name: NSMenu
+  Methods:
+  - Selector: "addItem:"
+    MethodKind: Instance
+    SwiftName: addItem(_:)
+  - Selector: "initWithTitle:"
+    MethodKind: Instance
+    DesignatedInit: true
+  - Selector: "insertItem:atIndex:"
+    MethodKind: Instance
+    SwiftName: insertItem(_:at:)
+  - Selector: "performKeyEquivalent:"
+    MethodKind: Instance
+    SwiftName: performKeyEquivalent(with:)
+  - Selector: "removeItem:"
+    MethodKind: Instance
+    SwiftName: removeItem(_:)
+  Properties:
+  - Name: itemArray
+    PropertyKind: Instance
+    SwiftName: items
+- Name: NSMenuItem
+  Properties:
+  - Name: isSeparatorItem
+    PropertyKind: Instance
+    SwiftName: isSeparator
+- Name: NSNib
+  Methods:
+  - Selector: "instantiateWithOwner:topLevelObjects:"
+    MethodKind: Instance
+    SwiftName: instantiate(withOwner:topLevelObjects:)
+- Name: NSObject
+  Methods:
+  - Selector: "infoForBinding:"
+    MethodKind: Instance
+    SwiftName: infoForBinding(_:)
+  - Selector: "validateMenuItem:"
+    MethodKind: Instance
+    SwiftName: validateMenuItem(_:)
+  - Selector: "validateToolbarItem:"
+    MethodKind: Instance
+    SwiftName: "validateToolbarItem(_:)"
+- Name: NSObjectController
+  Methods:
+  - Selector: "addObject:"
+    MethodKind: Instance
+    SwiftName: "addObject(_:)"
+  - Selector: "removeObject:"
+    MethodKind: Instance
+    SwiftName: "removeObject(_:)"
+  - Selector: "validateUserInterfaceItem:"
+    MethodKind: Instance
+    SwiftName: validateUserInterfaceItem(_:)
+- Name: NSPasteboard
+  Methods:
+  - Selector: "canReadItemWithDataConformingToTypes:"
+    MethodKind: Instance
+    SwiftName: canReadItem(withDataConformingToTypes:)
+- Name: NSPathCell
+  Methods:
+  - Selector: "mouseEntered:withFrame:inView:"
+    MethodKind: Instance
+    SwiftName: mouseEntered(with:frame:in:)
+  - Selector: "mouseExited:withFrame:inView:"
+    MethodKind: Instance
+    SwiftName: mouseExited(with:frame:in:)
+- Name: NSPopover
+  Methods:
+  - Selector: "showRelativeToRect:ofView:preferredEdge:"
+    MethodKind: Instance
+    SwiftName: show(relativeTo:of:preferredEdge:)
+- Name: NSPrintInfo
+  Methods:
+  - Selector: "setSharedPrintInfo:"
+    MethodKind: Class
+    SwiftName: setShared(_:)
+- Name: NSResponder
+  Methods:
+  - Selector: "cursorUpdate:"
+    MethodKind: Instance
+    SwiftName: cursorUpdate(with:)
+  - Selector: "flagsChanged:"
+    MethodKind: Instance
+    SwiftName: flagsChanged(with:)
+  - Selector: "keyDown:"
+    MethodKind: Instance
+    SwiftName: keyDown(with:)
+  - Selector: "keyUp:"
+    MethodKind: Instance
+    SwiftName: keyUp(with:)
+  - Selector: "mouseDown:"
+    MethodKind: Instance
+    SwiftName: mouseDown(with:)
+  - Selector: "mouseDragged:"
+    MethodKind: Instance
+    SwiftName: mouseDragged(with:)
+  - Selector: "mouseEntered:"
+    MethodKind: Instance
+    SwiftName: mouseEntered(with:)
+  - Selector: "mouseExited:"
+    MethodKind: Instance
+    SwiftName: mouseExited(with:)
+  - Selector: "mouseMoved:"
+    MethodKind: Instance
+    SwiftName: mouseMoved(with:)
+  - Selector: "mouseUp:"
+    MethodKind: Instance
+    SwiftName: mouseUp(with:)
+  - Selector: "otherMouseDown:"
+    MethodKind: Instance
+    SwiftName: otherMouseDown(with:)
+  - Selector: "otherMouseDragged:"
+    MethodKind: Instance
+    SwiftName: otherMouseDragged(with:)
+  - Selector: "otherMouseUp:"
+    MethodKind: Instance
+    SwiftName: otherMouseUp(with:)
+  - Selector: "performKeyEquivalent:"
+    MethodKind: Instance
+    SwiftName: performKeyEquivalent(with:)
+  - Selector: "rightMouseDown:"
+    MethodKind: Instance
+    SwiftName: rightMouseDown(with:)
+  - Selector: "rightMouseDragged:"
+    MethodKind: Instance
+    SwiftName: rightMouseDragged(with:)
+  - Selector: "rightMouseUp:"
+    MethodKind: Instance
+    SwiftName: rightMouseUp(with:)
+  - Selector: "scrollWheel:"
+    MethodKind: Instance
+    SwiftName: scrollWheel(with:)
+  - Selector: "tryToPerform:with:"
+    MethodKind: Instance
+    SwiftName: "tryToPerform(_:with:)"
+  Properties:
+  - Name: nextResponder
+    PropertyKind: Instance
+    SwiftName: nextResponder
+- Name: NSRulerMarker
+  Methods:
+  - Selector: "trackMouse:adding:"
+    MethodKind: Instance
+    SwiftName: trackMouse(with:adding:)
+- Name: NSScreen
+  Properties:
+  - Name: auxiliaryTopLeftArea
+    PropertyKind: Instance
+    SwiftPrivate: true
+  - Name: auxiliaryTopRightArea
+    PropertyKind: Instance
+    SwiftPrivate: true
+- Name: NSScroller
+  Methods:
+  - Selector: "drawArrow:highlight:"
+    MethodKind: Instance
+    SwiftName: drawArrow(_:highlight:)
+  - Selector: "scrollWheel:"
+    MethodKind: Instance
+    SwiftName: scrollWheel(with:)
+  - Selector: "trackKnob:"
+    MethodKind: Instance
+    SwiftName: trackKnob(with:)
+  - Selector: "trackScrollButtons:"
+    MethodKind: Instance
+    SwiftName: trackScrollButtons(with:)
+- Name: NSSharingServicePicker
+  Methods:
+  - Selector: "showRelativeToRect:ofView:preferredEdge:"
+    MethodKind: Instance
+    SwiftName: show(relativeTo:of:preferredEdge:)
+- Name: NSSlider
+  Methods:
+  - Selector: "acceptsFirstMouse:"
+    MethodKind: Instance
+    SwiftName: acceptsFirstMouse(for:)
+- Name: NSSliderCell
+  Methods:
+  - Selector: "knobRectFlipped:"
+    MethodKind: Instance
+    SwiftName: knobRect(flipped:)
+- Name: NSSpellChecker
+  Methods:
+  - Selector: "ignoredWordsInSpellDocumentWithTag:"
+    MethodKind: Instance
+    SwiftName: ignoredWords(inSpellDocumentWithTag:)
+- Name: NSSplitViewItem
+  Methods:
+  - Selector: "contentListWithViewController:"
+    MethodKind: Class
+    SwiftName: init(contentListWithViewController:)
+  - Selector: "sidebarWithViewController:"
+    MethodKind: Class
+    SwiftName: init(sidebarWithViewController:)
+- Name: NSStatusBar
+  Methods:
+  - Selector: "removeStatusItem:"
+    MethodKind: Instance
+    SwiftName: removeStatusItem(_:)
+- Name: NSString
+  Methods:
+  - Selector: "sizeWithAttributes:"
+    MethodKind: Instance
+    SwiftName: size(withAttributes:)
+- Name: NSTabView
+  Methods:
+  - Selector: "addTabViewItem:"
+    MethodKind: Instance
+    SwiftName: addTabViewItem(_:)
+  - Selector: "indexOfTabViewItem:"
+    MethodKind: Instance
+    SwiftName: indexOfTabViewItem(_:)
+  - Selector: "selectTabViewItemAtIndex:"
+    MethodKind: Instance
+    SwiftName: selectTabViewItem(at:)
+  - Selector: "selectTabViewItemWithIdentifier:"
+    MethodKind: Instance
+    SwiftName: selectTabViewItem(withIdentifier:)
+- Name: NSTabViewItem
+  Methods:
+  - Selector: "sizeOfLabel:"
+    MethodKind: Instance
+    SwiftName: sizeOfLabel(_:)
+- Name: NSTableColumn
+  Methods:
+  - Selector: "initWithIdentifier:"
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSTableView
+  Methods:
+  - Selector: "makeViewWithIdentifier:owner:"
+    MethodKind: Instance
+    SwiftName: "makeView(withIdentifier:owner:)"
+- Name: NSTextBlock
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSTextContentStorage
+  Methods:
+  - Selector: "locationFromLocation:withOffset:"
+    MethodKind: Instance
+    SwiftName: location(_:offsetBy:)
+- Name: NSTextField
+  Methods:
+  - Selector: "labelWithString:"
+    MethodKind: Class
+    SwiftName: init(labelWithString:)
+- Name: NSTextFinder
+  Methods:
+  - Selector: init
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSTextInputContext
+  Methods:
+  - Selector: "handleEvent:"
+    MethodKind: Instance
+    SwiftName: handleEvent(_:)
+  - Selector: "initWithClient:"
+    MethodKind: Instance
+    DesignatedInit: true
+- Name: NSTextLayoutManager
+  Methods:
+  - Selector: "replaceTextContentManager:"
+    MethodKind: Instance
+    SwiftName: replace(_:)
+- Name: NSTextRange
+  Methods:
+  - Selector: "containsLocation:"
+    MethodKind: Instance
+    SwiftName: contains(_:)
+  - Selector: "containsRange:"
+    MethodKind: Instance
+    SwiftName: contains(_:)
+  - Selector: "initWithLocation:"
+    MethodKind: Instance
+    SwiftName: init(location:)
+  - Selector: "intersectsWithTextRange:"
+    MethodKind: Instance
+    SwiftName: intersects(_:)
+  - Selector: "textRangeByFormingUnionWithTextRange:"
+    MethodKind: Instance
+    SwiftName: union(_:)
+  - Selector: "textRangeByIntersectingWithTextRange:"
+    MethodKind: Instance
+    SwiftName: intersection(_:)
+- Name: NSTextView
+  Methods:
+  - Selector: "initWithFrame:"
+    MethodKind: Instance
+    DesignatedInit: true
+  - Selector: "rulerView:handleMouseDown:"
+    MethodKind: Instance
+    SwiftName: rulerView(_:handleMouseDownWith:)
+  - Selector: "setNeedsDisplayInRect:avoidAdditionalLayout:"
+    MethodKind: Instance
+    SwiftName: setNeedsDisplay(_:avoidAdditionalLayout:)
+- Name: NSToolbar
+  Methods:
+  - Selector: "setConfigurationFromDictionary:"
+    MethodKind: Instance
+    SwiftName: setConfiguration(_:)
+  Properties:
+  - Name: configurationDictionary
+    PropertyKind: Instance
+    SwiftName: configuration
+- Name: NSTreeNode
+  Methods:
+  - Selector: "descendantNodeAtIndexPath:"
+    MethodKind: Instance
+    SwiftName: descendant(at:)
+  Properties:
+  - Name: childNodes
+    PropertyKind: Instance
+    SwiftName: children
+- Name: NSTypesetter
+  Methods:
+  - Selector: "beginLineWithGlyphAtIndex:"
+    MethodKind: Instance
+    SwiftName: beginLine(withGlyphAt:)
+  - Selector: "boundingBoxForControlGlyphAtIndex:forTextContainer:proposedLineFragment:glyphPosition:characterIndex:"
+    MethodKind: Instance
+    SwiftName: boundingBox(forControlGlyphAt:for:proposedLineFragment:glyphPosition:characterIndex:)
+  - Selector: "getGlyphsInRange:glyphs:characterIndexes:glyphInscriptions:elasticBits:bidiLevels:"
+    MethodKind: Instance
+    SwiftName: getGlyphs(in:glyphs:characterIndexes:glyphInscriptions:elasticBits:bidiLevels:)
+  - Selector: "hyphenCharacterForGlyphAtIndex:"
+    MethodKind: Instance
+    SwiftName: hyphenCharacter(forGlyphAt:)
+  - Selector: "hyphenationFactorForGlyphAtIndex:"
+    MethodKind: Instance
+    SwiftName: hyphenationFactor(forGlyphAt:)
+  - Selector: "lineSpacingAfterGlyphAtIndex:withProposedLineFragmentRect:"
+    MethodKind: Instance
+    SwiftName: lineSpacing(afterGlyphAt:withProposedLineFragmentRect:)
+  - Selector: "paragraphSpacingAfterGlyphAtIndex:withProposedLineFragmentRect:"
+    MethodKind: Instance
+    SwiftName: paragraphSpacing(afterGlyphAt:withProposedLineFragmentRect:)
+  - Selector: "paragraphSpacingBeforeGlyphAtIndex:withProposedLineFragmentRect:"
+    MethodKind: Instance
+    SwiftName: paragraphSpacing(beforeGlyphAt:withProposedLineFragmentRect:)
+  - Selector: "shouldBreakLineByHyphenatingBeforeCharacterAtIndex:"
+    MethodKind: Instance
+    SwiftName: shouldBreakLine(byHyphenatingBeforeCharacterAt:)
+  - Selector: "shouldBreakLineByWordBeforeCharacterAtIndex:"
+    MethodKind: Instance
+    SwiftName: shouldBreakLine(byWordBeforeCharacterAt:)
+  Properties:
+  - Name: sharedSystemTypesetter
+    PropertyKind: Class
+    SwiftName: sharedSystemTypesetter
+- Name: NSView
+  Methods:
+  - Selector: "acceptsFirstMouse:"
+    MethodKind: Instance
+    SwiftName: acceptsFirstMouse(for:)
+  - Selector: "autoscroll:"
+    MethodKind: Instance
+    SwiftName: autoscroll(with:)
+  - Selector: "convertPointFromBacking:"
+    MethodKind: Instance
+    SwiftName: convertFromBacking(_:)
+  - Selector: "convertPointToBacking:"
+    MethodKind: Instance
+    SwiftName: convertToBacking(_:)
+  - Selector: "convertRectFromBacking:"
+    MethodKind: Instance
+    SwiftName: convertFromBacking(_:)
+  - Selector: "convertRectToBacking:"
+    MethodKind: Instance
+    SwiftName: convertToBacking(_:)
+  - Selector: "convertSizeFromBacking:"
+    MethodKind: Instance
+    SwiftName: convertFromBacking(_:)
+  - Selector: "convertSizeToBacking:"
+    MethodKind: Instance
+    SwiftName: convertToBacking(_:)
+  - Selector: "displayIfNeededInRect:"
+    MethodKind: Instance
+    SwiftName: displayIfNeeded(_:)
+  - Selector: "displayIfNeededInRectIgnoringOpacity:"
+    MethodKind: Instance
+    SwiftName: displayIfNeededIgnoringOpacity(_:)
+  - Selector: "displayRectIgnoringOpacity:"
+    MethodKind: Instance
+    SwiftName: displayIgnoringOpacity(_:)
+  - Selector: "displayRectIgnoringOpacity:inContext:"
+    MethodKind: Instance
+    SwiftName: displayIgnoringOpacity(_:in:)
+  - Selector: "locationOfPrintRect:"
+    MethodKind: Instance
+    SwiftName: locationOfPrintRect(_:)
+  - Selector: "mouse:inRect:"
+    MethodKind: Instance
+    SwiftName: "isMousePoint(_:in:)"
+  - Selector: "needsToDrawRect:"
+    MethodKind: Instance
+    SwiftName: needsToDraw(_:)
+  - Selector: "performKeyEquivalent:"
+    MethodKind: Instance
+    SwiftName: performKeyEquivalent(with:)
+  - Selector: "print:"
+    MethodKind: Instance
+    SwiftName: printView(_:)
+  - Selector: "rectForPage:"
+    MethodKind: Instance
+    SwiftName: rectForPage(_:)
+  - Selector: "registerForDraggedTypes:"
+    MethodKind: Instance
+    SwiftName: registerForDraggedTypes(_:)
+  - Selector: "rotateByAngle:"
+    MethodKind: Instance
+    SwiftName: rotate(byDegrees:)
+  - Selector: "rulerView:handleMouseDown:"
+    MethodKind: Instance
+    SwiftName: rulerView(_:handleMouseDownWith:)
+  - Selector: "scrollRectToVisible:"
+    MethodKind: Instance
+    SwiftName: scrollToVisible(_:)
+  - Selector: "setKeyboardFocusRingNeedsDisplayInRect:"
+    MethodKind: Instance
+    SwiftName: setKeyboardFocusRingNeedsDisplay(_:)
+  - Selector: "setNeedsDisplayInRect:"
+    MethodKind: Instance
+    SwiftName: setNeedsDisplay(_:)
+  - Selector: "viewWillMoveToWindow:"
+    MethodKind: Instance
+    SwiftName: viewWillMove(toWindow:)
+  - Selector: focusView
+    MethodKind: Class
+    SwiftName: focusView()
+  Properties:
+  - Name: focusView
+    PropertyKind: Class
+    SwiftName: focusView
+  - Name: nextKeyView
+    PropertyKind: Instance
+    SwiftName: nextKeyView
+  - Name: nextValidKeyView
+    PropertyKind: Instance
+    SwiftName: nextValidKeyView
+  - Name: previousKeyView
+    PropertyKind: Instance
+    SwiftName: previousKeyView
+  - Name: previousValidKeyView
+    PropertyKind: Instance
+    SwiftName: previousValidKeyView
+- Name: NSViewController
+  Methods:
+  - Selector: "addChildViewController:"
+    MethodKind: Instance
+    SwiftName: "addChild(_:)"
+  - Selector: "insertChildViewController:atIndex:"
+    MethodKind: Instance
+    SwiftName: "insertChild(_:at:)"
+  - Selector: "removeChildViewControllerAtIndex:"
+    MethodKind: Instance
+    SwiftName: "removeChild(at:)"
+  - Selector: "removeFromParentViewController"
+    MethodKind: Instance
+    SwiftName: "removeFromParent()"
+  Properties:
+  - Name: childViewControllers
+    PropertyKind: Instance
+    SwiftName: children
+- Name: NSWindow
+  Methods:
+  - Selector: "convertRectFromBacking:"
+    MethodKind: Instance
+    SwiftName: convertFromBacking(_:)
+  - Selector: "convertRectFromScreen:"
+    MethodKind: Instance
+    SwiftName: convertFromScreen(_:)
+  - Selector: "convertRectToBacking:"
+    MethodKind: Instance
+    SwiftName: convertToBacking(_:)
+  - Selector: "convertRectToScreen:"
+    MethodKind: Instance
+    SwiftName: convertToScreen(_:)
+  - Selector: "initWithContentRect:styleMask:backing:defer:"
+    MethodKind: Instance
+    DesignatedInit: true
+  - Selector: "keyDown:"
+    MethodKind: Instance
+    SwiftName: keyDown(with:)
+  - Selector: "postEvent:atStart:"
+    MethodKind: Instance
+    SwiftName: postEvent(_:atStart:)
+  - Selector: "print:"
+    MethodKind: Instance
+    SwiftName: printWindow(_:)
+  - Selector: "registerForDraggedTypes:"
+    MethodKind: Instance
+    SwiftName: registerForDraggedTypes(_:)
+  - Selector: "selectKeyViewPrecedingView:"
+    MethodKind: Instance
+    SwiftName: selectKeyView(preceding:)
+  - Selector: "sendEvent:"
+    MethodKind: Instance
+    SwiftName: sendEvent(_:)
+  - Selector: "setFrameFromString:"
+    MethodKind: Instance
+    SwiftName: "setFrame(from:)"
+  - Selector: becomeKeyWindow
+    MethodKind: Instance
+    SwiftName: becomeKey()
+  - Selector: becomeMainWindow
+    MethodKind: Instance
+    SwiftName: becomeMain()
+  - Selector: disableFlushWindow
+    MethodKind: Instance
+    SwiftName: disableFlushing()
+  - Selector: enableFlushWindow
+    MethodKind: Instance
+    SwiftName: enableFlushing()
+  - Selector: flushWindow
+    MethodKind: Instance
+    SwiftName: flush()
+  - Selector: flushWindowIfNeeded
+    MethodKind: Instance
+    SwiftName: flushIfNeeded()
+  - Selector: makeKeyWindow
+    MethodKind: Instance
+    SwiftName: makeKey()
+  - Selector: makeMainWindow
+    MethodKind: Instance
+    SwiftName: makeMain()
+  - Selector: resignKeyWindow
+    MethodKind: Instance
+    SwiftName: resignKey()
+  - Selector: resignMainWindow
+    MethodKind: Instance
+    SwiftName: resignMain()
+  Properties:
+  - Name: canBecomeKeyWindow
+    PropertyKind: Instance
+    SwiftName: canBecomeKey
+  - Name: canBecomeMainWindow
+    PropertyKind: Instance
+    SwiftName: canBecomeMain
+  - Name: isAutodisplay
+    PropertyKind: Instance
+    SwiftName: isAutodisplaying
+  - Name: isFlushWindowDisabled
+    PropertyKind: Instance
+    SwiftName: isFlushingDisabled
+  - Name: isKeyWindow
+    PropertyKind: Instance
+    SwiftName: isKey
+  - Name: isMainWindow
+    PropertyKind: Instance
+    SwiftName: isMain
+- Name: NSWorkspace
+  Methods:
+  - Selector: "absolutePathForAppBundleWithIdentifier:"
+    MethodKind: Instance
+    SwiftName: absolutePathForApplication(withBundleIdentifier:)
+- Name: NSWorkspaceOpenConfiguration
+  SwiftName: NSWorkspace.OpenConfiguration
+
+# Method spellings of the protocols.
+Protocols:
+- Name: NSApplicationDelegate
+  Methods:
+  - Selector: "applicationShouldTerminateAfterLastWindowClosed:"
+    MethodKind: Instance
+    SwiftName: applicationShouldTerminateAfterLastWindowClosed(_:)
+- Name: NSColorPickingDefault
+  Methods:
+  - Selector: "attachColorList:"
+    MethodKind: Instance
+    SwiftName: attachColorList(_:)
+  - Selector: "detachColorList:"
+    MethodKind: Instance
+    SwiftName: detachColorList(_:)
+- Name: NSDraggingDestination
+  Methods:
+  - Selector: "prepareForDragOperation:"
+    MethodKind: Instance
+    SwiftName: prepareForDragOperation(_:)
+- Name: NSTabViewDelegate
+  Methods:
+  - Selector: "tabViewDidChangeNumberOfTabViewItems:"
+    MethodKind: Instance
+    SwiftName: tabViewDidChangeNumberOfTabViewItems(_:)
+- Name: NSTextAttachmentCell
+  Methods:
+  - Selector: "trackMouse:inRect:ofView:atCharacterIndex:untilMouseUp:"
+    MethodKind: Instance
+    SwiftName: trackMouse(with:in:of:atCharacterIndex:untilMouseUp:)
+  - Selector: "trackMouse:inRect:ofView:untilMouseUp:"
+    MethodKind: Instance
+    SwiftName: trackMouse(with:in:of:untilMouseUp:)
+- Name: NSTextAttachmentLayout
+  Methods:
+  - Selector: "attachmentBoundsForAttributes:location:textContainer:proposedLineFragment:position:"
+    MethodKind: Instance
+    SwiftName: attachmentBounds(for:location:textContainer:proposedLineFragment:position:)
+  - Selector: "imageForBounds:attributes:location:textContainer:"
+    MethodKind: Instance
+    SwiftName: image(for:attributes:location:textContainer:)
+  - Selector: "viewProviderForParentView:location:textContainer:"
+    MethodKind: Instance
+    SwiftName: viewProvider(for:location:textContainer:)
+- Name: NSUserInterfaceValidations
+  Methods:
+  - Selector: "validateUserInterfaceItem:"
+    MethodKind: Instance
+    SwiftName: validateUserInterfaceItem(_:)

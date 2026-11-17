@@ -1,0 +1,66 @@
+Small NSArchiver (typedstream) archives of AppKit nib object classes, written by
+mkfix.m (next to this file; build for x86_64 against the system frameworks and
+run as `mkfix <output dir>`) running on the Mac OS X 10.14.4 and macOS 26.7.3 systems named by the
+directories. Objects were built with public setters or by decoding a scripted
+coder, then archived with +[NSArchiver archivedDataWithRootObject:]. On
+macOS 26 NSNibOutletConnector and NSIBObjectData refuse non-keyed archiving, so
+those two files exist for 10.14.4 only.
+Content (expected by tests/appkit-nonkeyed-nib-objects.m):
+  customobject    NSCustomObject, class name "FixtureOwner", extension "ext"
+  windowtemplate  NSWindowTemplate, style 15, backing 2, rect 10,20,300,200,
+                  hides-on-deactivate/not-released/deferred/one-shot, title
+                  "Fixture Window", class NSWindow, screen rect present
+                  (0,0,1440,900), minimum size 120x80, autosave
+                  "FixtureAutosave", maximum size 640x480
+  outletconnector NSNibOutletConnector from a custom object to another, "someOutlet"
+  controlconnector NSNibControlConnector from FixtureTarget to FixtureOwner, "doIt:"
+  customview      NSCustomView with class name "NSTextView", extension "cvext"
+  ibobjectdata    NSIBObjectData with root FixtureOwner and one connector
+  view            NSView, frame 1,2,30,40, width-sizable and max-X margin, subviews
+                  not autoresizing, one subview, dragged type "public.text"
+  control         NSControl, tag 7, same frame, with an NSActionCell (text "cell",
+                  tag 5, action doIt:), tests/appkit-nonkeyed-view-control-cell.m
+
+Archives of controls (written by mkfix-controls.m, same two systems; expected by
+tests/appkit-nonkeyed-controls.m):
+  button-push     NSButton: title Push, alternate title Pushed, key equivalent k with
+                  command+option, tag 3, disabled, image above, left aligned, continuous,
+                  periodic delay 0.5 and interval 0.25
+  button-checkbox check box with mixed state allowed and set
+  button-radio    radio button, on, small
+  button-toggle   recessed push-on-push-off button showing its border on mouse over
+  textfield       NSTextField "Hello field", editable, selectable, bezeled, draws red
+                  background, blue text, right aligned, tag 11
+  textfield-rounded NSTextField with a rounded bezel
+  textlabel       label: not editable or selectable, no bezel or background, centered
+  imageview       NSImageView: top-left alignment, axes independently scaling, gray bezel
+                  frame, editable
+  slider          NSSlider 5..95, value 35, 7 tick marks above, snapping, alt increment 2.5
+  box, box-secondary NSBox primary (title Group, at bottom, line border, margins 7x9,
+                  one subview) and secondary (bezel border, above bottom, margins 3x5)
+  tabview         NSTabView with two items (second selected, with a colour), bottom
+                  tabs, no background, truncated labels allowed
+  matrix          NSMatrix of 2x3 radio button cells (tags 100-105, last selected)
+  progress, spinner NSProgressIndicator determinate small unbezeled 10..60 and
+                  indeterminate default
+mkfix-controllers.m (same run procedure) writes the controller, connector and view template
+archives expected by tests/appkit-nonkeyed-controllers.m:
+  objectcontroller, arraycontroller, treecontroller   controllers with non-default settings
+  bindingconnector, axattributeconnector             nib connectors
+  viewtemplate-button, viewtemplate-unknown, textviewtemplate, texttemplate
+                                                      view templates (10.14.4 only: macOS 26
+                                                      archives them as an empty object)
+  custom.nib/objects.nib                              old-style nib (10.14.4 only) with an owner,
+                                                      a custom object of a known class and one of an
+                                                      unknown class, and outlet connectors
+NSDictionaryController is not archived: 10.14.4 does not read back its own archive of it.
+
+mkfix-enabled.m (same run procedure) writes archives of an NSButton, NSScroller, NSTextField and
+NSSlider, each enabled (-on) and disabled (-off), expected by tests/appkit-nonkeyed-control-enabled.m.
+
+mkfix-cells.m (same run procedure) writes archives of a stepper cell and stepper (range 11..77,
+increment 3, value 22, no wrap, no autorepeat), level indicator cells and a level indicator,
+a secure text field cell, a search field cell (whole string, immediately, 7 recents, autosave
+name, menu template), a form cell (title width 55), a segmented control (three segments with
+labels, a disabled one with tag 77, select-any tracking), browser cells (leaf and branch) and
+custom and PDF image reps, expected by tests/appkit-nonkeyed-cells2.m.

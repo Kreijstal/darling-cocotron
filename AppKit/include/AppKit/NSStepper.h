@@ -17,22 +17,23 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 
-@interface NSStepper : NSControl
+// Legacy ObjC ABI (i386): instance size must stay 0x6c, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
+@interface NSStepper : NSControl {
+    NS_LEGACY_IVAR_PAD(_NSStepperReserved1, 16)
+}
 
-- (double) minValue;
-- (double) increment;
-- (double) maxValue;
+@property(nonatomic) double minValue;
+@property(nonatomic) double increment;
+@property(nonatomic) double maxValue;
 
-- (BOOL) autorepeat;
-- (BOOL) valueWraps;
+@property(nonatomic) BOOL autorepeat;
+@property(nonatomic) BOOL valueWraps;
 
-- (void) setMinValue: (double) value;
-- (void) setIncrement: (double) value;
-- (void) setMaxValue: (double) value;
 
-- (void) setAutorepeat: (BOOL) flag;
-- (void) setValueWraps: (BOOL) flag;
 
 @end

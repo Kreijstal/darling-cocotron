@@ -17,23 +17,24 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSDate.h>
 #import <Foundation/NSObject.h>
 
 @class NSMutableArray, NSArray, NSTimer;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSAnimationCurve) {
     NSAnimationEaseInOut,
     NSAnimationEaseIn,
     NSAnimationEaseOut,
     NSAnimationLinear,
-} NSAnimationCurve;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSAnimationBlockingMode) {
     NSAnimationBlocking,
     NSAnimationNonblocking,
     NSAnimationNonblockingThreaded
-} NSAnimationBlockingMode;
+};
 
 typedef float NSAnimationProgress;
 
@@ -68,6 +69,7 @@ APPKIT_EXPORT NSString *NSAnimationTriggerOrderOut;
     BOOL _isAnimating;
     NSTimer *_timer;
     NSTimeInterval _startTime;
+    NS_LEGACY_IVAR_PAD(_NSAnimationReserved, 16)
 }
 
 - initWithDuration: (NSTimeInterval) duration

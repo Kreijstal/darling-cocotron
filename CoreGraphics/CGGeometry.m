@@ -39,6 +39,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #warning MAX is already defined, MAX(a, b) may not not behave as expected.
 #endif
 
+#include <math.h>
 #import <CoreGraphics/CGGeometry.h>
 
 const CGRect CGRectZero = {{0, 0}, {0, 0}};
@@ -326,4 +327,84 @@ bool CGRectContainsRect(CGRect a, CGRect b) {
             CGRectGetMaxX(b) <= CGRectGetMaxX(a) &&
             CGRectGetMinY(b) >= CGRectGetMinY(a) &&
             CGRectGetMaxY(b) <= CGRectGetMaxY(a));
+}
+
+// The rectangle is standardized first and the amount is clamped to the
+// rectangle's extent along the edge's axis, so the slice never reaches past
+// the rectangle and the remainder is never negative. A null rectangle divides
+// into two null rectangles.
+void CGRectDivide(CGRect rect, CGRect *slice, CGRect *remainder,
+                  CGFloat amount, CGRectEdge edge)
+{
+    if (CGRectIsNull(rect)) {
+        *slice = CGRectNull;
+        *remainder = CGRectNull;
+        return;
+    }
+
+    if (rect.size.width < 0) {
+        rect.origin.x += rect.size.width;
+        rect.size.width = -rect.size.width;
+    }
+    if (rect.size.height < 0) {
+        rect.origin.y += rect.size.height;
+        rect.size.height = -rect.size.height;
+    }
+
+    CGFloat extent = (edge == CGRectMinXEdge || edge == CGRectMaxXEdge)
+                             ? rect.size.width
+                             : rect.size.height;
+    // Written as comparisons rather than MIN/MAX so that a NaN amount
+    // propagates into the results instead of being replaced.
+    if (amount < 0)
+        amount = 0;
+    if (amount > extent)
+        amount = extent;
+
+    *slice = rect;
+    *remainder = rect;
+
+    switch (edge) {
+    case CGRectMinXEdge:
+        slice->size.width = amount;
+        remainder->origin.x += amount;
+        remainder->size.width -= amount;
+        break;
+    case CGRectMaxXEdge:
+        slice->origin.x += rect.size.width - amount;
+        slice->size.width = amount;
+        remainder->size.width -= amount;
+        break;
+    case CGRectMinYEdge:
+        slice->size.height = amount;
+        remainder->origin.y += amount;
+        remainder->size.height -= amount;
+        break;
+    case CGRectMaxYEdge:
+        slice->origin.y += rect.size.height - amount;
+        slice->size.height = amount;
+        remainder->size.height -= amount;
+        break;
+    }
+}
+
+// Private. True for every finite value, false for NaN and the infinities.
+// Evidence: black-box calls on macOS 26.7.3 (tier 2) with 0, -0, 1, -1, the
+// smallest subnormal, DBL_MAX, 1e39, NaN, -NaN, +inf and -inf.
+// Test: coregraphics-private-context-functions.c
+bool CGFloatIsValid(CGFloat value) {
+    return isfinite(value);
+}
+
+// The same rectangle with a non-negative width and height. A negative size
+// moves the origin by the size. Observed on macOS 26.7.3: CGRectNull and
+// CGRectInfinite come back unchanged, and a size of -0 becomes +0.
+CGRect CGRectStandardize(CGRect rect) {
+    if (rect.size.width < 0)
+        rect.origin.x += rect.size.width;
+    if (rect.size.height < 0)
+        rect.origin.y += rect.size.height;
+    rect.size.width = fabs(rect.size.width);
+    rect.size.height = fabs(rect.size.height);
+    return rect;
 }

@@ -21,9 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @class NSPasteboard, NSWindow, NSImage;
 
-typedef NSUInteger NSDragOperation;
-
-enum {
+typedef NS_OPTIONS(NSUInteger, NSDragOperation) {
     NSDragOperationNone = 0x00,
     NSDragOperationCopy = 0x01,
     NSDragOperationLink = 0x02,
@@ -31,7 +29,7 @@ enum {
     NSDragOperationPrivate = 0x08,
     NSDragOperationMove = 0x10,
     NSDragOperationDelete = 0x20,
-    NSDragOperationEvery = UINT_MAX
+    NSDragOperationEvery = NSUIntegerMax,
 };
 
 @protocol NSDraggingInfo
@@ -46,6 +44,37 @@ enum {
 - (int) draggingSequenceNumber;
 - (NSArray *) namesOfPromisedFilesDroppedAtDestination: (NSURL *) destination;
 @end
+
+typedef NS_ENUM(NSInteger, NSDraggingFormation) {
+    NSDraggingFormationDefault = 0,
+    NSDraggingFormationNone,
+    NSDraggingFormationPile,
+    NSDraggingFormationList,
+    NSDraggingFormationStack,
+};
+
+typedef NS_ENUM(NSInteger, NSDraggingContext) {
+    NSDraggingContextOutsideApplication = 0,
+    NSDraggingContextWithinApplication,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSDraggingItemEnumerationOptions) {
+    NSDraggingItemEnumerationConcurrent = 1,
+    NSDraggingItemEnumerationClearNonenumeratedImages = (1UL << 16),
+};
+
+typedef NS_ENUM(NSInteger, NSSpringLoadingHighlight) {
+    NSSpringLoadingHighlightNone = 0,
+    NSSpringLoadingHighlightStandard,
+    NSSpringLoadingHighlightEmphasized,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSSpringLoadingOptions) {
+    NSSpringLoadingDisabled = 0,
+    NSSpringLoadingEnabled = 1UL << 0,
+    NSSpringLoadingContinuousActivation = 1UL << 1,
+    NSSpringLoadingNoHover = 1UL << 3,
+};
 
 @protocol NSDraggingDestination <NSObject>
 @optional

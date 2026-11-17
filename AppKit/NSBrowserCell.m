@@ -26,7 +26,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSStringDrawer.h>
 #import <AppKit/NSStringDrawing.h>
 
+@interface NSCell (NSBrowserCellFlags)
+- (void) _applyAppleFlags: (unsigned int) flags flags2: (unsigned int) flags2;
+@end
+
 @implementation NSBrowserCell
+
+// Bit 17 of the first cell flag word is the leaf flag.
+- (void) _applyAppleFlags: (unsigned int) flags flags2: (unsigned int) flags2 {
+    [super _applyAppleFlags: flags flags2: flags2];
+    NS_EXTRA(NSBrowserCell, self)->_isLeaf = (flags & 0x00020000) ? YES : NO;
+}
 
 + (NSImage *) branchImage {
     return [NSImage imageNamed: @"NSBrowserCellArrow"];
@@ -41,17 +51,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return [self initTextCell: @""];
 }
 
+- copyWithZone: (NSZone *) zone {
+    NSBrowserCell *copy = [super copyWithZone: zone];
+
+    // the extra state is not shared between the copies
+    NS_EXTRA_COPY(NSBrowserCell, copy, self);
+    [NS_EXTRA(NSBrowserCell, copy)->_alternateImage retain];
+    return copy;
+}
+
 - (void) dealloc {
-    [_alternateImage release];
+    [NS_EXTRA(NSBrowserCell, self)->_alternateImage release];
+    NS_EXTRA_FREE(NSBrowserCell, self);
     [super dealloc];
 }
 
 - (BOOL) isLeaf {
-    return _isLeaf;
+    return NS_EXTRA(NSBrowserCell, self)->_isLeaf;
 }
 
 - (BOOL) isLoaded {
-    return _isLoaded;
+    return NS_EXTRA(NSBrowserCell, self)->_isLoaded;
 }
 
 /*
@@ -62,15 +82,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 */
 
 - (NSImage *) alternateImage {
-    return _alternateImage;
+    return NS_EXTRA(NSBrowserCell, self)->_alternateImage;
 }
 
 - (void) setLeaf: (BOOL) value {
-    _isLeaf = value;
+    NS_EXTRA(NSBrowserCell, self)->_isLeaf = value;
 }
 
 - (void) setLoaded: (BOOL) value {
-    _isLoaded = value;
+    NS_EXTRA(NSBrowserCell, self)->_isLoaded = value;
 }
 
 - (void) setImage: (NSImage *) value {
@@ -79,23 +99,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setAlternateImage: (NSImage *) value {
     value = [value retain];
-    [_alternateImage release];
-    _alternateImage = value;
+    [NS_EXTRA(NSBrowserCell, self)->_alternateImage release];
+    NS_EXTRA(NSBrowserCell, self)->_alternateImage = value;
 }
 
 - (void) setState: (NSControlStateValue) value {
-    _state = value;
-    _isHighlighted = _state == NSOnState;
+    NS_EXTRA(NSCell, self)->_state = value;
+    NS_EXTRA(NSCell, self)->_isHighlighted = NS_EXTRA(NSCell, self)->_state == NSOnState;
 }
 
 - (void) set {
     [self setState: NSControlStateValueOn];
-    _isHighlighted = YES;
+    NS_EXTRA(NSCell, self)->_isHighlighted = YES;
 }
 
 - (void) reset {
     [self setState: NSControlStateValueOff];
-    _isHighlighted = NO;
+    NS_EXTRA(NSCell, self)->_isHighlighted = NO;
 }
 
 - (NSColor *) highlightColorInView: (NSView *) view {

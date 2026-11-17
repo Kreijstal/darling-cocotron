@@ -46,7 +46,8 @@
     _bitsPerPixel = 32;
     _bytesPerRow = (_bitsPerPixel / (sizeof(char) * 8)) * _width;
     _colorSpace = O2ColorSpaceCreateDeviceRGB();
-    _bitmapInfo = kO2BitmapByteOrder32Big | kO2ImageAlphaPremultipliedLast;
+    // JPEG has no alpha: the fourth byte of each pixel is padding
+    _bitmapInfo = kO2BitmapByteOrder32Big | kO2ImageAlphaNoneSkipLast;
 
     _pixelData = (CFDataRef)
             [[NSData alloc] initWithBytesNoCopy: bitmap

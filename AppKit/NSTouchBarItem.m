@@ -18,6 +18,7 @@
 */
 
 #import <AppKit/NSTouchBarItem.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFixedSpaceLarge =
         @"NSTouchBarItemIdentifierFixedSpaceLarge";
@@ -27,16 +28,24 @@ NSTouchBarItemIdentifier const NSTouchBarItemIdentifierFlexibleSpace =
         @"NSTouchBarItemIdentifierFlexibleSpace";
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierOtherItemsProxy =
         @"NSTouchBarItemIdentifierOtherItemsProxy";
+NSTouchBarItemIdentifier const NSTouchBarItemIdentifierCandidateList =
+        @"NSTouchBarItemIdentifierCandidateList";
 NSTouchBarItemIdentifier const NSTouchBarItemIdentifierCharacterPicker =
         @"NSTouchBarItemIdentifierCharacterPicker";
 
-@interface NSColorPickerTouchBarItem : NSTouchBarItem
+@interface NSColorPickerTouchBarItem : NSTouchBarItem {
+    NS_LEGACY_IVAR_PAD(_NSColorPickerTouchBarItemReserved, 64)
+}
 @end
 
-@interface NSSharingServicePickerTouchBarItem : NSTouchBarItem
+@interface NSSharingServicePickerTouchBarItem : NSTouchBarItem {
+    NS_LEGACY_IVAR_PAD(_NSSharingServicePickerTouchBarItemReserved, 32)
+}
 @end
 
-@interface NSSliderTouchBarItem : NSTouchBarItem
+@interface NSSliderTouchBarItem : NSTouchBarItem {
+    NS_LEGACY_IVAR_PAD(_NSSliderTouchBarItemReserved, 36)
+}
 @end
 
 static inline NSMethodSignature *stubTouchBarSignature(SEL aSelector) {
@@ -56,6 +65,8 @@ static inline NSMethodSignature *stubTouchBarSignature(SEL aSelector) {
 }
 
 @implementation NSTouchBarItem
+@synthesize identifier = _identifier;
+
 @synthesize identifier = _identifier;
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector

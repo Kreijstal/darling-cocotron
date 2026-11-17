@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSGeometry.h>
 #import <Foundation/NSMapTable.h>
 #import <Foundation/NSObject.h>
@@ -29,9 +30,10 @@ APPKIT_EXPORT NSString *const NSContextHelpModeDidDeactivateNotification;
 
 @interface NSHelpManager : NSObject {
     NSMapTable *_objectToText;
+    NS_LEGACY_IVAR_PAD(_NSHelpManagerReserved, 24)
 }
 
-+ (NSHelpManager *) sharedHelpManager;
+@property(class, readonly, retain, nonnull) NSHelpManager *sharedHelpManager;
 
 + (BOOL) isContextHelpModeActive;
 + (void) setContextHelpModeActive: (BOOL) flag;

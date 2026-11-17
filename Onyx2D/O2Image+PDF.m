@@ -141,8 +141,12 @@ const char *O2ImageNameWithIntent(O2ColorRenderingIntent intent) {
                           alphaInfo == kO2ImageAlphaFirst ||
                           alphaInfo == kO2ImageAlphaNoneSkipFirst;
         BOOL alphaLast = hasAlpha && (alphaFirst == NO);
-        BOOL bigEndian = _bitmapInfo & kO2BitmapByteOrder32Big;
-        BOOL littleEndian = bigEndian == NO;
+        // The default byte order is component order (R before B), like the
+        // 32-bit big-endian one.
+        O2BitmapInfo byteOrder = _bitmapInfo & kO2BitmapByteOrderMask;
+        BOOL littleEndian = byteOrder == kO2BitmapByteOrder16Little ||
+                            byteOrder == kO2BitmapByteOrder32Little;
+        BOOL bigEndian = littleEndian == NO;
         int bytesPerPixel = _bitsPerPixel / 8;
         for (int i = 0; i < _height; i++, ptr += _bytesPerRow) {
             const uint8_t *linePtr = ptr;
@@ -306,6 +310,25 @@ const char *O2ImageNameWithIntent(O2ColorRenderingIntent intent) {
     int bytesPerRow = ([stream bytesPerRow] != 0)
                               ? [stream bytesPerRow]
                               : ((width * bitsPerPixel) + 7) / 8;
+
+    // The DCT (JPEG) decoder always returns 8-bit RGBA (4 bytes per pixel), while the
+    // image samples are what /ColorSpace says: 3 bytes for DeviceRGB, 1 for DeviceGray.
+    // Repack them, otherwise every row is read with the wrong pixel stride.
+    if (bitsPerComponent == 8 && (componentsPerPixel == 1 || componentsPerPixel == 3) &&
+        bytesPerRow == width * 4 && [data length] >= (NSUInteger)(height * bytesPerRow)) {
+        int packedRow = width * componentsPerPixel;
+        NSMutableData *packed = [NSMutableData dataWithLength: height * packedRow];
+        const unsigned char *src = [data bytes];
+        unsigned char *dst = [packed mutableBytes];
+
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                for (int c = 0; c < componentsPerPixel; c++)
+                    dst[y * packedRow + x * componentsPerPixel + c] =
+                            src[y * bytesPerRow + x * 4 + c];
+        data = packed;
+        bytesPerRow = packedRow;
+    }
     O2DataProvider *provider;
     O2Image *image = NULL;
 

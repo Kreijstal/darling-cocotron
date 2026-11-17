@@ -51,12 +51,18 @@ CGColorCreateWithPattern(CGColorSpaceRef colorSpace, CGPatternRef pattern,
                          const CGFloat *components);
 
 COREGRAPHICS_EXPORT CGColorRef CGColorCreateCopy(CGColorRef self);
+COREGRAPHICS_EXPORT CGColorRef CGColorCreateCopyByMatchingToColorSpace(
+    CGColorSpaceRef colorSpace, CGColorRenderingIntent intent, CGColorRef color,
+    CFDictionaryRef options)
+    CF_SWIFT_NAME(CGColor.converted(to:intent:self:options:));
 COREGRAPHICS_EXPORT CGColorRef CGColorCreateCopyWithAlpha(CGColorRef self,
                                                           CGFloat a);
 COREGRAPHICS_EXPORT CGColorRef CGColorCreateCopyByMatchingToColorSpace(
         CGColorSpaceRef space, CGColorRenderingIntent intent, CGColorRef color,
         CFDictionaryRef options)
     CF_SWIFT_NAME(CGColor.converted(to:intent:self:options:));
+
+COREGRAPHICS_EXPORT CFTypeID CGColorGetTypeID(void);
 
 COREGRAPHICS_EXPORT bool CGColorEqualToColor(CGColorRef self, CGColorRef other);
 

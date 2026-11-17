@@ -18,31 +18,30 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSTextField.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 APPKIT_EXPORT NSString *const NSComboBoxSelectionDidChangeNotification;
 APPKIT_EXPORT NSString *const NSComboBoxSelectionIsChangingNotification;
 APPKIT_EXPORT NSString *const NSComboBoxWillDismissNotification;
 APPKIT_EXPORT NSString *const NSComboBoxWillPopUpNotification;
 
-@interface NSComboBox : NSTextField
+// Legacy ObjC ABI (i386): instance size must stay 0x68, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
+@interface NSComboBox : NSTextField {
+    NS_LEGACY_IVAR_PAD(_NSComboBoxReserved1, 4)
+}
 
 - dataSource;
-- (BOOL) usesDataSource;
-- (BOOL) isButtonBordered;
-- (CGFloat) itemHeight;
-- (BOOL) hasVerticalScroller;
-- (NSSize) intercellSpacing;
-- (BOOL) completes;
-- (NSInteger) numberOfVisibleItems;
+@property(nonatomic) BOOL usesDataSource;
+@property(nonatomic, getter=isButtonBordered) BOOL buttonBordered;
+@property(nonatomic) CGFloat itemHeight;
+@property(nonatomic) BOOL hasVerticalScroller;
+@property(nonatomic) NSSize intercellSpacing;
+@property(nonatomic) BOOL completes;
+@property(nonatomic) NSInteger numberOfVisibleItems;
 
 - (void) setDataSource: value;
-- (void) setUsesDataSource: (BOOL) value;
-- (void) setButtonBordered: (BOOL) value;
-- (void) setItemHeight: (CGFloat) value;
-- (void) setHasVerticalScroller: (BOOL) value;
-- (void) setIntercellSpacing: (NSSize) value;
-- (void) setCompletes: (BOOL) completes;
-- (void) setNumberOfVisibleItems: (NSInteger) value;
 
 - (NSInteger) numberOfItems;
 - (NSArray *) objectValues;

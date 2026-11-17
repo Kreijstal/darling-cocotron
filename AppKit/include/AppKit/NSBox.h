@@ -17,11 +17,12 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSView.h>
 
 @class NSFont;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSTitlePosition) {
     NSNoTitle,
     NSAboveTop,
     NSAtTop,
@@ -29,43 +30,43 @@ typedef enum {
     NSAboveBottom,
     NSAtBottom,
     NSBelowBottom,
-} NSTitlePosition;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSBoxType) {
     NSBoxPrimary,
     NSBoxSecondary,
     NSBoxSeparator,
     NSBoxOldStyle,
     NSBoxCustom
-} NSBoxType;
+};
 
+// Legacy ObjC ABI (i386): instance size must stay 0x88, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSBox : NSView {
-    NSBoxType _boxType;
-    NSBorderType _borderType;
-    NSTitlePosition _titlePosition;
     id _titleCell;
+    NS_LEGACY_IVAR_PAD(_NSBoxReserved1, 4)
     NSSize _contentViewMargins;
-    BOOL _isTransparent;
-    id _customData;
+    NS_LEGACY_IVAR_PAD(_NSBoxReserved2, 36)
+    NS_EXTRA_IVARS_BEGIN(NSBox)
+        NSBoxType _boxType;
+        NSBorderType _borderType;
+        NSTitlePosition _titlePosition;
+        BOOL _isTransparent;
+        id _customData;
+    NS_EXTRA_IVARS_END(NSBox)
 }
 
-- (NSBoxType) boxType;
-- (NSBorderType) borderType;
-- (NSString *) title;
-- (NSFont *) titleFont;
+@property(nonatomic) NSBoxType boxType;
+@property(nonatomic) NSBorderType borderType;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, retain) NSFont *titleFont;
 - contentView;
-- (NSSize) contentViewMargins;
-- (NSTitlePosition) titlePosition;
-- (BOOL) isTransparent;
+@property(nonatomic) NSSize contentViewMargins;
+@property(nonatomic) NSTitlePosition titlePosition;
+@property(nonatomic, getter=isTransparent) BOOL transparent;
 
-- (void) setBoxType: (NSBoxType) value;
-- (void) setBorderType: (NSBorderType) value;
-- (void) setTitle: (NSString *) title;
-- (void) setTitleFont: (NSFont *) font;
 - (void) setContentView: (NSView *) view;
-- (void) setContentViewMargins: (NSSize) value;
-- (void) setTitlePosition: (NSTitlePosition) value;
-- (void) setTransparent: (BOOL) value;
 - (void) setTitleWithMnemonic: (NSString *) value;
 
 - (NSRect) titleRect;
@@ -75,14 +76,10 @@ typedef enum {
 - (void) setFrameFromContentFrame: (NSRect) content;
 - (void) sizeToFit;
 
-- (CGFloat) borderWidth;
-- (CGFloat) cornerRadius;
-- (NSColor *) borderColor;
-- (NSColor *) fillColor;
+@property(nonatomic) CGFloat borderWidth;
+@property(nonatomic) CGFloat cornerRadius;
+@property(nonatomic, retain) NSColor *borderColor;
+@property(nonatomic, retain) NSColor *fillColor;
 
-- (void) setBorderWidth: (CGFloat) value;
-- (void) setCornerRadius: (CGFloat) value;
-- (void) setBorderColor: (NSColor *) value;
-- (void) setFillColor: (NSColor *) value;
 
 @end

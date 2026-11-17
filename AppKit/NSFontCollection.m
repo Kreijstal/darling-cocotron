@@ -32,3 +32,6 @@
 }
 
 @end
+
+NSNotificationName const NSFontCollectionDidChangeNotification = @"NSFontCollectionDidChange";
+NSString *const NSFontCollectionUser = @"com.apple.UserFonts";

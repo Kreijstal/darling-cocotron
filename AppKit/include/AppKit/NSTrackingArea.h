@@ -21,10 +21,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // Reviewed for API completeness against 10.6.
 
 #import <Foundation/Foundation.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSView;
 
-enum {
+typedef NS_OPTIONS(NSUInteger, NSTrackingAreaOptions) {
     NSTrackingMouseEnteredAndExited = (1 << 0),
     NSTrackingMouseMoved = (1 << 1),
     NSTrackingCursorUpdate = (1 << 2),
@@ -39,15 +40,14 @@ enum {
     NSTrackingEnabledDuringMouseDrag = (1 << 10),
 };
 
-typedef NSUInteger NSTrackingAreaOptions;
-
 @interface NSTrackingArea : NSObject {
+    NS_LEGACY_IVAR_PAD(_NSTrackingAreaReserved, 32)
+    NS_EXTRA_IVARS_BEGIN(NSTrackingArea)
     NSRect _rect;
     NSTrackingAreaOptions _options;
     id _owner;
     void *_userData;
     BOOL _retainUserData;
-
     // NSWindow needs this. It's maintained when areas are collected for the
     // window.
     NSView *_view;
@@ -63,6 +63,7 @@ typedef NSUInteger NSTrackingAreaOptions;
     // be discarded by -[NSView discardCursorRects] (and -[NSWindow
     // discardCursorRects]).
     BOOL _legacy;
+    NS_EXTRA_IVARS_END(NSTrackingArea)
 }
 
 // Apple documented

@@ -97,8 +97,13 @@ COREGRAPHICS_EXPORT CGRect CGRectUnion(CGRect a, CGRect b);
 COREGRAPHICS_EXPORT CGRect CGRectStandardize(CGRect rect);
 COREGRAPHICS_EXPORT CGRect CGRectIntersection(CGRect a, CGRect b);
 COREGRAPHICS_EXPORT CGRect CGRectIntegral(CGRect rect);
+COREGRAPHICS_EXPORT CGRect CGRectStandardize(CGRect rect);
 
 COREGRAPHICS_EXPORT bool CGRectContainsRect(CGRect a, CGRect b);
+
+COREGRAPHICS_EXPORT void CGRectDivide(CGRect rect, CGRect *slice,
+                                      CGRect *remainder, CGFloat amount,
+                                      CGRectEdge edge);
 
 CFDictionaryRef CGPointCreateDictionaryRepresentation(CGPoint point);
 bool CGPointMakeWithDictionaryRepresentation(CFDictionaryRef dict,

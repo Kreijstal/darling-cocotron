@@ -18,15 +18,20 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
-typedef NSString *NSDraggingImageComponentKey;
+typedef NSString *NSDraggingImageComponentKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSDraggingImageComponentKey const NSDraggingImageComponentIconKey;
 APPKIT_EXPORT NSDraggingImageComponentKey const NSDraggingImageComponentLabelKey;
 
-@interface NSDraggingImageComponent : NSObject
+@interface NSDraggingImageComponent : NSObject {
+    NS_LEGACY_IVAR_PAD(_NSDraggingImageComponentReserved, 24)
+}
 @end
 
-@interface NSDraggingItem : NSObject
+@interface NSDraggingItem : NSObject {
+    NS_LEGACY_IVAR_PAD(_NSDraggingItemReserved, 36)
+}
 @end

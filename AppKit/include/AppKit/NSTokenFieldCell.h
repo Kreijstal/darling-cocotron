@@ -18,18 +18,27 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSTextFieldCell.h>
+#import <AppKit/AppKitIvarLayout.h>
 
-typedef enum {
-    NSDefaultTokenStyle,
-    NSPlainTextTokenStyle,
-    NSRoundedTokenStyle,
-} NSTokenStyle;
+typedef NS_ENUM(NSUInteger, NSTokenStyle) {
+    NSTokenStyleDefault,
+    NSTokenStylePlainSquared,
+    NSTokenStyleRounded,
+};
+
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSDefaultTokenStyle = NSTokenStyleDefault,
+    NSPlainTextTokenStyle = NSTokenStylePlainSquared,
+    NSRoundedTokenStyle = NSTokenStyleRounded,
+};
 
 @interface NSTokenFieldCell : NSTextFieldCell {
     NSTokenStyle _style;
     NSCharacterSet *_set;
     NSTimeInterval _completionDelay;
     id _delegate;
+    NS_LEGACY_IVAR_PAD(_NSTokenFieldCellReserved, 60)
 }
 
 + (NSTimeInterval) defaultCompletionDelay;

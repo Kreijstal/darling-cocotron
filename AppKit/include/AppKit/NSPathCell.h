@@ -1,14 +1,14 @@
 #import <AppKit/NSActionCell.h>
 #import <AppKit/NSSavePanel.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSPathComponentCell, NSURL, NSColor;
 
-enum {
+typedef NS_ENUM(NSInteger, NSPathStyle) {
     NSPathStyleStandard,
     NSPathStyleNavigationBar,
     NSPathStylePopUp,
 };
-typedef NSInteger NSPathStyle;
 
 @interface NSPathCell : NSActionCell /* < NSOpenSavePanelDelegate > */ {
     NSURL *_URL;
@@ -20,6 +20,7 @@ typedef NSInteger NSPathStyle;
     NSColor *_backgroundColor;
     NSArray *_allowedTypes;
     NSAttributedString *_placeholder;
+    NS_LEGACY_IVAR_PAD(_NSPathCellReserved, 32)
 }
 
 - (void) mouseEntered: (NSEvent *) event

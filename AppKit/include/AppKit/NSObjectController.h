@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSController.h>
+#import <AppKit/AppKitIvarLayout.h>
 @class NSString, NSPredicate, NSFetchRequest, NSManagedObjectContext,
         NSMenuItem, NSError, NSArray, NSCountedSet;
 
@@ -27,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     BOOL _editable;
     BOOL _automaticallyPreparesContent;
     NSCountedSet *_observedKeys;
+    NS_LEGACY_IVAR_PAD(_NSObjectControllerReserved, 12)
 }
 - (void) setContent: (id) content;
 - (id) content;
@@ -36,14 +38,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - initWithContent: (id) content;
 
-//-(Class)objectClass;
+- (Class) objectClass;
 //-(NSString *)entityName;
 //-(NSPredicate *)fetchPredicate;
 //-(NSManagedObjectContext *)managedObjectContext;
 - (BOOL) isEditable;
 - (BOOL) automaticallyPreparesContent;
 
-//-(void)setObjectClass:(Class)class;
+- (void) setObjectClass: (Class) objectClass;
 //-(void)setEntityName:(NSString *)name;
 //-(void)setFetchPredicate:(NSPredicate *)predicate;
 //-(void)setManagedObjectContext:(NSManagedObjectContext *)context;

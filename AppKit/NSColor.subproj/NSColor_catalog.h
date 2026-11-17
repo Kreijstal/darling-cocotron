@@ -20,6 +20,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSColor.h>
 
 @interface NSColor_catalog : NSColor {
+#if !__OBJC2__ // NSColor's ivars, see NSColor.h
+    NSColorListName _catalogName;
+    NSColorName _colorName;
+#endif
     NSColor *_color;
 }
 
@@ -28,6 +32,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 + (NSColor *) colorWithCatalogName: (NSColorListName) catalogName
                          colorName: (NSColorName) colorName
                              color: (NSColor *) color;
-- (NSColor *) highlightWithLevel: (CGFloat) level;
+// A catalog color read from an archive: it stands for the named color as the
+// running system defines it; the archived color is used only when the name is
+// not known. The catalog is left unchanged.
++ (NSColor *) colorWithArchivedCatalogName: (NSColorListName) catalogName
+                                 colorName: (NSColorName) colorName
+                             fallbackColor: (NSColor *) fallback;
 
 @end

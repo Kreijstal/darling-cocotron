@@ -59,14 +59,85 @@
 	NSInvalidAbstractInvocation();
 }
 
++(CGError) activateWindowsOfProcess:(pid_t)pid options:(uint32_t)options
+{
+	return kCGErrorNotImplemented;
+}
+
++(CGError) copyFrontProcessID:(pid_t*)pid
+{
+	return kCGErrorNotImplemented;
+}
+
+// A backend that can read the window system's keymap overrides this; nil means it has no layout.
 -(CGSKeyboardLayout*) createKeyboardLayout
 {
-	NSInvalidAbstractInvocation();
+	return nil;
 }
 
 -(CGPoint) mouseLocation
 {
 	NSInvalidAbstractInvocation();
+}
+
+-(BOOL) isKeyDown:(CGKeyCode)keyCode
+{
+	return NO;
+}
+
+-(BOOL) isMouseButtonDown:(CGMouseButton)button
+{
+	return NO;
+}
+
+extern void _CGSPostHotKeyEvent(CGSConnectionID connection, int uid, BOOL pressed, CGEventFlags flags, CGPoint location, uint64_t time);
+
+-(void) setHotKeyWithUID:(int)uid keyCode:(CGKeyCode)keyCode flags:(CGEventFlags)flags exclusion:(int)exclusion
+{
+}
+
+-(BOOL) getHotKeyWithUID:(int)uid keyCode:(CGKeyCode*)outKeyCode flags:(CGEventFlags*)outFlags
+{
+	return NO;
+}
+
+-(void) removeHotKeyWithUID:(int)uid
+{
+}
+
+-(BOOL) isHotKeyEnabledWithUID:(int)uid
+{
+	return NO;
+}
+
+-(void) setHotKeyWithUID:(int)uid enabled:(BOOL)enabled
+{
+}
+
+-(CGError) getGlobalHotKeyOperatingMode:(int*)outMode
+{
+	if (!outMode)
+		return kCGErrorIllegalArgument;
+	*outMode = _hotKeyOperatingMode;
+	return kCGErrorSuccess;
+}
+
+-(CGError) setGlobalHotKeyOperatingMode:(int)mode
+{
+	if (mode < 0 || mode > 2)
+		return kCGErrorIllegalArgument;
+	_hotKeyOperatingMode = mode;
+	[self hotKeyOperatingModeChanged];
+	return kCGErrorSuccess;
+}
+
+-(void) hotKeyOperatingModeChanged
+{
+}
+
+-(void) postHotKeyEventForUID:(int)uid pressed:(BOOL)pressed flags:(CGEventFlags)flags location:(CGPoint)location time:(uint64_t)time
+{
+	_CGSPostHotKeyEvent(_connectionId, uid, pressed, flags, location, time);
 }
 
 -(NSArray *) modesForScreen:(int)screenIndex
@@ -92,6 +163,11 @@
 -(void*) nativeDisplay
 {
 	NSInvalidAbstractInvocation();
+}
+
+-(NSArray<NSDictionary*>*) copyWindowDescriptions
+{
+	return [[NSArray alloc] init];
 }
 
 -(CGError) destroyWindow:(CGSWindowID)winId

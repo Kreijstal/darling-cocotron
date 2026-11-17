@@ -64,10 +64,6 @@ typedef struct png_data_t {
 	int len;
 } png_data_t;
 
-static void O2ImageSource_PNGError(png_structp png_ptr, png_const_charp error_message) {
-    [NSException raise: @"PNG exception" format: @"%s", error_message];
-}
-
 static void png_read_data(png_structp pngPtr, png_bytep data, png_size_t length) {
     //Here we get our IO pointer back from the read struct.
     //This is the parameter we passed to the png_set_read_fn() function.
@@ -80,7 +76,7 @@ static void png_read_data(png_structp pngPtr, png_bytep data, png_size_t length)
 
 // Load an unpacked image into outData - RGBA 8 bits/pixels
 // Adapted from libpng sample code
-bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int *outHeight, void **outData) {
+bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int *outHeight, int *outComp, void **outData) {
     png_structp png_ptr;
     png_infop info_ptr;
     unsigned int sig_read = 0;
@@ -96,7 +92,7 @@ bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int 
      * was compiled with a compatible version
      * of the library.  REQUIRED
      */
-    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, O2ImageSource_PNGError, NULL);
+    png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
 
     if (png_ptr == NULL) {
         return false;
@@ -107,6 +103,15 @@ bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int 
     info_ptr = png_create_info_struct(png_ptr);
     if (info_ptr == NULL) {
         png_destroy_read_struct(&png_ptr, NULL, NULL);
+        return false;
+    }
+
+    /* libpng reports errors (a truncated or corrupt file) by longjmp-ing here: an
+       Objective-C exception raised from its error callback cannot unwind through
+       libpng's C frames and aborted the process. Nothing is allocated by us before
+       png_read_png, the only call that can fail. */
+    if (setjmp(png_jmpbuf(png_ptr))) {
+        png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
         return false;
     }
 
@@ -162,6 +167,7 @@ bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int 
 
         *outWidth = width;
         *outHeight = height;
+        *outComp = nb_comp; // 3: no alpha channel in the file, 4: alpha
     } @catch (NSException *ex) {
         NSLog(@"Error reading PNG: %@", ex);
         png_destroy_read_struct(&png_ptr, &info_ptr, NULL);
@@ -180,11 +186,12 @@ bool load_png_image(const unsigned char *buffer, int length, int *outWidth, int 
 unsigned char *stbi_png_load_from_memory(const unsigned char *buffer, int len, int *x, int *y, int *comp, int req_comp)
 {
 	void* result = NULL;
-	if (comp) {
-		*comp = 4;
-	}
-	if (load_png_image(buffer, len, x, y, &result) == NO) {
+	int channels = 4;
+	if (load_png_image(buffer, len, x, y, &channels, &result) == NO) {
 		result = NULL;
+	}
+	if (comp) {
+		*comp = channels;
 	}
 	return result;
 }
@@ -816,19 +823,18 @@ static unsigned char *O2PNGLoadCgBI(const unsigned char *buffer, NSUInteger leng
     if (pixels == NULL)
         return nil;
 
-    // clamp premultiplied data, this should probably be moved into the O2Image
-    // init
-    int i;
-    for (i = 0; i < bytesPerRow * height; i += 4) {
-        unsigned char a = pixels[i + 3];
-        if (a != 0xff) {
-            unsigned char r = pixels[i + 0];
-            unsigned char g = pixels[i + 1];
-            unsigned char b = pixels[i + 2];
+    // A file without alpha (gray, RGB or palette without transparency) yields an image
+    // without an alpha channel: its fourth byte is padding.
+    BOOL hasAlpha = comp == 2 || comp == 4;
 
-            pixels[i + 0] = MIN(r, a);
-            pixels[i + 1] = MIN(g, a);
-            pixels[i + 2] = MIN(b, a);
+    // PNG stores straight alpha; the image below is declared premultiplied.
+    int i;
+    for (i = 0; hasAlpha && i < bytesPerRow * height; i += 4) {
+        unsigned a = pixels[i + 3];
+        if (a != 0xff) {
+            pixels[i + 0] = (unsigned char) ((pixels[i + 0] * a + 127) / 255);
+            pixels[i + 1] = (unsigned char) ((pixels[i + 1] * a + 127) / 255);
+            pixels[i + 2] = (unsigned char) ((pixels[i + 2] * a + 127) / 255);
         }
     }
 
@@ -845,7 +851,8 @@ static unsigned char *O2PNGLoadCgBI(const unsigned char *buffer, NSUInteger leng
                               bitsPerPixel: bitsPerPixel
                                bytesPerRow: bytesPerRow
                                 colorSpace: colorSpace
-                                bitmapInfo: kO2ImageAlphaPremultipliedLast |
+                                bitmapInfo: (hasAlpha ? kO2ImageAlphaPremultipliedLast
+                                                      : kO2ImageAlphaNoneSkipLast) |
                                             kO2BitmapByteOrder32Big
                                    decoder: NULL
                                   provider: provider

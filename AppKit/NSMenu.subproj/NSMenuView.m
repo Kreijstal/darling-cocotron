@@ -352,6 +352,10 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
 
             case '\r': // Return = select the current item and exit the loop
                 MENUDEBUG(@"Selecting current item and exit");
+                // The item remembered so far is the one under the pointer
+                // before its latest move; the highlighted item of the
+                // deepest open menu, picked after the loop, is the one meant.
+                item = nil;
                 state = STATE_EXIT;
                 break;
             case 27: // Escape = pop unless we're done then it's cancel
@@ -678,8 +682,15 @@ const NSTimeInterval kMouseMovementThreshold = .001f;
     item = [self trackForEvent: event];
     [[self window] setAcceptsMouseMovedEvents: didAccept];
 
-    if (item != nil)
-        [NSApp sendAction: [item action] to: [item target] from: item];
+    if (item != nil) {
+        NSMenu *menu = [item menu];
+        NSInteger index = [menu indexOfItem: item];
+
+        if (menu != nil && index != NSNotFound)
+            [menu performActionForItemAtIndex: index];
+        else
+            [NSApp sendAction: [item action] to: [item target] from: item];
+    }
 }
 
 @end

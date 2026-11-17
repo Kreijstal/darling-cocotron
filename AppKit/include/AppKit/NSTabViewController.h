@@ -18,9 +18,19 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 #import <AppKit/NSViewController.h>
 
-@interface NSTabViewController : NSViewController
+typedef NS_ENUM(NSInteger, NSTabViewControllerTabStyle) {
+    NSTabViewControllerTabStyleSegmentedControlOnTop = 0,
+    NSTabViewControllerTabStyleSegmentedControlOnBottom,
+    NSTabViewControllerTabStyleToolbar,
+    NSTabViewControllerTabStyleUnspecified = -1,
+};
+
+@interface NSTabViewController : NSViewController {
+    NS_LEGACY_IVAR_PAD(_NSTabViewControllerReserved, 12)
+}
 
 @end

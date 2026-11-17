@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSNibLoading.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSPanel.h>
 
 @class NSButton, NSColorWell, NSMatrix, NSView, NSColorList, NSSplitView,
@@ -35,19 +36,30 @@ enum {
     NSColorPanelAllModesMask = 0xFFFF,
 };
 
-enum {
-    NSNoModeColorPanel = -1,
-    NSGrayModeColorPanel = 0,
-    NSRGBModeColorPanel = 1,
-    NSCMYKModeColorPanel = 2,
-    NSHSBModeColorPanel = 3,
-    NSCustomPaletteModeColorPanel = 4,
-    NSColorListModeColorPanel = 5,
-    NSWheelModeColorPanel = 6,
-    NSCrayonModeColorPanel = 7,
+typedef NS_ENUM(NSInteger, NSColorPanelMode) {
+    NSColorPanelModeNone = -1,
+    NSColorPanelModeGray = 0,
+    NSColorPanelModeRGB = 1,
+    NSColorPanelModeCMYK = 2,
+    NSColorPanelModeHSB = 3,
+    NSColorPanelModeCustomPalette = 4,
+    NSColorPanelModeColorList = 5,
+    NSColorPanelModeWheel = 6,
+    NSColorPanelModeCrayon = 7,
 };
 
-typedef NSInteger NSColorPanelMode;
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSNoModeColorPanel = NSColorPanelModeNone,
+    NSGrayModeColorPanel = NSColorPanelModeGray,
+    NSRGBModeColorPanel = NSColorPanelModeRGB,
+    NSCMYKModeColorPanel = NSColorPanelModeCMYK,
+    NSHSBModeColorPanel = NSColorPanelModeHSB,
+    NSCustomPaletteModeColorPanel = NSColorPanelModeCustomPalette,
+    NSColorListModeColorPanel = NSColorPanelModeColorList,
+    NSWheelModeColorPanel = NSColorPanelModeWheel,
+    NSCrayonModeColorPanel = NSColorPanelModeCrayon,
+};
 
 APPKIT_EXPORT NSString *const NSColorPanelColorDidChangeNotification;
 
@@ -71,10 +83,11 @@ APPKIT_EXPORT NSString *const NSColorPanelColorDidChangeNotification;
     NSMutableArray *_colorPickers;
     id _target;
     SEL _action;
+    NS_LEGACY_IVAR_PAD(_NSColorPanelReserved, 56)
 }
 
 + (BOOL) sharedColorPanelExists;
-+ (NSColorPanel *) sharedColorPanel;
+@property(class, readonly, retain, nonnull) NSColorPanel *sharedColorPanel;
 
 + (void) setPickerMask: (NSUInteger) mask;
 + (void) setPickerMode: (NSColorPanelMode) mode;
@@ -83,18 +96,13 @@ APPKIT_EXPORT NSString *const NSColorPanelColorDidChangeNotification;
          withEvent: (NSEvent *) event
           fromView: (NSView *) view;
 
-- (NSColor *) color;
+@property(nonatomic, retain) NSColor *color;
 - (CGFloat) alpha;
-- (NSColorPanelMode) mode;
-- (BOOL) showsAlpha;
-- (BOOL) isContinuous;
-- (NSView *) accessoryView;
+@property(nonatomic) NSColorPanelMode mode;
+@property(nonatomic) BOOL showsAlpha;
+@property(nonatomic, getter=isContinuous) BOOL continuous;
+@property(nonatomic, retain) NSView *accessoryView;
 
-- (void) setColor: (NSColor *) color;
-- (void) setMode: (NSColorPanelMode) mode;
-- (void) setShowsAlpha: (BOOL) flag;
-- (void) setContinuous: (BOOL) flag;
-- (void) setAccessoryView: (NSView *) view;
 
 - (void) setAction: (SEL) action;
 - (void) setTarget: target;

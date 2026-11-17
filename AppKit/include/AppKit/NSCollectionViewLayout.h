@@ -18,14 +18,32 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSCollectionView.h>
 #import <Foundation/NSString.h>
 
-typedef NSString *NSCollectionViewDecorationElementKind;
+typedef NSString *NSCollectionViewDecorationElementKind NS_SWIFT_BRIDGED_TYPEDEF;
 
 APPKIT_EXPORT NSCollectionViewSupplementaryElementKind const
         NSCollectionElementKindInterItemGapIndicator;
 
-@interface NSCollectionViewLayout : NSObject
+typedef NS_ENUM(NSInteger, NSCollectionElementCategory) {
+    NSCollectionElementCategoryItem,
+    NSCollectionElementCategorySupplementaryView,
+    NSCollectionElementCategoryDecorationView,
+    NSCollectionElementCategoryInterItemGap,
+};
+
+typedef NS_ENUM(NSInteger, NSCollectionUpdateAction) {
+    NSCollectionUpdateActionInsert,
+    NSCollectionUpdateActionDelete,
+    NSCollectionUpdateActionReload,
+    NSCollectionUpdateActionMove,
+    NSCollectionUpdateActionNone,
+};
+
+@interface NSCollectionViewLayout : NSObject {
+    NS_LEGACY_IVAR_PAD(_NSCollectionViewLayoutReserved, 124)
+}
 
 @end

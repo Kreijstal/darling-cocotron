@@ -22,15 +22,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @class NSArray, NSData, NSPasteboard, NSURL;
 
+typedef NS_ENUM(NSInteger, NSImageLayoutDirection) {
+    NSImageLayoutDirectionUnspecified = -1,
+    NSImageLayoutDirectionLeftToRight = 2,
+    NSImageLayoutDirectionRightToLeft = 3,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x1c, Apple's, which leaves
+// no room for further ivars or for a pointer to extra state: the two flags
+// share the storage unit of _bitsPerSample there (assign them YES/NO only).
+// Never add an ivar to this class.
 @interface NSImageRep : NSObject <NSCopying> {
     NSSize _size;
     NSString *_colorSpaceName;
+#if __OBJC2__
     NSInteger _bitsPerSample;
     int _pixelsWide;
     int _pixelsHigh;
 
     BOOL _hasAlpha;
     BOOL _isOpaque;
+#else
+    NSInteger _bitsPerSample : 30;
+    unsigned int _hasAlpha : 1;
+    unsigned int _isOpaque : 1;
+    int _pixelsWide;
+    int _pixelsHigh;
+#endif
 }
 
 + (NSArray *) registeredImageRepClasses;
@@ -60,21 +78,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (instancetype) initWithCoder:(NSCoder *) coder;
 
-- (NSSize) size;
-- (int) pixelsWide;
-- (int) pixelsHigh;
-- (BOOL) isOpaque;
+@property(nonatomic) NSSize size;
+@property(nonatomic) int pixelsWide;
+@property(nonatomic) int pixelsHigh;
+@property(nonatomic, getter=isOpaque) BOOL opaque;
 - (BOOL) hasAlpha;
-- (NSString *) colorSpaceName;
-- (NSInteger) bitsPerSample;
+@property(nonatomic, copy) NSString *colorSpaceName;
+@property(nonatomic) NSInteger bitsPerSample;
 
-- (void) setSize: (NSSize) value;
-- (void) setPixelsWide: (int) value;
-- (void) setPixelsHigh: (int) value;
-- (void) setOpaque: (BOOL) value;
 - (void) setAlpha: (BOOL) value;
-- (void) setColorSpaceName: (NSString *) value;
-- (void) setBitsPerSample: (int) value;
 
 - (BOOL) draw;
 - (BOOL) drawAtPoint: (NSPoint) point;

@@ -18,14 +18,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/NSGeometry.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
 @class NSColor, NSMutableArray, NSArray, NSColorSpace, NSBezierPath;
 
-typedef enum {
+typedef NS_OPTIONS(NSUInteger, NSGradientDrawingOptions) {
     NSGradientDrawsBeforeStartingLocation = (1 << 0),
     NSGradientDrawsAfterEndingLocation = (1 << 1),
-} NSGradientDrawingOptions;
+};
 
 @interface NSGradient : NSObject <NSCopying> {
     NSColorSpace *_colorSpace;
@@ -33,6 +34,7 @@ typedef enum {
     NSInteger _numberOfComponents;
     CGFloat **_components;
     CGFloat *_locations;
+    NS_LEGACY_IVAR_PAD(_NSGradientReserved, 8)
 }
 
 - initWithColors: (NSArray *) colors

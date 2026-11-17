@@ -18,20 +18,21 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSUserInterfaceValidation.h>
 #import <Foundation/NSGeometry.h>
 #import <Foundation/NSObject.h>
 
 @class NSString, NSImage, NSView, NSMenuItem, NSToolbar, NSToolbarItemView;
 
-enum {
-    NSToolbarItemVisibilityPriorityStandard = 0,
-    NSToolbarItemVisibilityPriorityLow = -1000,
-    NSToolbarItemVisibilityPriorityHigh = 1000,
-    NSToolbarItemVisibilityPriorityUser = 2000
-};
+typedef NSInteger NSToolbarItemVisibilityPriority NS_TYPED_EXTENSIBLE_ENUM;
 
-typedef NSString *NSToolbarItemIdentifier;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityStandard = 0;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityLow = -1000;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityHigh = 1000;
+static const NSToolbarItemVisibilityPriority NSToolbarItemVisibilityPriorityUser = 2000;
+
+typedef NSString *NSToolbarItemIdentifier NS_EXTENSIBLE_STRING_ENUM;
 
 APPKIT_EXPORT const NSToolbarItemIdentifier
         NSToolbarCustomizeToolbarItemIdentifier;
@@ -42,8 +43,15 @@ APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarSeparatorItemIdentifier;
 APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarShowColorsItemIdentifier;
 APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarShowFontsItemIdentifier;
 APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarSpaceItemIdentifier;
+// The system SDK declares these three without const.
+APPKIT_EXPORT NSToolbarItemIdentifier NSToolbarToggleSidebarItemIdentifier;
+APPKIT_EXPORT NSToolbarItemIdentifier
+        NSToolbarSidebarTrackingSeparatorItemIdentifier;
+APPKIT_EXPORT NSToolbarItemIdentifier NSToolbarWritingToolsItemIdentifier;
 
 @interface NSToolbarItem : NSObject <NSCopying, NSValidatedUserInterfaceItem> {
+    NS_LEGACY_IVAR_PAD(_NSToolbarItemReserved, 64)
+    NS_EXTRA_IVARS_BEGIN(NSToolbarItem)
     NSToolbarItemIdentifier _itemIdentifier;
     NSToolbar *_toolbar;
     NSToolbarItemView *_enclosingView;
@@ -54,16 +62,14 @@ APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarSpaceItemIdentifier;
     NSString *_paletteLabel;
     id _target;
     SEL _action;
-
     NSMenuItem *_menuFormRepresentation;
-
     NSView *_view;
-
     NSSize _minSize;
     NSSize _maxSize;
     NSInteger _visibilityPriority;
     BOOL _autovalidates;
     BOOL _isEnabled;
+    NS_EXTRA_IVARS_END(NSToolbarItem)
 }
 
 - (instancetype) initWithItemIdentifier: (NSToolbarItemIdentifier) identifier;
@@ -71,38 +77,25 @@ APPKIT_EXPORT const NSToolbarItemIdentifier NSToolbarSpaceItemIdentifier;
 - (NSToolbarItemIdentifier) itemIdentifier;
 - (NSToolbar *) toolbar;
 
-- (NSString *) label;
-- (NSString *) paletteLabel;
-- (NSMenuItem *) menuFormRepresentation;
-- (NSView *) view;
-- (NSSize) minSize;
-- (NSSize) maxSize;
-- (NSInteger) visibilityPriority;
-- (BOOL) autovalidates;
+@property(nonatomic, copy) NSString *label;
+@property(nonatomic, copy) NSString *paletteLabel;
+@property(nonatomic, retain) NSMenuItem *menuFormRepresentation;
+@property(nonatomic, retain) NSView *view;
+@property(nonatomic) NSSize minSize;
+@property(nonatomic) NSSize maxSize;
+@property(nonatomic) NSInteger visibilityPriority;
+@property(nonatomic) BOOL autovalidates;
 - (BOOL) allowsDuplicatesInToolbar;
 
-- (void) setLabel: (NSString *) label;
-- (void) setPaletteLabel: (NSString *) label;
-- (void) setMenuFormRepresentation: (NSMenuItem *) menuItem;
-- (void) setView: (NSView *) view;
-- (void) setMinSize: (NSSize) size;
-- (void) setMaxSize: (NSSize) size;
-- (void) setVisibilityPriority: (NSInteger) value;
-- (void) setAutovalidates: (BOOL) value;
 
-- (NSImage *) image;
+@property(nonatomic, retain) NSImage *image;
 - target;
-- (SEL) action;
-- (NSInteger) tag;
-- (BOOL) isEnabled;
-- (NSString *) toolTip;
+@property(nonatomic) SEL action;
+@property(nonatomic) NSInteger tag;
+@property(nonatomic, getter=isEnabled) BOOL enabled;
+@property(nonatomic, copy) NSString *toolTip;
 
-- (void) setImage: (NSImage *) image;
 - (void) setTarget: target;
-- (void) setAction: (SEL) action;
-- (void) setTag: (NSInteger) tag;
-- (void) setEnabled: (BOOL) enabled;
-- (void) setToolTip: (NSString *) tip;
 
 - (void) validate;
 

@@ -18,39 +18,43 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/NSGeometry.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
 @class NSImage, NSColor, NSEvent;
 
 @interface NSCursor : NSObject <NSCoding> {
+    NS_LEGACY_IVAR_PAD(_NSCursorReserved, 12)
+    NS_EXTRA_IVARS_BEGIN(NSCursor)
     NSImage *_image;
     NSPoint _hotSpot;
     BOOL _isSetOnMouseEntered;
     BOOL _isSetOnMouseExited;
     id _platformCursor;
+    NS_EXTRA_IVARS_END(NSCursor)
 }
 
-+ (NSCursor *) currentCursor;
-+ (NSCursor *) currentSystemCursor;
+@property(class, readonly, retain, nonnull) NSCursor *currentCursor;
+@property(class, readonly, retain) NSCursor *currentSystemCursor;
 
-+ (NSCursor *) arrowCursor;
-+ (NSCursor *) closedHandCursor;
-+ (NSCursor *) contextualMenuCursor;
-+ (NSCursor *) crosshairCursor;
-+ (NSCursor *) disappearingItemCursor;
-+ (NSCursor *) IBeamCursor;
-+ (NSCursor *) openHandCursor;
-+ (NSCursor *) pointingHandCursor;
-+ (NSCursor *) resizeDownCursor;
-+ (NSCursor *) resizeLeftCursor;
-+ (NSCursor *) resizeLeftRightCursor;
-+ (NSCursor *) resizeRightCursor;
-+ (NSCursor *) resizeUpCursor;
-+ (NSCursor *) resizeUpDownCursor;
+@property(class, readonly, retain, nonnull) NSCursor *arrowCursor;
+@property(class, readonly, retain, nonnull) NSCursor *closedHandCursor;
+@property(class, readonly, retain, nonnull) NSCursor *contextualMenuCursor;
+@property(class, readonly, retain, nonnull) NSCursor *crosshairCursor;
+@property(class, readonly, retain, nonnull) NSCursor *disappearingItemCursor;
+@property(class, readonly, retain, nonnull) NSCursor *IBeamCursor;
+@property(class, readonly, retain, nonnull) NSCursor *openHandCursor;
+@property(class, readonly, retain, nonnull) NSCursor *pointingHandCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeDownCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeLeftCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeLeftRightCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeRightCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeUpCursor;
+@property(class, readonly, retain, nonnull) NSCursor *resizeUpDownCursor;
 
-+ (NSCursor *) dragCopyCursor;
-+ (NSCursor *) dragLinkCursor;
-+ (NSCursor *) operationNotAllowedCursor;
+@property(class, readonly, retain, nonnull) NSCursor *dragCopyCursor;
+@property(class, readonly, retain, nonnull) NSCursor *dragLinkCursor;
+@property(class, readonly, retain, nonnull) NSCursor *operationNotAllowedCursor;
 
 + (void) hide;
 + (void) unhide;

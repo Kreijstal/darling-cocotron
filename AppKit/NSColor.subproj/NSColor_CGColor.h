@@ -21,6 +21,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <ApplicationServices/ApplicationServices.h>
 
 @interface NSColor_CGColor : NSColor {
+#if !__OBJC2__ // NSColor's ivars, see NSColor.h
+    NSColorListName _catalogName;
+    NSImage *_pattern;
+#endif
     CGColorRef _colorRef;
     NSColorSpaceName _colorSpaceName;
 }
@@ -49,5 +53,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                 brightness: (CGFloat) brightness
                      alpha: (CGFloat) alpha
                  spaceName: (NSColorSpaceName) spaceName;
+
+
+// The same with an explicit CGColor space for the components.
++ (NSColor *) colorWithGray: (CGFloat) gray
+                      alpha: (CGFloat) alpha
+                  spaceName: (NSColorSpaceName) spaceName
+                 colorSpace: (CGColorSpaceRef) colorSpace;
++ (NSColor *) colorWithRed: (CGFloat) red
+                     green: (CGFloat) green
+                      blue: (CGFloat) blue
+                     alpha: (CGFloat) alpha
+                 spaceName: (NSColorSpaceName) spaceName
+                colorSpace: (CGColorSpaceRef) colorSpace;
++ (NSColor *) colorWithHue: (CGFloat) hue
+                saturation: (CGFloat) saturation
+                brightness: (CGFloat) brightness
+                     alpha: (CGFloat) alpha
+                 spaceName: (NSColorSpaceName) spaceName
+                colorSpace: (CGColorSpaceRef) colorSpace;
 
 @end

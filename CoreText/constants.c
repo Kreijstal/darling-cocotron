@@ -27,6 +27,7 @@ const CFStringRef kCTStrokeWidthAttributeName = CFSTR("NSStrokeWidth");
 const CFStringRef kCTForegroundColorAttributeName = CFSTR("CTForegroundColor");
 const CFStringRef kCTSuperscriptAttributeName = CFSTR("NSSuperScript");
 const CFStringRef kCTParagraphStyleAttributeName = CFSTR("NSParagraphStyle");
+const CFStringRef kCTGlyphInfoAttributeName = CFSTR("NSGlyphInfo");
 const CFStringRef kCTKernAttributeName = CFSTR("CTKernAttributeName");
 const CFStringRef kCTLanguageAttributeName = CFSTR("CTLanguageAttributeName");
 const CFStringRef kCTTypesetterOptionForcedEmbeddingLevel = CFSTR("CTTypesetterOptionForcedEmbeddingLevel");
@@ -36,3 +37,7 @@ const CFStringRef kCTFontWidthTrait = CFSTR("NSCTFontWidthTrait");
 const CFStringRef kCTFontSlantTrait = CFSTR("NSCTFontSlantTrait");
 const CFStringRef kCTFontOpenTypeFeatureTag = CFSTR("CTFeatureOpenTypeTag");
 const CFStringRef kCTFontOpenTypeFeatureValue = CFSTR("CTFeatureOpenTypeValue");
+
+// Not declared in the public SDK headers, but exported by macOS's CoreText (as an NSString attribute name) and bound by
+// applications. The string was read from the exported constant on macOS 26.7.3 (black-box observation; absent on macOS 10.14).
+const CFStringRef NSTextEncapsulationAttributeName = CFSTR("NSTextEncapsulation");

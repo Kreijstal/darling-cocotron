@@ -21,6 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSATSTypesetter.h>
 #import <AppKit/NSAccessibility.h>
+#import <AppKit/NSAccessibilityCustomAction.h>
 #import <AppKit/NSAccessibilityElement.h>
 #import <AppKit/NSActionCell.h>
 #import <AppKit/NSAdaptiveImageGlyph.h>
@@ -51,6 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSColor.h>
 #import <AppKit/NSColorList.h>
 #import <AppKit/NSColorPanel.h>
+#import <AppKit/NSColorSampler.h>
 #import <AppKit/NSColorPicker.h>
 #import <AppKit/NSColorSampler.h>
 #import <AppKit/NSColorSpace.h>
@@ -65,6 +67,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSDatePicker.h>
 #import <AppKit/NSDatePickerCell.h>
 #import <AppKit/NSDictionaryController.h>
+#import <AppKit/NSDiffableDataSourceSnapshot.h>
 #import <AppKit/NSDockTile.h>
 #import <AppKit/NSDocument.h>
 #import <AppKit/NSDocumentController.h>
@@ -98,6 +101,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSInterfaceStyle.h>
 #import <AppKit/NSKeyBindingManager.h>
 #import <AppKit/NSKeyValueBinding.h>
+#import <AppKit/NSAutoresizingMaskLayoutConstraint.h>
+#import <AppKit/NSContentSizeLayoutConstraint.h>
+#import <AppKit/NSIBPrototypingLayoutConstraint.h>
+#import <AppKit/NSLayoutAnchor.h>
 #import <AppKit/NSLayoutConstraint.h>
 #import <AppKit/NSLayoutManager.h>
 #import <AppKit/NSLevelIndicator.h>
@@ -105,6 +112,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSMatrix.h>
 #import <AppKit/NSMenu.h>
 #import <AppKit/NSMenuItem.h>
+#import <AppKit/NSMenuItemBadge.h>
 #import <AppKit/NSMovie.h>
 #import <AppKit/NSMovieView.h>
 #import <AppKit/NSMutableParagraphStyle.h>
@@ -120,6 +128,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSOpenPanel.h>
 #import <AppKit/NSOutlineView.h>
 #import <AppKit/NSPDFImageRep.h>
+#import <AppKit/NSPICTImageRep.h>
 #import <AppKit/NSPageController.h>
 #import <AppKit/NSPageLayout.h>
 #import <AppKit/NSPanel.h>
@@ -138,6 +147,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSPrintPanel.h>
 #import <AppKit/NSPrinter.h>
 #import <AppKit/NSProgressIndicator.h>
+#import <AppKit/NSQuickDrawView.h>
 #import <AppKit/NSResponder.h>
 #import <AppKit/NSRuleEditor.h>
 #import <AppKit/NSRulerMarker.h>
@@ -158,6 +168,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSSegmentedControl.h>
 #import <AppKit/NSShadow.h>
 #import <AppKit/NSSharingService.h>
+#import <AppKit/NSPreviewRepresentingActivityItem.h>
 #import <AppKit/NSSlider.h>
 #import <AppKit/NSSliderCell.h>
 #import <AppKit/NSSound.h>

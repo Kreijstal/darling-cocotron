@@ -190,7 +190,25 @@ static NSMutableArray *_cursorStack = nil;
 }
 
 - initWithCoder: (NSCoder *) coder {
-    // TODO: Need to implement
+    if (![coder allowsKeyedCoding]) {
+        // QUIRK: a cursor archived with NSArchiver decodes to the standard arrow cursor,
+        // whichever cursor (standard or created from an image) was archived. The archive holds
+        // the hot spot as two floats, the image (nil for standard cursors) and two flag bytes,
+        // all of which are read and dropped. Not documented. Evidence: black-box observation on
+        // macOS 10.14.4, i386 and x86_64 (tier 2): 17 standard cursors and one image cursor
+        // all unarchive to +arrowCursor, also while another cursor is current.
+        // Test: tests/src/typedstream_appkit.m (test_quirk_cursor_decodes_as_arrow)
+        float hotSpot[2];
+        id image = nil;
+        char flags[2];
+
+        [coder decodeValuesOfObjCTypes: "ff", &hotSpot[0], &hotSpot[1]];
+        [coder decodeValueOfObjCType: @encode(id) at: &image];
+        [coder decodeValueOfObjCType: @encode(char) at: &flags[0]];
+        [coder decodeValueOfObjCType: @encode(char) at: &flags[1]];
+        [image release];
+        return [self initWithName: @"arrowCursor"];
+    }
     return self;
 }
 
@@ -199,7 +217,7 @@ static NSMutableArray *_cursorStack = nil;
 }
 
 - initWithName: (NSString *) name {
-    _platformCursor = NSPlatformCreateCursorImpWithName(name);
+    NS_EXTRA(NSCursor, self)->_platformCursor = NSPlatformCreateCursorImpWithName(name);
     return self;
 }
 
@@ -378,40 +396,41 @@ static NSMutableArray *_cursorStack = nil;
 }
 
 - initWithImage: (NSImage *) image hotSpot: (NSPoint) hotSpot {
-    _image = [image retain];
-    _hotSpot = hotSpot;
-    _platformCursor = NSPlatformCreateCursorImpWithImage(image, hotSpot);
+    NS_EXTRA(NSCursor, self)->_image = [image retain];
+    NS_EXTRA(NSCursor, self)->_hotSpot = hotSpot;
+    NS_EXTRA(NSCursor, self)->_platformCursor = NSPlatformCreateCursorImpWithImage(image, hotSpot);
     return self;
 }
 
 - (void) dealloc {
-    [_image release];
-    NSPlatformReleaseCursorImp(_platformCursor);
+    [NS_EXTRA(NSCursor, self)->_image release];
+    NSPlatformReleaseCursorImp(NS_EXTRA(NSCursor, self)->_platformCursor);
+    NS_EXTRA_FREE(NSCursor, self);
     [super dealloc];
 }
 
 - (NSImage *) image {
-    return _image;
+    return NS_EXTRA(NSCursor, self)->_image;
 }
 
 - (NSPoint) hotSpot {
-    return _hotSpot;
+    return NS_EXTRA(NSCursor, self)->_hotSpot;
 }
 
 - (BOOL) isSetOnMouseEntered {
-    return _isSetOnMouseEntered;
+    return NS_EXTRA(NSCursor, self)->_isSetOnMouseEntered;
 }
 
 - (BOOL) isSetOnMouseExited {
-    return _isSetOnMouseExited;
+    return NS_EXTRA(NSCursor, self)->_isSetOnMouseExited;
 }
 
 - (void) setOnMouseEntered: (BOOL) value {
-    _isSetOnMouseEntered = value;
+    NS_EXTRA(NSCursor, self)->_isSetOnMouseEntered = value;
 }
 
 - (void) setOnMouseExited: (BOOL) value {
-    _isSetOnMouseExited = value;
+    NS_EXTRA(NSCursor, self)->_isSetOnMouseExited = value;
 }
 
 - (void) mouseEntered: (NSEvent *) event {
@@ -431,12 +450,12 @@ static NSMutableArray *_cursorStack = nil;
         [_cursorStack removeLastObject];
 
     [_cursorStack addObject: self];
-    NSPlatformSetCursorImp(_platformCursor);
+    NSPlatformSetCursorImp(NS_EXTRA(NSCursor, self)->_platformCursor);
 }
 
 - (void) push {
     [_cursorStack addObject: self];
-    NSPlatformSetCursorImp(_platformCursor);
+    NSPlatformSetCursorImp(NS_EXTRA(NSCursor, self)->_platformCursor);
 }
 
 + (void) pop {
@@ -450,7 +469,7 @@ static NSMutableArray *_cursorStack = nil;
     if (cursor == nil)
         cursor = [NSCursor arrowCursor];
 
-    NSPlatformSetCursorImp(cursor->_platformCursor);
+    NSPlatformSetCursorImp(NS_EXTRA(NSCursor, cursor)->_platformCursor);
 }
 
 @end

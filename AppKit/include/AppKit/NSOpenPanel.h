@@ -35,17 +35,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSInteger) runModalForDirectory: (NSString *) directory
                               file: (NSString *) file
                              types: (NSArray *) types;
-- (NSInteger) runModalForTypes: (NSArray *) types;
+- (NSModalResponse) runModalForTypes: (NSArray *) types;
 
-- (BOOL) allowsMultipleSelection;
-- (BOOL) canChooseDirectories;
-- (BOOL) canChooseFiles;
-- (BOOL) resolvesAliases;
+@property(nonatomic) BOOL allowsMultipleSelection;
+@property(nonatomic) BOOL canChooseDirectories;
+@property(nonatomic) BOOL canChooseFiles;
+@property(nonatomic) BOOL resolvesAliases;
 
-- (void) setAllowsMultipleSelection: (BOOL) flag;
-- (void) setCanChooseDirectories: (BOOL) flag;
-- (void) setCanChooseFiles: (BOOL) flag;
-- (void) setResolvesAliases: (BOOL) value;
 
 - (void) beginSheetForDirectory: (NSString *) path
                            file: (NSString *) name

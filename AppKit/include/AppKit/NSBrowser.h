@@ -17,61 +17,80 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 
 @class NSMatrix, NSScroller;
 
+typedef NS_ENUM(NSUInteger, NSBrowserColumnResizingType) {
+    NSBrowserNoColumnResizing = 0,
+    NSBrowserAutoColumnResizing = 1,
+    NSBrowserUserColumnResizing = 2,
+};
+
+typedef NS_ENUM(NSUInteger, NSBrowserDropOperation) {
+    NSBrowserDropOn,
+    NSBrowserDropAbove,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0xa0, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSBrowser : NSControl {
-    id _target;
-    SEL _action;
-    SEL _doubleAction;
-
+    NS_LEGACY_IVAR_PAD(_NSBrowserReserved1, 8)
     id _delegate;
-
-    NSMutableArray *_explicitTitles;
-    NSMutableArray *_titles;
-    NSMutableArray *_matrices;
-    NSMutableArray *_scrollViews;
-    NSScroller *_horizontalScroller;
-    NSColor *_backgroundColor;
-
+    SEL _doubleAction;
     Class _matrixClass;
-    Class _cellClass;
     id _cellPrototype;
-    int _numberOfVisibleColumns;
-    int _minColumnWidth;
-    int _firstVisibleColumn;
-    int _maxVisibleColumns;
-    int _selectedColumn;
-    BOOL _reusesColumns;
-    BOOL _hasHorizontalScroller;
-    BOOL _separatesColumns;
-    BOOL _isTitled;
-    BOOL _allowsMultipleSelection;
-    BOOL _allowsBranchSelection;
-    BOOL _allowsEmptySelection;
-    BOOL _takesTitleFromPreviousColumn;
-    BOOL _acceptsArrowKeys;
-    BOOL _sendsActionOnArrowKeys;
+    NS_LEGACY_IVAR_PAD(_NSBrowserReserved2, 16)
+    NSMutableArray *_titles;
+    NS_LEGACY_IVAR_PAD(_NSBrowserReserved3, 20)
+    NS_EXTRA_IVARS_BEGIN(NSBrowser)
+        id _target;
+        SEL _action;
+
+        NSMutableArray *_explicitTitles;
+        NSMutableArray *_matrices;
+        NSMutableArray *_scrollViews;
+        NSScroller *_horizontalScroller;
+        NSColor *_backgroundColor;
+
+        Class _cellClass;
+        int _numberOfVisibleColumns;
+        int _minColumnWidth;
+        int _firstVisibleColumn;
+        int _maxVisibleColumns;
+        int _selectedColumn;
+        BOOL _reusesColumns;
+        BOOL _hasHorizontalScroller;
+        BOOL _separatesColumns;
+        BOOL _isTitled;
+        BOOL _allowsMultipleSelection;
+        BOOL _allowsBranchSelection;
+        BOOL _allowsEmptySelection;
+        BOOL _takesTitleFromPreviousColumn;
+        BOOL _acceptsArrowKeys;
+        BOOL _sendsActionOnArrowKeys;
+    NS_EXTRA_IVARS_END(NSBrowser)
 }
 
 - delegate;
-- (NSColor *) backgroundColor;
-- (SEL) doubleAction;
-- (Class) matrixClass;
-- (NSInteger) maxVisibleColumns;
-- (BOOL) hasHorizontalScroller;
-- (BOOL) separatesColumns;
-- (BOOL) isTitled;
-- (BOOL) takesTitleFromPreviousColumn;
-- (BOOL) allowsMultipleSelection;
-- (BOOL) allowsBranchSelection;
-- (BOOL) allowsEmptySelection;
-- (BOOL) acceptsArrowKeys;
-- (BOOL) sendsActionOnArrowKeys;
-- (BOOL) reusesColumns;
+@property(nonatomic, retain) NSColor *backgroundColor;
+@property(nonatomic) SEL doubleAction;
+@property(nonatomic) Class matrixClass;
+@property(nonatomic) NSInteger maxVisibleColumns;
+@property(nonatomic) BOOL hasHorizontalScroller;
+@property(nonatomic) BOOL separatesColumns;
+@property(nonatomic, getter=isTitled) BOOL titled;
+@property(nonatomic) BOOL takesTitleFromPreviousColumn;
+@property(nonatomic) BOOL allowsMultipleSelection;
+@property(nonatomic) BOOL allowsBranchSelection;
+@property(nonatomic) BOOL allowsEmptySelection;
+@property(nonatomic) BOOL acceptsArrowKeys;
+@property(nonatomic) BOOL sendsActionOnArrowKeys;
+@property(nonatomic) BOOL reusesColumns;
 
-- (NSInteger) lastColumn;
+@property(nonatomic) NSInteger lastColumn;
 - (NSInteger) lastVisibleColumn;
 - (NSInteger) firstVisibleColumn;
 
@@ -91,21 +110,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSRect) frameOfInsideOfColumn: (NSInteger) column;
 
 - (void) setDelegate: delegate;
-- (void) setBackgroundColor: (NSColor *) color;
-- (void) setDoubleAction: (SEL) action;
-- (void) setMatrixClass: (Class) aClass;
 - (void) setCellClass: (Class) aClass;
-- (void) setMaxVisibleColumns: (NSInteger) count;
-- (void) setHasHorizontalScroller: (BOOL) flag;
-- (void) setSeparatesColumns: (BOOL) flag;
-- (void) setTitled: (BOOL) flag;
-- (void) setTakesTitleFromPreviousColumn: (BOOL) flag;
-- (void) setAllowsMultipleSelection: (BOOL) flag;
-- (void) setAllowsBranchSelection: (BOOL) flag;
-- (void) setAllowsEmptySelection: (BOOL) flag;
-- (void) setAcceptsArrowKeys: (BOOL) flag;
-- (void) setSendsActionOnArrowKeys: (BOOL) flag;
-- (void) setReusesColumns: (BOOL) flag;
+@property(nonatomic, retain) id cellPrototype;
 
 - (void) setTitle: (NSString *) title ofColumn: (NSInteger) column;
 
@@ -119,7 +125,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) loadColumnZero;
 - (void) reloadColumn: (NSInteger) column;
 - (void) addColumn;
-- (void) setLastColumn: (NSInteger) column;
 - (void) validateVisibleColumns;
 
 - (void) scrollColumnsLeftBy: (NSInteger) delta;

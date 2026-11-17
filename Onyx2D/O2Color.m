@@ -105,12 +105,32 @@ O2ColorRef O2ColorCreate(O2ColorSpaceRef colorSpace, const O2Float *components)
     return O2ColorInitWithColorSpace([O2Color alloc], colorSpace, components);
 }
 
+// The generic colors are in the named generic spaces (CGColorCreateGenericRGB
+// is the Generic RGB space, which is not device RGB: a generic red filled into
+// an sRGB context gives different numbers). A space that cannot be created
+// falls back to the device one.
 O2ColorRef O2ColorCreateGenericGray(O2Float gray, O2Float a) {
-    return [[O2Color alloc] initWithDeviceGray: gray alpha: a];
+    O2ColorSpaceRef colorSpace =
+            O2ColorSpaceCreateWithName(CFSTR("kCGColorSpaceGenericGray"));
+    if (colorSpace == NULL)
+        return [[O2Color alloc] initWithDeviceGray: gray alpha: a];
+
+    O2Float components[2] = {gray, a};
+    O2ColorRef result = O2ColorCreate(colorSpace, components);
+    O2ColorSpaceRelease(colorSpace);
+    return result;
 }
 
 O2ColorRef O2ColorCreateGenericRGB(O2Float r, O2Float g, O2Float b, O2Float a) {
-    return [[O2Color alloc] initWithDeviceRed: r green: g blue: b alpha: a];
+    O2ColorSpaceRef colorSpace =
+            O2ColorSpaceCreateWithName(CFSTR("kCGColorSpaceGenericRGB"));
+    if (colorSpace == NULL)
+        return [[O2Color alloc] initWithDeviceRed: r green: g blue: b alpha: a];
+
+    O2Float components[4] = {r, g, b, a};
+    O2ColorRef result = O2ColorCreate(colorSpace, components);
+    O2ColorSpaceRelease(colorSpace);
+    return result;
 }
 
 O2ColorRef O2ColorCreateGenericCMYK(O2Float c, O2Float m, O2Float y, O2Float k,
@@ -304,6 +324,84 @@ int O2ColorConvertComponentsToDeviceRGB(O2ColorSpaceRef inputSpace,
         return 0;
     }
     return 0;
+}
+
+// Spaces with colorimetric profiles (the named sRGB, Display P3, generic and
+// gray spaces) convert through CIE XYZ. Any other conversion goes through device
+// RGB; spaces it cannot convert from or to give NULL.
+O2ColorRef O2ColorCreateCopyByMatchingToColorSpace(O2ColorSpaceRef colorSpace,
+                                                   O2ColorRef color)
+{
+    if (colorSpace == NULL || color == NULL)
+        return NULL;
+    if (O2ColorGetPattern(color) != NULL)
+        return NULL;
+
+    O2ColorSpaceRef source = O2ColorGetColorSpace(color);
+    O2ColorSpaceModel sourceModel = O2ColorSpaceGetModel(source);
+    O2ColorSpaceModel targetModel = O2ColorSpaceGetModel(colorSpace);
+    const O2Float *components = O2ColorGetComponents(color);
+
+    // Two spaces with colorimetric profiles convert through CIE XYZ.
+    O2ColorProfile sourceProfile, targetProfile;
+    if (O2ColorSpaceGetColorProfile(source, &sourceProfile) &&
+        O2ColorSpaceGetColorProfile(colorSpace, &targetProfile)) {
+        size_t sourceCount = O2ColorSpaceGetNumberOfComponents(source);
+        size_t targetCount = O2ColorSpaceGetNumberOfComponents(colorSpace);
+        double in[3] = {components[0], 0, 0};
+        for (size_t i = 1; i < sourceCount; i++)
+            in[i] = components[i];
+        double out[3];
+        O2ColorProfileConvert(&sourceProfile, &targetProfile, in, out);
+
+        O2Float result[4];
+        for (size_t i = 0; i < targetCount; i++)
+            result[i] = out[i];
+        result[targetCount] = components[sourceCount];
+        return O2ColorCreate(colorSpace, result);
+    }
+
+    if (sourceModel == targetModel &&
+        (targetModel == kO2ColorSpaceModelMonochrome ||
+         targetModel == kO2ColorSpaceModelRGB ||
+         targetModel == kO2ColorSpaceModelCMYK))
+        return O2ColorCreate(colorSpace, components);
+
+    O2Float rgb[4];
+    if (!O2ColorConvertComponentsToDeviceRGB(source, components, rgb))
+        return NULL;
+
+    O2Float result[5];
+    switch (targetModel) {
+    case kO2ColorSpaceModelMonochrome:
+        // Rec. 709 luma weights.
+        result[0] = 0.2126f * rgb[0] + 0.7152f * rgb[1] + 0.0722f * rgb[2];
+        result[1] = rgb[3];
+        break;
+
+    case kO2ColorSpaceModelRGB:
+        result[0] = rgb[0];
+        result[1] = rgb[1];
+        result[2] = rgb[2];
+        result[3] = rgb[3];
+        break;
+
+    case kO2ColorSpaceModelCMYK: {
+        // The inverse of the CMYK to RGB conversion above, with full black
+        // generation.
+        O2Float maxRGB = MAX(rgb[0], MAX(rgb[1], rgb[2]));
+        O2Float k = 1 - maxRGB;
+        for (int i = 0; i < 3; i++)
+            result[i] = (maxRGB > 0) ? (maxRGB - rgb[i]) / maxRGB : 0;
+        result[3] = k;
+        result[4] = rgb[3];
+        break;
+    }
+
+    default:
+        return NULL;
+    }
+    return O2ColorCreate(colorSpace, result);
 }
 
 O2ColorRef O2ColorConvertToDeviceRGB(O2ColorRef self) {

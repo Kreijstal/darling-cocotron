@@ -17,20 +17,26 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSButton.h>
 #import <AppKit/NSMenuItem.h>
 
 APPKIT_EXPORT NSString *const NSPopUpButtonWillPopUpNotification;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x60, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSPopUpButton : NSButton {
-    BOOL _observerAdded;
+    NS_EXTRA_IVARS_BEGIN(NSPopUpButton)
+        BOOL _observerAdded;
+    NS_EXTRA_IVARS_END(NSPopUpButton)
 }
 - initWithFrame: (NSRect) frame pullsDown: (BOOL) pullsDown;
 
-- (BOOL) pullsDown;
-- (NSMenu *) menu;
-- (BOOL) autoenablesItems;
-- (NSRectEdge) preferredEdge;
+@property(nonatomic) BOOL pullsDown;
+@property(nonatomic, retain) NSMenu *menu;
+@property(nonatomic) BOOL autoenablesItems;
+@property(nonatomic) NSRectEdge preferredEdge;
 
 - (NSArray *) itemArray;
 - (NSInteger) numberOfItems;
@@ -49,10 +55,6 @@ APPKIT_EXPORT NSString *const NSPopUpButtonWillPopUpNotification;
 - (NSString *) titleOfSelectedItem;
 - (NSInteger) indexOfSelectedItem;
 
-- (void) setPullsDown: (BOOL) flag;
-- (void) setMenu: (NSMenu *) menu;
-- (void) setAutoenablesItems: (BOOL) value;
-- (void) setPreferredEdge: (NSRectEdge) edge;
 
 - (void) addItemWithTitle: (NSString *) title;
 - (void) addItemsWithTitles: (NSArray *) titles;
