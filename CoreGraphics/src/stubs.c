@@ -78,17 +78,6 @@ CGWindowLevel CGShieldingWindowLevel(void) {
     return 0;
 }
 
-void* CGColorSpaceGetBaseColorSpace(void* space) {
-    return NULL;
-}
-
-void CGColorSpaceGetColorTable(void* space, uint8_t *table) {
-}
-
-size_t CGColorSpaceGetColorTableCount(void* space) {
-    return 0;
-}
-
 void CGPathAddRelativeArc(void* path, const void *m, CGFloat x, CGFloat y, CGFloat radius, CGFloat startAngle, CGFloat delta) {
 }
 

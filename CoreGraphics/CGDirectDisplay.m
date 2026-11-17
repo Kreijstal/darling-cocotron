@@ -87,32 +87,6 @@ static CGRect globalRectForFrame(NSArray<NSScreen *> *screens, NSRect frame) {
                       frame.size.width, frame.size.height);
 }
 
-// A display's ID belongs to the screen (the backend ties it to the output it
-// drives), and [NSScreen screens] lists the main screen first, so an array
-// position is not an ID.
-static NSScreen *screenForDisplayID(NSArray<NSScreen *> *screens,
-                                    CGDirectDisplayID displayID)
-{
-    for (NSScreen *screen in screens) {
-        if ([screen cgDirectDisplayID] == displayID)
-            return screen;
-    }
-    return nil;
-}
-
-// NSScreen frames are in Cocoa's global space (origin at the main screen's
-// bottom-left corner, y up, like window frames); CoreGraphics' global space has its
-// origin at the main screen's top-left corner and y down, so a display above the main
-// one has a negative y, as on macOS. [NSScreen screens] lists the main screen first.
-static CGRect globalRectForFrame(NSArray<NSScreen *> *screens, NSRect frame) {
-    if (NSIsEmptyRect(frame) || [screens count] == 0)
-        return frame;
-    CGFloat mainHeight = NSHeight([[screens objectAtIndex: 0] frame]);
-    return CGRectMake(frame.origin.x,
-                      mainHeight - frame.origin.y - frame.size.height,
-                      frame.size.width, frame.size.height);
-}
-
 CGDirectDisplayID CGMainDisplayID(void) {
     NSDisplay *display = currentDisplay();
     if (!display)

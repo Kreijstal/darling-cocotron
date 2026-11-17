@@ -19,6 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSDisplay.h>
 #import <AppKit/NSOpenPanel.h>
+#import <AppKit/NSOutlineView.h>
 #import <Foundation/NSURL.h>
 
 @interface NSSavePanel (Private)

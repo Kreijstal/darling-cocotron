@@ -42,6 +42,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
              options: (NSDictionary *) opts
   documentAttributes: (NSDictionary **) dict;
 - (BOOL) readFromData: (NSData *) data
+              options: (NSDictionary<NSAttributedStringDocumentReadingOptionKey, id> *) opts
+   documentAttributes: (NSDictionary<NSAttributedStringDocumentAttributeKey, id> * _Nullable *) dict
+                error: (NSError * _Nullable *) error;
+- (BOOL) readFromData: (NSData *) data
               options: (NSDictionary *) opts
    documentAttributes: (NSDictionary **) dict;
 

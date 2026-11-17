@@ -688,23 +688,6 @@ static int bitsPerPixelForParameters(size_t bitsPerComponent,
         return nil;
     }
 
-    // Both local rejection and superclass initialization failure call dealloc.
-    // Establish the mutex before either path can destroy it.
-    pthread_mutex_init(&_lock, NULL);
-    if (width > SIZE_MAX / (size_t)bitsPerPixel) {
-        [self release];
-        return nil;
-    }
-    size_t minimumRowBytes = width * (size_t)bitsPerPixel / 8;
-    size_t effectiveRowBytes = bytesPerRow;
-    if (bytes == NULL && effectiveRowBytes < minimumRowBytes)
-        effectiveRowBytes = minimumRowBytes;
-    if ((bytes != NULL && bytesPerRow < minimumRowBytes) ||
-        (effectiveRowBytes != 0 && height > SIZE_MAX / effectiveRowBytes)) {
-        [self release];
-        return nil;
-    }
-
     if (bytes != NULL) {
         provider = [[[O2DataProvider alloc] initWithBytes: bytes
                                                    length: bytesPerRow * height]

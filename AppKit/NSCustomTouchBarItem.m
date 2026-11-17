@@ -39,9 +39,6 @@ static inline NSMethodSignature *stubTouchBarSignature(SEL aSelector) {
 @synthesize view = _view;
 @synthesize customizationLabel = _customizationLabel;
 
-@synthesize view = _view;
-@synthesize customizationLabel = _customizationLabel;
-
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
 {
     return stubTouchBarSignature(aSelector);

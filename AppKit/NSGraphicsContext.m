@@ -237,10 +237,6 @@ NSMutableArray *NSCurrentFocusStack() {
     return [self graphicsPort];
 }
 
-- (CGContextRef) CGContext {
-    return [self graphicsPort];
-}
-
 - (NSMutableArray *) focusStack {
     return NS_EXTRA(NSGraphicsContext, self)->_focusStack;
 }

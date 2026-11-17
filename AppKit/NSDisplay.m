@@ -28,10 +28,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // for a posted event; timers alone never end it.
 static void eventPosted(void *info) {}
 
-// Handling this source is what makes -[NSRunLoop runMode:beforeDate:] return
-// for a posted event; timers alone never end it.
-static void eventPosted(void *info) {}
-
 @implementation NSDisplay
 
 + (void) initialize {

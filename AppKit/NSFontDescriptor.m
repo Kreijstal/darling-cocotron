@@ -64,13 +64,6 @@ NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignRounded = @"NSCTF
 
 static NSString *const NSFontUIFontDesignTrait = @"NSCTFontUIFontDesignTrait";
 
-NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignDefault = @"NSCTFontUIFontDesignDefault";
-NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignSerif = @"NSCTFontUIFontDesignSerif";
-NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignMonospaced = @"NSCTFontUIFontDesignMonospaced";
-NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignRounded = @"NSCTFontUIFontDesignRounded";
-
-static NSString *const NSFontUIFontDesignTrait = @"NSCTFontUIFontDesignTrait";
-
 @implementation NSFontDescriptor : NSObject
 
 - initWithFontAttributes: (NSDictionary *) attributes {

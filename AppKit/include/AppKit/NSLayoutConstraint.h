@@ -25,9 +25,8 @@
 @class NSDictionary;
 #import <Foundation/NSString.h>
 #import <Foundation/NSArray.h>
-#import <Foundation/NSLayoutConstraint.h>
 
-// Foundation's NSLayoutConstraint.h, imported above, declares these under the
+// Shared with Foundation-side headers under the
 // same guards: Swift nests them only into a class of their own module.
 #if !__NSLAYOUT_PRIORITY_SHARED_SECTION__
 #define __NSLAYOUT_PRIORITY_SHARED_SECTION__ 1

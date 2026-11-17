@@ -112,14 +112,6 @@
         [_subwindow show];
 }
 
-// A transparent or hidden root layer still has a native child window.
-- (void) setHidden: (BOOL) hidden {
-    if (hidden)
-        [_subwindow hide];
-    else
-        [_subwindow show];
-}
-
 - (void) setSubwindow: (CGSubWindow*) subwindow
 {
     CGSubWindow* oldSubwindow = _subwindow;

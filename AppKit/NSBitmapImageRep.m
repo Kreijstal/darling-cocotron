@@ -1052,8 +1052,6 @@ NSBitmapImageRepPropertyKey NSImageCurrentFrame = @"NSImageCurrentFrame";
 
     size_t bpc = _bitsPerSample ? _bitsPerSample : (_bitsPerPixel / _samplesPerPixel);
 
-    size_t bpc = _bitsPerSample ? _bitsPerSample : (_bitsPerPixel / _samplesPerPixel);
-
     CGImageRef image = CGImageCreate(
             _pixelsWide, _pixelsHigh, bpc,
             _bitsPerPixel, _bytesPerRow, [self CGColorSpace],

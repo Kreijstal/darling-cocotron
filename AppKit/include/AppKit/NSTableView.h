@@ -309,15 +309,6 @@ typedef NS_ENUM(NSInteger, NSTableRowActionEdge) {
 - (void) deselectAll: sender;
 
 - (void) scrollRowToVisible: (NSInteger) index;
-typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
-    NSTableViewAnimationEffectNone = 0x0,
-    NSTableViewAnimationEffectFade = 0x1,
-    NSTableViewAnimationEffectGap = 0x2,
-    NSTableViewAnimationSlideUp = 0x10,
-    NSTableViewAnimationSlideDown = 0x20,
-    NSTableViewAnimationSlideLeft = 0x30,
-    NSTableViewAnimationSlideRight = 0x40,
-};
 
 - (void) scrollColumnToVisible: (NSInteger) index;
 

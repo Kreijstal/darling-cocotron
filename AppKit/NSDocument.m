@@ -444,14 +444,6 @@ static int untitled_document_number = 0;
     NS_EXTRA(NSDocument, self)->_draft = value;
 }
 
-- (BOOL) isDraft {
-    return _draft;
-}
-
-- (void) setDraft: (BOOL) value {
-    _draft = value;
-}
-
 - (void) updateChangeCount: (NSDocumentChangeType) changeType {
     int count = [NS_EXTRA(NSDocument, self)->_windowControllers count];
 

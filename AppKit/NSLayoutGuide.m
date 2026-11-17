@@ -19,7 +19,7 @@
 
 #import <AppKit/NSLayoutGuide.h>
 #import <AppKit/NSView.h>
-#import <Foundation/NSLayoutConstraint.h>
+#import <AppKit/NSLayoutConstraint.h>
 
 @implementation NSLayoutGuide
 

@@ -19,7 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import "NSCustomView.h"
 #import <Foundation/NSKeyedArchiver.h>
 #import <Foundation/NSString.h>
-#import <Foundation/NSUnarchiver.h>
+#import <Foundation/NSArchiver.h>
 #import <objc/runtime.h>
 
 @implementation NSCustomView

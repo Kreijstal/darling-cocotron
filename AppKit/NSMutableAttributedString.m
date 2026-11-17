@@ -267,6 +267,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return YES;
 }
 
+- (BOOL) readFromData: (NSData *) data
+              options: (NSDictionary<NSAttributedStringDocumentReadingOptionKey, id> *) opts
+   documentAttributes: (NSDictionary<NSAttributedStringDocumentAttributeKey, id> *_Nullable *) dict
+                error: (NSError *_Nullable *) error
+{
+    NSAttributedString *str = [NSAttributedString alloc];
+    str = [str initWithData: data
+                    options: opts
+         documentAttributes: dict
+                      error: error];
+    if (str == nil) {
+        return NO;
+    }
+    [self setAttributedString: str];
+    [str release];
+    return YES;
+}
+
 - (BOOL) readFromURL: (NSURL *) url
              options: (NSDictionary *) opts
   documentAttributes: (NSDictionary **) dict

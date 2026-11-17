@@ -606,14 +606,6 @@ static NSTextView *s_targetTextView = nil;
     return NS_EXTRA(NSTextView, self)->_markedTextAttributes;
 }
 
-- (NSDictionary *) linkTextAttributes {
-    return _linkTextAttributes;
-}
-
-- (NSDictionary *) markedTextAttributes {
-    return _markedTextAttributes;
-}
-
 - (NSArray *) selectedRanges {
     return NS_EXTRA(NSTextView, self)->_selectedRanges;
 }
@@ -659,14 +651,6 @@ static NSTextView *s_targetTextView = nil;
 
 - (BOOL) usesFontPanel {
     return NS_EXTRA(NSTextView, self)->_usesFontPanel;
-}
-
-- (void) setUsesFindPanel: (BOOL) flag {
-    _usesFindPanel = flag;
-}
-
-- (BOOL) usesFindPanel {
-    return _usesFindPanel;
 }
 
 - (void) setAllowsUndo: (BOOL) flag {
@@ -730,16 +714,6 @@ static NSTextView *s_targetTextView = nil;
 - (void) setMarkedTextAttributes: (NSDictionary *) attributes {
     [NS_EXTRA(NSTextView, self)->_markedTextAttributes autorelease];
     NS_EXTRA(NSTextView, self)->_markedTextAttributes = [attributes copy];
-}
-
-- (void) setLinkTextAttributes: (NSDictionary *) attributes {
-    [_linkTextAttributes autorelease];
-    _linkTextAttributes = [attributes copy];
-}
-
-- (void) setMarkedTextAttributes: (NSDictionary *) attributes {
-    [_markedTextAttributes autorelease];
-    _markedTextAttributes = [attributes copy];
 }
 
 - (NSRange) selectionRangeForProposedRange: (NSRange) range

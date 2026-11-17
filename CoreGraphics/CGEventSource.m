@@ -75,22 +75,6 @@ CGEventFlags CGEventSourceFlagsState(CGEventSourceStateID stateID) {
     return g_sourceStates[stateID + 1];
 }
 
-bool CGEventSourceButtonState(CGEventSourceStateID stateID, CGMouseButton button) {
-    return false;
-}
-
-bool CGEventSourceKeyState(CGEventSourceStateID stateID, CGKeyCode key) {
-    return false;
-}
-
-CFTimeInterval CGEventSourceSecondsSinceLastEventType(CGEventSourceStateID stateID, CGEventType eventType) {
-    return 0.0;
-}
-
-uint32_t CGEventSourceCounterForEventType(CGEventSourceStateID stateID, CGEventType eventType) {
-    return 0;
-}
-
 void CGEventSourceSetLocalEventsSuppressionInterval(CGEventSourceRef source, CFTimeInterval seconds) {
 }
 

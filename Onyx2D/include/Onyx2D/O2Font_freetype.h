@@ -68,6 +68,8 @@ O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,
                              top: (NSInteger) top
                          advance: (FT_Pos) advance;
 
+@end
+
 /* Lists the installed faces whose properties equal all of the non-nil
  * arguments; no substitution takes place. Each element is a dictionary
  * with the NSString keys @"family", @"postScriptName", @"style",
@@ -81,25 +83,5 @@ NSArray *O2FontCopyInstalledFaces(NSString *family, NSString *postScriptName,
 O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,
                                            size_t count, FT_Face baseFace,
                                            const char *language);
-
-- (O2FreeTypeCachedGlyph *) rasterizeGlyph: (O2Glyph) glyph
-                                  pointSize: (O2Float) pointSize;
-
-@end
-
-@interface O2FreeTypeCachedGlyph : NSObject {
-@public
-    FT_Bitmap bitmap;
-    NSInteger left;
-    NSInteger top;
-    FT_Pos advance;
-}
-
-- (instancetype) initWithBitmap: (const FT_Bitmap *) bitmap
-                            left: (NSInteger) left
-                             top: (NSInteger) top
-                         advance: (FT_Pos) advance;
-
-@end
 
 #endif
