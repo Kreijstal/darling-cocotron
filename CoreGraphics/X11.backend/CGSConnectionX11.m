@@ -523,12 +523,6 @@ static double windowOpacity(Display* display, Window window)
 	return _display;
 }
 
--(void*) nativeDisplay
-{
-	// EGLNativeDisplayType on X11 is the Display itself.
-	return _display;
-}
-
 // The main monitor's rectangle in root coordinates (device pixels) and the backing
 // scale. Without RandR, or with no active output, the root window stands in, as in
 // AppKit's X11 backend.
