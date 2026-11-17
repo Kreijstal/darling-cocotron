@@ -30,43 +30,47 @@ typedef NS_ENUM(NSUInteger, NSProgressIndicatorStyle) {
 #define NSProgressIndicatorBarStyle NSProgressIndicatorStyleBar
 #define NSProgressIndicatorSpinningStyle NSProgressIndicatorStyleSpinning
 
+typedef NS_ENUM(NSUInteger, NSProgressIndicatorThickness) {
+    NSProgressIndicatorPreferredThickness = 14,
+    NSProgressIndicatorPreferredSmallThickness = 10,
+    NSProgressIndicatorPreferredLargeThickness = 18,
+    NSProgressIndicatorPreferredAquaThickness = 12,
+};
+
+// Legacy ObjC ABI (i386): instance size is 0x90, Apple's, with the flags and
+// the three doubles where Apple has them.
 @interface NSProgressIndicator : NSView {
+    BOOL _isBezeled;
+    BOOL _isIndeterminate;
+    BOOL _usesThreadedAnimation;
+    BOOL _displayWhenStopped;
     double _minValue;
     double _maxValue;
     double _value;
-    NSTimeInterval _animationDelay;
     NSTimer *_animationTimer;
+    NSTimeInterval _animationDelay;
     double _animationValue;
     NSProgressIndicatorStyle _style;
     NSControlSize _size;
     NSControlTint _tint;
-    BOOL _displayWhenStopped;
-    BOOL _isBezeled;
-    BOOL _isIndeterminate;
-    BOOL _usesThreadedAnimation;
     BOOL _endThreadedAnimation;
 }
 
 @property NSProgressIndicatorStyle style;
 @property NSControlSize controlSize;
-- (NSControlTint) controlTint;
-- (BOOL) isDisplayedWhenStopped;
-- (BOOL) usesThreadedAnimation;
+@property(nonatomic) NSControlTint controlTint;
+@property(nonatomic, getter=isDisplayedWhenStopped) BOOL displayedWhenStopped;
+@property(nonatomic) BOOL usesThreadedAnimation;
 
 @property double minValue;
 @property double maxValue;
 @property double doubleValue;
 
-- (NSTimeInterval) animationDelay;
+@property(nonatomic) NSTimeInterval animationDelay;
 @property (getter=isIndeterminate) BOOL indeterminate;
-- (BOOL) isBezeled;
+@property(nonatomic, getter=isBezeled) BOOL bezeled;
 
-- (void) setControlTint: (NSControlTint) value;
-- (void) setDisplayedWhenStopped: (BOOL) value;
-- (void) setUsesThreadedAnimation: (BOOL) value;
 
-- (void) setAnimationDelay: (double) value;
-- (void) setBezeled: (BOOL) value;
 
 - (void) incrementBy: (double) value;
 

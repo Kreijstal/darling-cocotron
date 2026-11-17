@@ -60,50 +60,50 @@ static const char *X11CursorAliasesFor(const char *name)
     return NULL;
 }
 
-- (id) initWithName: (const char *) name {
-    X11Display *d = (X11Display *) [NSDisplay currentDisplay];
-    Display *display = [d display];
+// Loads a themed cursor at the backing scale, falling back to the nominal size and
+// then to libXcursor's own lookup. Returns None when the theme has no such cursor.
+static Cursor X11LoadThemedCursor(Display *display, const char *name, CGFloat scale) {
+    Cursor cursor = None;
 
     // Ask the theme for an image at the scaled size and let libXcursor scale the hot
     // spot with it, so the cursor stays sharp rather than being one image stretched.
     const int nominal = XcursorGetDefaultSize(display);
     XcursorImages *images =
-            XcursorLibraryLoadImages(NULL, name,
-                                     X11CursorScaledSize(nominal, [d backingScale]));
+            XcursorLibraryLoadImages(NULL, name, X11CursorScaledSize(nominal, scale));
     if (images != NULL) {
         XcursorImagesSetName(images, name);
-        _cursor = XcursorImagesLoadCursor(display, images);
+        cursor = XcursorImagesLoadCursor(display, images);
         XcursorImagesDestroy(images);
     }
 
     // No scaled image: a theme may only carry one size, or resolve to nothing at all.
     // Try the nominal size before giving up on the theme-aware path.
-    if (_cursor == None) {
+    if (cursor == None) {
         images = XcursorLibraryLoadImages(NULL, name, X11CursorScaledSize(nominal, 1.0));
         if (images != NULL) {
             XcursorImagesSetName(images, name);
-            _cursor = XcursorImagesLoadCursor(display, images);
+            cursor = XcursorImagesLoadCursor(display, images);
             XcursorImagesDestroy(images);
         }
     }
 
-    if (_cursor == None)
-        _cursor = XcursorLibraryLoadCursor(display, name);
+    if (cursor == None)
+        cursor = XcursorLibraryLoadCursor(display, name);
 
-    // The theme may not know the legacy spelling; retry with the name it does ship,
-    // at the scaled size, so the substitute is as sharp as the original would have been.
+    return cursor;
+}
+
+- (id) initWithName: (const char *) name {
+    X11Display *d = (X11Display *) [NSDisplay currentDisplay];
+    Display *display = [d display];
+    const CGFloat scale = [d backingScale];
+
+    _cursor = X11LoadThemedCursor(display, name, scale);
+
+    // The theme may not know the legacy spelling; retry with the name it does ship.
     const char *alias = _cursor == None ? X11CursorAliasesFor(name) : NULL;
-    if (alias != NULL) {
-        images = XcursorLibraryLoadImages(NULL, alias,
-                                          X11CursorScaledSize(nominal, [d backingScale]));
-        if (images != NULL) {
-            XcursorImagesSetName(images, alias);
-            _cursor = XcursorImagesLoadCursor(display, images);
-            XcursorImagesDestroy(images);
-        }
-        if (_cursor == None)
-            _cursor = XcursorLibraryLoadCursor(display, alias);
-    }
+    if (alias != NULL)
+        _cursor = X11LoadThemedCursor(display, alias, scale);
 
     if (_cursor == None)
         _cursor = XcursorLibraryLoadCursor(display, "left_ptr");
@@ -117,10 +117,10 @@ static const char *X11CursorAliasesFor(const char *name)
 
     // Xcursor wants device pixels. Rasterize at the backing scale rather than
     // stretching a 1x image, so the cursor stays sharp on a 2x display instead of
+    // being upscaled. The hotspot scales with it.
     CGFloat scale = [(X11Display *) [NSDisplay currentDisplay] backingScale];
     if (!(scale >= 1.0) || !isfinite(scale))
         scale = 1.0;
-
     const CGFloat logicalWidth = image.size.width, logicalHeight = image.size.height;
 
     // libXcursor requires the hot spot to be inside the image, and converting a
@@ -128,9 +128,8 @@ static const char *X11CursorAliasesFor(const char *name)
     // non-finite/non-positive image size) has to be rejected before the cast.
     if (!isfinite(hotPoint.x) || !isfinite(hotPoint.y)
             || !(logicalWidth > 0.0) || !(logicalHeight > 0.0)
-            || !isfinite(logicalWidth) || !isfinite(logicalHeight)) {
+            || !isfinite(logicalWidth) || !isfinite(logicalHeight))
         return [self initWithName: "left_ptr"];
-    }
 
     const double scaledWidth = floor(logicalWidth * scale + 0.5);
     const double scaledHeight = floor(logicalHeight * scale + 0.5);
@@ -138,9 +137,8 @@ static const char *X11CursorAliasesFor(const char *name)
     // XcursorImageCreate allocates width*height*4, and nothing else bounds it, so an
     // image with an enormous size would ask for gigabytes. Bound on floating-point
     // values before converting to size_t.
-    if (scaledWidth < 1.0 || scaledHeight < 1.0 || scaledWidth > 0x7FFF || scaledHeight > 0x7FFF) {
+    if (scaledWidth < 1.0 || scaledHeight < 1.0 || scaledWidth > 0x7FFF || scaledHeight > 0x7FFF)
         return [self initWithName: "left_ptr"];
-    }
 
     const size_t width = (size_t) scaledWidth;
     const size_t height = (size_t) scaledHeight;
@@ -149,10 +147,9 @@ static const char *X11CursorAliasesFor(const char *name)
     if (!ximage)
         return [self initWithName: "left_ptr"];
 
-    ximage->xhot = (int) fmin(fmax(floor(hotPoint.x * scale), 0.0),
-                              (CGFloat) width - 1);
-    ximage->yhot = (int) fmin(fmax(floor(hotPoint.y * scale), 0.0),
-                              (CGFloat) height - 1);
+    // libXcursor requires the hot spot to be inside the image.
+    ximage->xhot = (int) fmin(fmax(floor(hotPoint.x * scale), 0.0), (CGFloat) width - 1);
+    ximage->yhot = (int) fmin(fmax(floor(hotPoint.y * scale), 0.0), (CGFloat) height - 1);
 
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGContextRef context = CGBitmapContextCreate(
@@ -184,19 +181,11 @@ static const char *X11CursorAliasesFor(const char *name)
     const uint8_t *rowBytes = (const uint8_t *) CGBitmapContextGetData(context);
     const size_t bytesPerRow = CGBitmapContextGetBytesPerRow(context);
 
-    // Onyx2D bitmap storage already has top-to-bottom rows, as Xcursor requires.
-    for (size_t row = 0; row < height; row++) {
-        const uint8_t *srcRow = rowBytes + row * bytesPerRow;
-        for (size_t column = 0; column < width; column++) {
-            const uint8_t *px = srcRow + column * 4;
-            uint32_t b = px[0];
-            uint32_t g = px[1];
-            uint32_t r = px[2];
-            uint32_t a = px[3];
-            XcursorPixel cp = (a << 24) | (r << 16) | (g << 8) | b;
-            ximage->pixels[row * width + column] = cp;
-        }
-    }
+    // The Xcursor image is packed, one XcursorPixel per pixel; the bitmap rows
+    // may be padded. Copy each row once.
+    for (size_t row = 0; row < height; row++, rowBytes += bytesPerRow)
+        memcpy(ximage->pixels + row * width, rowBytes,
+               width * sizeof(XcursorPixel));
 
     CGContextRelease(context);
 

@@ -51,16 +51,21 @@
 #import <AppKit/NSTextTab.h>
 #import <AppKit/NSTextView.h>
 #import <AppKit/NSWindow.h>
+#import <AppKit/NSWorkspace.h>
 #import <Foundation/NSKeyedArchiver.h>
 
 #import "NSRulerMarker+NSTextExtensions.h"
 #import "NSUndoTextOperation.h"
 
-NSString *const NSTextViewDidChangeSelectionNotification =
-        @"NSTextViewDidChangeSelectionNotification";
 NSString *const NSOldSelectedCharacterRange = @"NSOldSelectedCharacterRange";
-NSString *const NSAllRomanInputSourcesLocaleIdentifier =
-        @"NSAllRomanInputSourcesLocaleIdentifier";
+NSString *const NSTouchBarItemIdentifierTextStyle =
+        @"NSTouchBarItemIdentifierTextStyle";
+NSString *const NSTouchBarItemIdentifierTextAlignment =
+        @"NSTouchBarItemIdentifierTextAlignment";
+NSString *const NSTouchBarItemIdentifierTextColorPicker =
+        @"NSTouchBarItemIdentifierTextColorPicker";
+NSString *const NSTouchBarItemIdentifierTextList =
+        @"NSTouchBarItemIdentifierTextList";
 
 @interface NSLayoutManager (NSLayoutManager_visualKeyboardMovement)
 - (NSRange) _softLineRangeForCharacterAtIndex: (NSUInteger) location;
@@ -75,7 +80,17 @@ NSString *const NSAllRomanInputSourcesLocaleIdentifier =
 @end
 
 @interface NSTextView ()
+- (NSUInteger) _linkedCharacterIndexAtPoint: (NSPoint) point;
+- (NSUInteger) glyphIndexForPoint: (NSPoint) point
+        fractionOfDistanceThroughGlyph: (CGFloat *) fraction;
 - (void) _updateTypingAttributes;
+- (void) _setDefaultSettings;
+- (void) _applyTypedTextSubstitutionsForRange: (NSRange) typed;
+- (void) _pasteRestrictedToTypes: (NSArray *) types;
+- (void) _applySharedData: (NSTextViewSharedData *) sharedData;
+- (void) _clearMarkedText;
+- (BOOL) _delegateChangeTextInRanges: (NSArray *) ranges
+                   replacementStrings: (NSArray *) strings;
 - (void) _replaceCharactersInRange: (NSRange) range
                         withString: (id) string
                useTypingAttributes: (BOOL) useTypingAttributes
@@ -176,7 +191,7 @@ static NSTextView *s_targetTextView = nil;
         [findPboard setString: text forType: NSStringPboardType];
     }
     NSMenuItem *dummy = [[[NSMenuItem alloc] initWithTitle: @"" action: NULL keyEquivalent: @""] autorelease];
-    [dummy setTag: 2];
+    [dummy setTag: NSFindPanelActionNext];
     [s_targetTextView performFindPanelAction: dummy];
 }
 
@@ -188,13 +203,14 @@ static NSTextView *s_targetTextView = nil;
         [findPboard setString: text forType: NSStringPboardType];
     }
     NSMenuItem *dummy = [[[NSMenuItem alloc] initWithTitle: @"" action: NULL keyEquivalent: @""] autorelease];
-    [dummy setTag: 3];
+    [dummy setTag: NSFindPanelActionPrevious];
     [s_targetTextView performFindPanelAction: dummy];
 }
 
 @end
 
 @implementation NSTextView
+
 - (void) configureMenu {
     static NSMenu *menu = nil;
 
@@ -250,36 +266,36 @@ static NSTextView *s_targetTextView = nil;
     if (storage == nil)
         return;
     // A view that owns its text network keeps owning it when the storage changes.
-    if (_ownsTextStorage) {
+    if (NS_EXTRA(NSTextView, self)->_ownsTextStorage) {
         [storage retain];
-        [_textStorage release];
+        [NS_EXTRA(NSTextView, self)->_textStorage release];
     }
-    _textStorage = storage;
+    NS_EXTRA(NSTextView, self)->_textStorage = storage;
 
     NSMutableDictionary *typingAttributes = nil;
-    if ([_textStorage length] > 0) {
-        typingAttributes = [[_textStorage attributesAtIndex: 0
+    if ([NS_EXTRA(NSTextView, self)->_textStorage length] > 0) {
+        typingAttributes = [[NS_EXTRA(NSTextView, self)->_textStorage attributesAtIndex: 0
                                              effectiveRange: NULL] mutableCopy];
     } else {
         typingAttributes = [[NSMutableDictionary alloc] init];
     }
-    if (_font && ![typingAttributes objectForKey: NSFontAttributeName]) {
-        [typingAttributes setObject: _font forKey: NSFontAttributeName];
+    if (NS_EXTRA(NSTextView, self)->_font && ![typingAttributes objectForKey: NSFontAttributeName]) {
+        [typingAttributes setObject: NS_EXTRA(NSTextView, self)->_font forKey: NSFontAttributeName];
     }
-    if (_textColor && ![typingAttributes objectForKey: NSForegroundColorAttributeName]) {
-        [typingAttributes setObject: _textColor
+    if (NS_EXTRA(NSTextView, self)->_textColor && ![typingAttributes objectForKey: NSForegroundColorAttributeName]) {
+        [typingAttributes setObject: NS_EXTRA(NSTextView, self)->_textColor
                              forKey: NSForegroundColorAttributeName];
     }
 
-    [_typingAttributes release];
-    _typingAttributes = typingAttributes;
+    [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+    NS_EXTRA(NSTextView, self)->_typingAttributes = typingAttributes;
 
-    [_defaultParagraphStyle release];
+    [NS_EXTRA(NSTextView, self)->_defaultParagraphStyle release];
     if ([typingAttributes objectForKey: NSParagraphStyleAttributeName]) {
-        _defaultParagraphStyle = [[typingAttributes
+        NS_EXTRA(NSTextView, self)->_defaultParagraphStyle = [[typingAttributes
                 objectForKey: NSParagraphStyleAttributeName] copy];
     } else {
-        _defaultParagraphStyle =
+        NS_EXTRA(NSTextView, self)->_defaultParagraphStyle =
                 [[NSParagraphStyle defaultParagraphStyle] copy];
     }
 }
@@ -301,83 +317,84 @@ static NSTextView *s_targetTextView = nil;
         NSTextViewSharedData *sharedData =
                 [keyed decodeObjectForKey: @"NSSharedData"];
 
-        _textContainer =
+        NS_EXTRA(NSTextView, self)->_textContainer =
                 [[keyed decodeObjectForKey: @"NSTextContainer"] retain];
-        [_textContainer setTextView: self];
-        _textContainerInset = NSMakeSize(4, 4);
+        [NS_EXTRA(NSTextView, self)->_textContainer setTextView: self];
+        NS_EXTRA(NSTextView, self)->_textContainerInset = NSMakeSize(4, 4);
 
-        NSLayoutManager *lm = [_textContainer layoutManager];
+        NSLayoutManager *lm = [NS_EXTRA(NSTextView, self)->_textContainer layoutManager];
         if (lm != nil) {
-            _textStorage = [[lm textStorage] retain];
-            if (_textStorage != nil) {
-                [_textStorage addLayoutManager: lm];
+            NS_EXTRA(NSTextView, self)->_textStorage = [[lm textStorage] retain];
+            if (NS_EXTRA(NSTextView, self)->_textStorage != nil) {
+                [NS_EXTRA(NSTextView, self)->_textStorage addLayoutManager: lm];
             }
         }
-        _ownsTextStorage = YES;
+        NS_EXTRA(NSTextView, self)->_ownsTextStorage = YES;
 
-        _delegate = [keyed decodeObjectForKey: @"NSDelegate"];
+        NS_EXTRA(NSTextView, self)->_delegate = [keyed decodeObjectForKey: @"NSDelegate"];
 
-        _isEditable = [sharedData isEditable];
-        _isSelectable = [sharedData isSelectable];
-        _isRichText = [sharedData isRichText];
-        _allowsUndo = [sharedData allowsUndo];
+        NS_EXTRA(NSTextView, self)->_isEditable = [sharedData isEditable];
+        NS_EXTRA(NSTextView, self)->_isSelectable = [sharedData isSelectable];
+        NS_EXTRA(NSTextView, self)->_isRichText = [sharedData isRichText];
+        NS_EXTRA(NSTextView, self)->_allowsUndo = [sharedData allowsUndo];
 
-        _backgroundColor = [[sharedData backgroundColor] retain];
-        _drawsBackground = [sharedData drawsBackground];
-        _font = [[NSFont userFontOfSize: 0] retain];
-        _textColor = [[NSColor textColor] copy];
+        NS_EXTRA(NSTextView, self)->_backgroundColor = [[sharedData backgroundColor] retain];
+        NS_EXTRA(NSTextView, self)->_drawsBackground = [sharedData drawsBackground];
+        NS_EXTRA(NSTextView, self)->_font = [[NSFont userFontOfSize: 0] retain];
+        NS_EXTRA(NSTextView, self)->_textColor = [[NSColor textColor] copy];
 
-        _textAlignment = [[sharedData defaultParagraphStyle] alignment];
-        _insertionPointColor = [[sharedData insertionColor] retain];
+        NS_EXTRA(NSTextView, self)->_textAlignment = [[sharedData defaultParagraphStyle] alignment];
+        NS_EXTRA(NSTextView, self)->_insertionPointColor = [[sharedData insertionColor] retain];
 
-        _usesFontPanel = YES;
-        _usesFindPanel = YES;
+        NS_EXTRA(NSTextView, self)->_usesFontPanel = YES;
+        [self _setDefaultSettings];
+        [self _applySharedData: sharedData];
 
-        _isFieldEditor = NO;
-        _maxSize = [self bounds].size;
-        _minSize = NSMakeSize(0, 0);
+        NS_EXTRA(NSTextView, self)->_isFieldEditor = NO;
+        NS_EXTRA(NSTextView, self)->_maxSize = [self bounds].size;
+        NS_EXTRA(NSTextView, self)->_minSize = NSMakeSize(0, 0);
 
-        _isHorizontallyResizable = ((flags & 0x01) != 0);
-        _isVerticallyResizable = ((flags & 0x02) != 0);
+        NS_EXTRA(NSTextView, self)->_isHorizontallyResizable = ((flags & 0x01) != 0);
+        NS_EXTRA(NSTextView, self)->_isVerticallyResizable = ((flags & 0x02) != 0);
 
-        _selectedRanges = [[NSMutableArray alloc] init];
-        [_selectedRanges
+        NS_EXTRA(NSTextView, self)->_selectedRanges = [[NSMutableArray alloc] init];
+        [NS_EXTRA(NSTextView, self)->_selectedRanges
                 addObject: [NSValue valueWithRange: NSMakeRange(0, 0)]];
 
-        _rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
-        _selectedTextAttributes = [[NSDictionary
+        NS_EXTRA(NSTextView, self)->_rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
+        NS_EXTRA(NSTextView, self)->_selectedTextAttributes = [[NSDictionary
                 dictionaryWithObjectsAndKeys:
                         [NSColor selectedTextColor],
                         NSForegroundColorAttributeName,
                         [NSColor selectedTextBackgroundColor],
                         NSBackgroundColorAttributeName, nil] retain];
 
-        [_textStorage
+        [NS_EXTRA(NSTextView, self)->_textStorage
                 addAttribute: NSFontAttributeName
-                       value: _font
+                       value: NS_EXTRA(NSTextView, self)->_font
                        range: NSMakeRange(0, [[self textStorage] length])];
-        [_textStorage
+        [NS_EXTRA(NSTextView, self)->_textStorage
                 addAttribute: NSForegroundColorAttributeName
-                       value: _textColor
+                       value: NS_EXTRA(NSTextView, self)->_textColor
                        range: NSMakeRange(0, [[self textStorage] length])];
 
         NSMutableDictionary *typingAttributes =
-                [[_textStorage attributesAtIndex: 0
+                [[NS_EXTRA(NSTextView, self)->_textStorage attributesAtIndex: 0
                                   effectiveRange: NULL] mutableCopy];
         if (![typingAttributes objectForKey: NSFontAttributeName]) {
-            [typingAttributes setObject: _font forKey: NSFontAttributeName];
+            [typingAttributes setObject: NS_EXTRA(NSTextView, self)->_font forKey: NSFontAttributeName];
         }
         if (![typingAttributes objectForKey: NSForegroundColorAttributeName]) {
-            [typingAttributes setObject: _textColor
+            [typingAttributes setObject: NS_EXTRA(NSTextView, self)->_textColor
                                  forKey: NSForegroundColorAttributeName];
         }
-        _typingAttributes = typingAttributes;
+        NS_EXTRA(NSTextView, self)->_typingAttributes = typingAttributes;
 
         if ([typingAttributes objectForKey: NSParagraphStyleAttributeName]) {
-            _defaultParagraphStyle = [[typingAttributes
+            NS_EXTRA(NSTextView, self)->_defaultParagraphStyle = [[typingAttributes
                     objectForKey: NSParagraphStyleAttributeName] copy];
         } else {
-            _defaultParagraphStyle =
+            NS_EXTRA(NSTextView, self)->_defaultParagraphStyle =
                     [[NSParagraphStyle defaultParagraphStyle] copy];
         }
     } else {
@@ -385,20 +402,17 @@ static NSTextView *s_targetTextView = nil;
                     format: @"-[%@ %s] is not implemented for coder %@",
                             [self class], sel_getName(_cmd), coder];
     }
-    [self registerForDraggedTypes: [NSArray
-                                           arrayWithObjects: NSRTFPboardType,
-                                                             NSStringPboardType,
-                                                             nil]];
+    [self updateDragTypeRegistration];
 
     return self;
 }
 
 - (BOOL) acceptsGlyphInfo {
-    return _acceptsGlyphInfo;
+    return NS_EXTRA(NSTextView, self)->_acceptsGlyphInfo;
 }
 
 - (void) setAcceptsGlyphInfo: (BOOL) flag {
-    _acceptsGlyphInfo = flag;
+    NS_EXTRA(NSTextView, self)->_acceptsGlyphInfo = flag;
 }
 
 - (void) setNeedsDisplayInRect: (NSRect) rect avoidAdditionalLayout: (BOOL) avoidLayout {
@@ -408,51 +422,43 @@ static NSTextView *s_targetTextView = nil;
 - initWithFrame: (NSRect) frame textContainer: (NSTextContainer *) container {
     [super initWithFrame: frame];
 
-    _textContainer = [container retain];
-    [_textContainer setTextView: self];
-    _textContainerInset = NSMakeSize(0, 0);
+    NS_EXTRA(NSTextView, self)->_textContainer = [container retain];
+    [NS_EXTRA(NSTextView, self)->_textContainer setTextView: self];
+    NS_EXTRA(NSTextView, self)->_textContainerInset = NSMakeSize(0, 0);
 
-    NSTextStorage *storage = [[_textContainer layoutManager] textStorage];
-    if (storage != nil) {
-        [self _setTextStorage: storage];
-    }
+    NS_EXTRA(NSTextView, self)->_isEditable = YES;
+    NS_EXTRA(NSTextView, self)->_isSelectable = YES;
+    NS_EXTRA(NSTextView, self)->_isRichText = YES;
+    NS_EXTRA(NSTextView, self)->_usesFontPanel = YES;
+    NS_EXTRA(NSTextView, self)->_backgroundColor = [[NSColor whiteColor] copy];
+    NS_EXTRA(NSTextView, self)->_drawsBackground = YES;
+    NS_EXTRA(NSTextView, self)->_font = [[NSFont userFontOfSize: 0] retain];
+    NS_EXTRA(NSTextView, self)->_textColor = [[NSColor textColor] copy];
+    NS_EXTRA(NSTextView, self)->_textAlignment = NSLeftTextAlignment;
+    NS_EXTRA(NSTextView, self)->_insertionPointColor = [[NSColor blackColor] copy];
+    NS_EXTRA(NSTextView, self)->_isFieldEditor = NO;
+    NS_EXTRA(NSTextView, self)->_maxSize = [self bounds].size;
+    NS_EXTRA(NSTextView, self)->_isHorizontallyResizable = NO;
+    NS_EXTRA(NSTextView, self)->_isVerticallyResizable = YES;
+    NS_EXTRA(NSTextView, self)->_selectedRanges = [[NSMutableArray alloc] init];
+    [NS_EXTRA(NSTextView, self)->_selectedRanges addObject: [NSValue valueWithRange: NSMakeRange(0, 0)]];
 
-    _isEditable = YES;
-    _isSelectable = YES;
-    _isRichText = YES;
-    _usesFontPanel = YES;
-    _usesFindPanel = YES;
-    _backgroundColor = [[NSColor whiteColor] copy];
-    _drawsBackground = YES;
-    _font = [[NSFont userFontOfSize: 0] retain];
-    _textColor = [[NSColor textColor] copy];
-    _textAlignment = NSLeftTextAlignment;
-    _insertionPointColor = [[NSColor blackColor] copy];
-    _isFieldEditor = NO;
-    _maxSize = [self bounds].size;
-    _isHorizontallyResizable = NO;
-    _isVerticallyResizable = YES;
-    _selectedRanges = [[NSMutableArray alloc] init];
-    [_selectedRanges addObject: [NSValue valueWithRange: NSMakeRange(0, 0)]];
-
-    _rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
-    _selectedTextAttributes = [[NSDictionary
+    NS_EXTRA(NSTextView, self)->_rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
+    NS_EXTRA(NSTextView, self)->_selectedTextAttributes = [[NSDictionary
             dictionaryWithObjectsAndKeys: [NSColor selectedTextColor],
                                           NSForegroundColorAttributeName,
                                           [NSColor selectedTextBackgroundColor],
                                           NSBackgroundColorAttributeName, nil]
             retain];
+    [self _setDefaultSettings];
 
     [self _setTextStorage: [[container layoutManager] textStorage]];
 
-    [self setBoundsOrigin: NSMakePoint(-_textContainerInset.width,
-                                       -_textContainerInset.height)];
+    [self setBoundsOrigin: NSMakePoint(-NS_EXTRA(NSTextView, self)->_textContainerInset.width,
+                                       -NS_EXTRA(NSTextView, self)->_textContainerInset.height)];
     [self configureMenu];
 
-    [self registerForDraggedTypes: [NSArray
-                                           arrayWithObjects: NSRTFPboardType,
-                                                             NSStringPboardType,
-                                                             nil]];
+    [self updateDragTypeRegistration];
 
     return self;
 }
@@ -470,8 +476,8 @@ static NSTextView *s_targetTextView = nil;
     if (self == nil)
         return nil;
 
-    [_textStorage retain];
-    _ownsTextStorage = YES;
+    [NS_EXTRA(NSTextView, self)->_textStorage retain];
+    NS_EXTRA(NSTextView, self)->_ownsTextStorage = YES;
 
     return self;
 }
@@ -481,30 +487,32 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) dealloc {
-    if (_delegate) {
+    if (NS_EXTRA(NSTextView, self)->_delegate) {
         // Be sure to remove our delegate as an observer before we die
         [self setDelegate: nil];
     }
-    if (_ownsTextStorage) {
-        [_textStorage release];
+    if (NS_EXTRA(NSTextView, self)->_ownsTextStorage) {
+        [NS_EXTRA(NSTextView, self)->_textStorage release];
     }
-    [_textContainer setTextView: nil];
-    [_textContainer release];
-    [_typingAttributes release];
-    [_defaultParagraphStyle release];
-    [_backgroundColor release];
-    [_font release];
-    [_textColor release];
-    [_insertionPointColor release];
-    [_insertionPointTimer invalidate];
-    [_insertionPointTimer release];
-    [_selectedRanges release];
-    [_initialRanges release];
-    [_selectedTextAttributes release];
-    [_linkTextAttributes release];
-    [_markedTextAttributes release];
-    [_fieldEditorUndoManager release];
-    [_undoTyping release];
+    [NS_EXTRA(NSTextView, self)->_textContainer setTextView: nil];
+    [NS_EXTRA(NSTextView, self)->_textContainer release];
+    [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+    [NS_EXTRA(NSTextView, self)->_defaultParagraphStyle release];
+    [NS_EXTRA(NSTextView, self)->_backgroundColor release];
+    [NS_EXTRA(NSTextView, self)->_font release];
+    [NS_EXTRA(NSTextView, self)->_textColor release];
+    [NS_EXTRA(NSTextView, self)->_insertionPointColor release];
+    [NS_EXTRA(NSTextView, self)->_insertionPointTimer invalidate];
+    [NS_EXTRA(NSTextView, self)->_insertionPointTimer release];
+    [NS_EXTRA(NSTextView, self)->_selectedRanges release];
+    [NS_EXTRA(NSTextView, self)->_initialRanges release];
+    [NS_EXTRA(NSTextView, self)->_selectedTextAttributes release];
+    [NS_EXTRA(NSTextView, self)->_linkTextAttributes release];
+    [NS_EXTRA(NSTextView, self)->_markedTextAttributes release];
+    [NS_EXTRA(NSTextView, self)->_fieldEditorUndoManager release];
+    [NS_EXTRA(NSTextView, self)->_undoTyping release];
+    [NS_EXTRA(NSTextView, self)->_allowedInputSourceLocales release];
+    NS_EXTRA_FREE(NSTextView, self);
     [super dealloc];
 }
 
@@ -536,58 +544,66 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (NSTextContainer *) textContainer {
-    return _textContainer;
+    return NS_EXTRA(NSTextView, self)->_textContainer;
 }
 
 - (NSSize) textContainerInset {
-    return _textContainerInset;
+    return NS_EXTRA(NSTextView, self)->_textContainerInset;
 }
 
 - (NSPoint) textContainerOrigin {
-    return NSMakePoint(_textContainerInset.width, _textContainerInset.height);
+    return NSMakePoint(NS_EXTRA(NSTextView, self)->_textContainerInset.width, NS_EXTRA(NSTextView, self)->_textContainerInset.height);
 }
 
 - (NSLayoutManager *) layoutManager {
-    return [_textContainer layoutManager];
+    return [NS_EXTRA(NSTextView, self)->_textContainer layoutManager];
 }
 
 - (NSTextStorage *) textStorage {
     NSTextStorage *storage = [[self layoutManager] textStorage];
     if (storage != nil) {
-        if (_textStorage != storage) {
+        if (NS_EXTRA(NSTextView, self)->_textStorage != storage) {
             [self _setTextStorage: storage];
         }
         return storage;
     }
-    return _textStorage;
+    return NS_EXTRA(NSTextView, self)->_textStorage;
 }
 
 - (BOOL) usesRuler {
-    return _usesRuler;
+    return NS_EXTRA(NSTextView, self)->_usesRuler;
 }
 
 - (BOOL) isRulerVisible {
-    return _rulerVisible;
+    return NS_EXTRA(NSTextView, self)->_rulerVisible;
 }
 
 - (BOOL) allowsUndo {
-    return _allowsUndo;
+    return NS_EXTRA(NSTextView, self)->_allowsUndo;
 }
 
 - (NSColor *) insertionPointColor {
-    return _insertionPointColor;
+    return NS_EXTRA(NSTextView, self)->_insertionPointColor;
 }
 
 - (NSDictionary *) typingAttributes {
-    return [[_typingAttributes retain] autorelease];
+    return [[NS_EXTRA(NSTextView, self)->_typingAttributes retain] autorelease];
 }
 
 - (NSParagraphStyle *) defaultParagraphStyle {
-    return _defaultParagraphStyle;
+    return NS_EXTRA(NSTextView, self)->_defaultParagraphStyle;
 }
 
 - (NSDictionary *) selectedTextAttributes {
-    return _selectedTextAttributes;
+    return NS_EXTRA(NSTextView, self)->_selectedTextAttributes;
+}
+
+- (NSDictionary *) linkTextAttributes {
+    return NS_EXTRA(NSTextView, self)->_linkTextAttributes;
+}
+
+- (NSDictionary *) markedTextAttributes {
+    return NS_EXTRA(NSTextView, self)->_markedTextAttributes;
 }
 
 - (NSDictionary *) linkTextAttributes {
@@ -599,50 +615,50 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (NSArray *) selectedRanges {
-    return _selectedRanges;
+    return NS_EXTRA(NSTextView, self)->_selectedRanges;
 }
 
 - (void) setTextContainer: (NSTextContainer *) container {
-    if (container != _textContainer) {
+    if (container != NS_EXTRA(NSTextView, self)->_textContainer) {
         container = [container retain];
-        [_textContainer release];
-        _textContainer = container;
+        [NS_EXTRA(NSTextView, self)->_textContainer release];
+        NS_EXTRA(NSTextView, self)->_textContainer = container;
 
-        if (_ownsTextStorage) {
-            [_textStorage release];
-            _ownsTextStorage = NO;
+        if (NS_EXTRA(NSTextView, self)->_ownsTextStorage) {
+            [NS_EXTRA(NSTextView, self)->_textStorage release];
+            NS_EXTRA(NSTextView, self)->_ownsTextStorage = NO;
         }
-        _textStorage = [[_textContainer layoutManager] textStorage];
+        NS_EXTRA(NSTextView, self)->_textStorage = [[NS_EXTRA(NSTextView, self)->_textContainer layoutManager] textStorage];
     }
 }
 
 - (void) setTextContainerInset: (NSSize) size {
-    _textContainerInset = size;
-    [_textContainer _resizeToTextView];
+    NS_EXTRA(NSTextView, self)->_textContainerInset = size;
+    [NS_EXTRA(NSTextView, self)->_textContainer _resizeToTextView];
     [self sizeToFit];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setUsesRuler: (BOOL) flag {
-    _usesRuler = flag;
-    [[self enclosingScrollView] setHasHorizontalRuler: _usesRuler];
+    NS_EXTRA(NSTextView, self)->_usesRuler = flag;
+    [[self enclosingScrollView] setHasHorizontalRuler: NS_EXTRA(NSTextView, self)->_usesRuler];
 
     [self updateRuler];
 }
 
 - (void) setRulerVisible: (BOOL) flag {
-    _rulerVisible = flag;
-    [[self enclosingScrollView] setRulersVisible: _rulerVisible];
+    NS_EXTRA(NSTextView, self)->_rulerVisible = flag;
+    [[self enclosingScrollView] setRulersVisible: NS_EXTRA(NSTextView, self)->_rulerVisible];
 
     [self updateRuler];
 }
 
 - (void) setUsesFontPanel: (BOOL) flag {
-    _usesFontPanel = flag;
+    NS_EXTRA(NSTextView, self)->_usesFontPanel = flag;
 }
 
 - (BOOL) usesFontPanel {
-    return _usesFontPanel;
+    return NS_EXTRA(NSTextView, self)->_usesFontPanel;
 }
 
 - (void) setUsesFindPanel: (BOOL) flag {
@@ -654,32 +670,66 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) setAllowsUndo: (BOOL) flag {
-    _allowsUndo = flag;
+    NS_EXTRA(NSTextView, self)->_allowsUndo = flag;
 }
 
 - (void) setInsertionPointColor: (NSColor *) color {
     color = [color copy];
-    [_insertionPointColor release];
-    _insertionPointColor = color;
+    [NS_EXTRA(NSTextView, self)->_insertionPointColor release];
+    NS_EXTRA(NSTextView, self)->_insertionPointColor = color;
 }
 
+// A change of the typing attributes goes through the delegate, which may veto
+// or modify it, and is announced afterwards (observed on macOS 10.14.4 and
+// 26.7.3: any change of the dictionary, whatever caused it).
+// Test: appkit-textview-editing-api.m (typing attributes delegation)
 - (void) setTypingAttributes: (NSDictionary *) attributes {
+    NSDictionary *old = NS_EXTRA(NSTextView, self)->_typingAttributes;
+    BOOL changed = ![old isEqual: attributes] && !(old == nil && attributes == nil);
+    id delegate = NS_EXTRA(NSTextView, self)->_delegate;
+
+    if (changed && attributes != nil &&
+        [delegate respondsToSelector: @selector
+                  (textView:shouldChangeTypingAttributes:toAttributes:)]) {
+        NSDictionary *result = [delegate textView: self
+                shouldChangeTypingAttributes: old != nil ? old : [NSDictionary dictionary]
+                                toAttributes: attributes];
+        if (result != nil)
+            attributes = result;
+        changed = ![old isEqual: attributes];
+    }
+
     attributes = [attributes retain];
-    [_typingAttributes release];
-    _typingAttributes = attributes;
+    [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+    NS_EXTRA(NSTextView, self)->_typingAttributes = attributes;
 
     [self updateRuler];
+
+    if (changed)
+        [[NSNotificationCenter defaultCenter]
+                postNotificationName: NSTextViewDidChangeTypingAttributesNotification
+                              object: self];
 }
 
 - (void) setDefaultParagraphStyle: (NSParagraphStyle *) paragraphStyle {
     paragraphStyle = [paragraphStyle copy];
-    [_defaultParagraphStyle release];
-    _defaultParagraphStyle = paragraphStyle;
+    [NS_EXTRA(NSTextView, self)->_defaultParagraphStyle release];
+    NS_EXTRA(NSTextView, self)->_defaultParagraphStyle = paragraphStyle;
 }
 
 - (void) setSelectedTextAttributes: (NSDictionary *) attributes {
-    [_selectedTextAttributes autorelease];
-    _selectedTextAttributes = [attributes retain];
+    [NS_EXTRA(NSTextView, self)->_selectedTextAttributes autorelease];
+    NS_EXTRA(NSTextView, self)->_selectedTextAttributes = [attributes retain];
+}
+
+- (void) setLinkTextAttributes: (NSDictionary *) attributes {
+    [NS_EXTRA(NSTextView, self)->_linkTextAttributes autorelease];
+    NS_EXTRA(NSTextView, self)->_linkTextAttributes = [attributes copy];
+}
+
+- (void) setMarkedTextAttributes: (NSDictionary *) attributes {
+    [NS_EXTRA(NSTextView, self)->_markedTextAttributes autorelease];
+    NS_EXTRA(NSTextView, self)->_markedTextAttributes = [attributes copy];
 }
 
 - (void) setLinkTextAttributes: (NSDictionary *) attributes {
@@ -700,10 +750,10 @@ static NSTextView *s_targetTextView = nil;
         return range;
 
     case NSSelectByWord:
-        return [_textStorage doubleClickAtIndex: range.location];
+        return [NS_EXTRA(NSTextView, self)->_textStorage doubleClickAtIndex: range.location];
 
     case NSSelectByParagraph:
-        return [[_textStorage string] lineRangeForRange: range];
+        return [[NS_EXTRA(NSTextView, self)->_textStorage string] lineRangeForRange: range];
     }
 
     return NSMakeRange(NSNotFound, 0);
@@ -725,9 +775,12 @@ static NSTextView *s_targetTextView = nil;
                   affinity: (NSSelectionAffinity) affinity
             stillSelecting: (BOOL) stillSelecting
 {
-    // A nil array leaves the selection alone: TextEdit copies the selection of
-    // a text view that doesn't exist yet into its first one. Only a non-nil
-    // empty array raises.
+    // QUIRK: a nil array is ignored and leaves the selection unchanged, while
+    // an empty non-nil array raises NSInvalidArgumentException. Not documented.
+    // Evidence: black-box observation on macOS 27 (tier 2, MC11.4 in the
+    // project's evidence notes).
+    // Test: test_quirk_nil_selected_ranges_is_ignored in
+    // tests/appkit-text-system-settings.m
     if (ranges == nil)
         return;
     if ([ranges count] == 0)
@@ -735,31 +788,35 @@ static NSTextView *s_targetTextView = nil;
                     format: @"-[%@ %s] ranges should not be empty",
                             [self class], _cmd];
 
+    // Moving the selection ends marked text (the text stays).
+    if (!NS_EXTRA(NSTextView, self)->_updatingMarkedText)
+        [self _clearMarkedText];
+
     // Save the initial selected ranges so we can use it when we're done with
     // the selection change
-    if (_initialRanges == nil) {
-        _initialRanges = [[self selectedRanges] copy];
+    if (NS_EXTRA(NSTextView, self)->_initialRanges == nil) {
+        NS_EXTRA(NSTextView, self)->_initialRanges = [[self selectedRanges] copy];
     }
 
     if (stillSelecting == NO &&
         [[ranges objectAtIndex: 0] rangeValue].length == 0)
-        _selectionOrigin = [[ranges objectAtIndex: 0] rangeValue].location;
+        NS_EXTRA(NSTextView, self)->_selectionOrigin = [[ranges objectAtIndex: 0] rangeValue].location;
 
-    NSArray *oldRanges = [[_selectedRanges copy] autorelease];
+    NSArray *oldRanges = [[NS_EXTRA(NSTextView, self)->_selectedRanges copy] autorelease];
 
     // Tell the world the selection will change when the selection change is
     // done
     if (!stillSelecting) {
-        ranges = [self _delegateChangeSelectionFromRanges: _initialRanges
+        ranges = [self _delegateChangeSelectionFromRanges: NS_EXTRA(NSTextView, self)->_initialRanges
                                                  toRanges: ranges];
-        [_initialRanges release];
-        _initialRanges = nil;
+        [NS_EXTRA(NSTextView, self)->_initialRanges release];
+        NS_EXTRA(NSTextView, self)->_initialRanges = nil;
     }
-    [_selectedRanges setArray: ranges];
+    [NS_EXTRA(NSTextView, self)->_selectedRanges setArray: ranges];
 
-    _selectionAffinity = affinity;
-    _selectionGranularity = NSSelectByCharacter;
-    _insertionPointOn = [self shouldDrawInsertionPoint];
+    NS_EXTRA(NSTextView, self)->_selectionAffinity = affinity;
+    NS_EXTRA(NSTextView, self)->_selectionGranularity = NSSelectByCharacter;
+    NS_EXTRA(NSTextView, self)->_insertionPointOn = [self shouldDrawInsertionPoint];
 
     if (![oldRanges isEqual: [self selectedRanges]]) {
         [self setNeedsDisplay: YES];
@@ -782,7 +839,7 @@ static NSTextView *s_targetTextView = nil;
                                                           forKey: NSOldSelectedCharacterRange]];
     }
 
-    if (!_isContinuousSpellCheckingEnabled)
+    if (!NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled)
         [[self layoutManager]
                 removeTemporaryAttribute: NSSpellingStateAttributeName
                        forCharacterRange: NSMakeRange(0,
@@ -791,13 +848,13 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) setSelectedRanges: (NSArray *) ranges {
     [self setSelectedRanges: ranges
-                   affinity: _selectionAffinity
+                   affinity: NS_EXTRA(NSTextView, self)->_selectionAffinity
              stillSelecting: NO];
 }
 
 - (NSRange) rangeForUserCompletion {
     NSRange range = [self selectedRange];
-    NSUInteger index = [_textStorage nextWordFromIndex: range.location
+    NSUInteger index = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                forward: NO];
 
     if (range.length != 0)
@@ -819,7 +876,7 @@ static NSTextView *s_targetTextView = nil;
                               @"objects d'art", @"objection", @"objectivism",
                               @"objective-c", @"NSString", nil];
     NSMutableArray *completions = [NSMutableArray new];
-    NSString *string = [[_textStorage string] substringWithRange: range];
+    NSString *string = [[NS_EXTRA(NSTextView, self)->_textStorage string] substringWithRange: range];
     NSInteger i, count = [source count];
 
     *index = NSNotFound;
@@ -836,11 +893,11 @@ static NSTextView *s_targetTextView = nil;
 
     result = completions;
 
-    if ([_delegate
+    if ([NS_EXTRA(NSTextView, self)->_delegate
                 respondsToSelector: @selector
                 (textView:
                         completions:forPartialWordRange:indexOfSelectedItem:)])
-        result = [_delegate textView: self
+        result = [NS_EXTRA(NSTextView, self)->_delegate textView: self
                          completions: result
                  forPartialWordRange: range
                  indexOfSelectedItem: index];
@@ -856,8 +913,8 @@ static NSTextView *s_targetTextView = nil;
     [self _replaceCharactersInRange: range withString: string];
 
     // is this proper behavior? i dunno
-    _rangeForUserCompletion = NSMakeRange(range.location, [string length]);
-    [self setSelectedRange: _rangeForUserCompletion];
+    NS_EXTRA(NSTextView, self)->_rangeForUserCompletion = NSMakeRange(range.location, [string length]);
+    [self setSelectedRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion];
 
     if (isFinal) {
         // i think that doing something "else", e.g, (just typing, clicking
@@ -874,7 +931,14 @@ static NSTextView *s_targetTextView = nil;
     }
 }
 
+// Nothing can be written without a selection; plain text offers only the
+// string (observed on macOS 10.14.4 and 26.7.3).
+// Test: appkit-textview-editing-api.m (writable pasteboard types)
 - (NSArray *) writablePasteboardTypes {
+    if ([self selectedRange].length == 0)
+        return [NSArray array];
+    if (!NS_EXTRA(NSTextView, self)->_isRichText)
+        return [NSArray arrayWithObject: NSStringPboardType];
     return [NSArray arrayWithObjects: NSRTFPboardType, NSStringPboardType, nil];
 }
 
@@ -910,30 +974,30 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (NSRange) rangeForUserTextChange {
-    if (_isEditable == NO)
+    if (NS_EXTRA(NSTextView, self)->_isEditable == NO)
         return NSMakeRange(NSNotFound, 0);
 
     return [self selectedRange];
 }
 
 - (NSRange) rangeForUserCharacterAttributeChange {
-    if (_isEditable == NO)
+    if (NS_EXTRA(NSTextView, self)->_isEditable == NO)
         return NSMakeRange(NSNotFound, 0);
 
-    if (_isRichText)
+    if (NS_EXTRA(NSTextView, self)->_isRichText)
         return [self selectedRange];
     else
-        return NSMakeRange(0, [[_textStorage string] length]);
+        return NSMakeRange(0, [[NS_EXTRA(NSTextView, self)->_textStorage string] length]);
 }
 
 - (NSRange) rangeForUserParagraphAttributeChange {
-    if (_isEditable == NO)
+    if (NS_EXTRA(NSTextView, self)->_isEditable == NO)
         return NSMakeRange(NSNotFound, 0);
 
-    if (_isRichText)
-        return [[_textStorage string] lineRangeForRange: [self selectedRange]];
+    if (NS_EXTRA(NSTextView, self)->_isRichText)
+        return [[NS_EXTRA(NSTextView, self)->_textStorage string] lineRangeForRange: [self selectedRange]];
     else
-        return NSMakeRange(0, [[_textStorage string] length]);
+        return NSMakeRange(0, [[NS_EXTRA(NSTextView, self)->_textStorage string] length]);
 }
 
 - (BOOL) shouldChangeTextInRange: (NSRange) changeInRange
@@ -944,6 +1008,39 @@ static NSTextView *s_targetTextView = nil;
 
     return [self _delegateChangeTextInRange: changeInRange
                           replacementString: replacementString];
+}
+
+// The ranges are nil when the matching single-range method gives
+// NSNotFound (the view is not editable).
+- (NSArray *) rangesForUserTextChange {
+    NSRange range = [self rangeForUserTextChange];
+    if (range.location == NSNotFound)
+        return nil;
+    return [NSArray arrayWithObject: [NSValue valueWithRange: range]];
+}
+
+- (NSArray *) rangesForUserCharacterAttributeChange {
+    NSRange range = [self rangeForUserCharacterAttributeChange];
+    if (range.location == NSNotFound)
+        return nil;
+    return [NSArray arrayWithObject: [NSValue valueWithRange: range]];
+}
+
+- (NSArray *) rangesForUserParagraphAttributeChange {
+    NSRange range = [self rangeForUserParagraphAttributeChange];
+    if (range.location == NSNotFound)
+        return nil;
+    return [NSArray arrayWithObject: [NSValue valueWithRange: range]];
+}
+
+- (BOOL) shouldChangeTextInRanges: (NSArray *) affectedRanges
+               replacementStrings: (NSArray *) replacementStrings
+{
+    if (![self isEditable])
+        return NO;
+
+    return [self _delegateChangeTextInRanges: affectedRanges
+                          replacementStrings: replacementStrings];
 }
 
 - (void) didChangeText {
@@ -987,11 +1084,11 @@ static NSTextView *s_targetTextView = nil;
     NSRange glyphRange;
     NSRect glyphRect = rect;
 
-    [_backgroundColor setFill];
+    [NS_EXTRA(NSTextView, self)->_backgroundColor setFill];
     NSRectFill(rect);
 
-    glyphRect.origin.x -= _textContainerInset.width;
-    glyphRect.origin.y -= _textContainerInset.height;
+    glyphRect.origin.x -= NS_EXTRA(NSTextView, self)->_textContainerInset.width;
+    glyphRect.origin.y -= NS_EXTRA(NSTextView, self)->_textContainerInset.height;
 
     if (NSIntersectsRect(glyphRect,
                          [[self layoutManager] extraLineFragmentRect])) {
@@ -1016,13 +1113,13 @@ static NSTextView *s_targetTextView = nil;
     NSRect result;
 
     if (range.length == 0) {
-        if (range.location >= [_textStorage length]) {
-            [[self layoutManager] ensureLayoutForTextContainer: _textContainer];
+        if (range.location >= [NS_EXTRA(NSTextView, self)->_textStorage length]) {
+            [[self layoutManager] ensureLayoutForTextContainer: NS_EXTRA(NSTextView, self)->_textContainer];
             result = [[self layoutManager] extraLineFragmentUsedRect];
-            if (NSIsEmptyRect(result) && [_textStorage length]) {
+            if (NSIsEmptyRect(result) && [NS_EXTRA(NSTextView, self)->_textStorage length]) {
                 NSUInteger rectCount = 0;
                 // Get the last used fragment rect
-                range = NSMakeRange([_textStorage length] - 1, 1);
+                range = NSMakeRange([NS_EXTRA(NSTextView, self)->_textStorage length] - 1, 1);
                 range = [[self layoutManager]
                         glyphRangeForCharacterRange: range
                                actualCharacterRange: NULL];
@@ -1038,12 +1135,16 @@ static NSTextView *s_targetTextView = nil;
                                      glyphInscriptions: NULL
                                            elasticBits: NULL
                                             bidiLevels: &level];
+                // The used rect also covers the line fragment padding, the
+                // glyphs themselves start at the fragment location.
                 if (level & 1) {
                     // Right to Left fragment
-                    result.origin.x = NSMinX(result);
+                    result.origin.x = [[self layoutManager]
+                            locationForGlyphAtIndex: range.location].x;
                 } else {
                     // Left to right fragment
-                    result.origin.x = NSMaxX(result);
+                    result.origin.x = NSMaxX(result) -
+                                      [[self textContainer] lineFragmentPadding];
                 }
             }
             result.size.width = 1;
@@ -1058,7 +1159,7 @@ static NSTextView *s_targetTextView = nil;
         }
         result.size.width = 1;
     } else {
-        if (range.location >= [_textStorage length]) {
+        if (range.location >= [NS_EXTRA(NSTextView, self)->_textStorage length]) {
             result = [[self layoutManager] extraLineFragmentRect];
         } else {
             NSRange glyphRange =
@@ -1078,46 +1179,46 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) _displayInsertionPointWithState: (BOOL) ison {
-    _insertionPointOn = ison;
+    NS_EXTRA(NSTextView, self)->_insertionPointOn = ison;
 
     [self lockFocus];
-    [self drawInsertionPointInRect: _insertionPointRect
-                             color: _insertionPointColor
-                          turnedOn: _insertionPointOn];
+    [self drawInsertionPointInRect: NS_EXTRA(NSTextView, self)->_insertionPointRect
+                             color: NS_EXTRA(NSTextView, self)->_insertionPointColor
+                          turnedOn: NS_EXTRA(NSTextView, self)->_insertionPointOn];
     [self unlockFocus];
     [[self window] flushWindow];
 }
 
 - (void) _insertionPointTimerFired: (NSTimer *) timer {
     if ([self shouldDrawInsertionPoint])
-        [self _displayInsertionPointWithState: !_insertionPointOn];
+        [self _displayInsertionPointWithState: !NS_EXTRA(NSTextView, self)->_insertionPointOn];
 }
 
 - (void) updateInsertionPointStateAndRestartTimer: (BOOL) restartFlag {
     NSRange range = [self selectedRange];
 
     if (range.length > 0)
-        _insertionPointRect = NSZeroRect;
+        NS_EXTRA(NSTextView, self)->_insertionPointRect = NSZeroRect;
     else
-        _insertionPointRect =
+        NS_EXTRA(NSTextView, self)->_insertionPointRect =
                 [self _viewRectForCharacterRange: [self selectedRange]];
 
     if (restartFlag) {
         CGFloat interval = [[NSDisplay currentDisplay] textCaretBlinkInterval];
 
-        _insertionPointOn = [self shouldDrawInsertionPoint];
-        [_insertionPointTimer invalidate];
-        [_insertionPointTimer release];
-        _insertionPointTimer = nil;
+        NS_EXTRA(NSTextView, self)->_insertionPointOn = [self shouldDrawInsertionPoint];
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer invalidate];
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer release];
+        NS_EXTRA(NSTextView, self)->_insertionPointTimer = nil;
 
-        _insertionPointTimer =
+        NS_EXTRA(NSTextView, self)->_insertionPointTimer =
                 [[NSTimer scheduledTimerWithTimeInterval: interval
                                                   target: self
                                                 selector: @selector
                                                 (_insertionPointTimerFired:)
                                                 userInfo: nil
                                                  repeats: YES] retain];
-        [[NSRunLoop currentRunLoop] addTimer: _insertionPointTimer
+        [[NSRunLoop currentRunLoop] addTimer: NS_EXTRA(NSTextView, self)->_insertionPointTimer
                                      forMode: NSModalPanelRunLoopMode];
     }
 }
@@ -1170,30 +1271,7 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) paste: sender {
-    id string = nil;
-
-    NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-    if (_isRichText) {
-        NSData *data = [pboard dataForType: NSRTFPboardType];
-        if (data && data.length > 0) {
-            string =
-                    [[[NSAttributedString alloc] initWithRTF: data
-                                          documentAttributes: nil] autorelease];
-        }
-    }
-    if (string == nil) {
-        string = [pboard stringForType: NSStringPboardType];
-    }
-    if ([string length] > 0) {
-        if (![self _delegateChangeTextInRange: [self selectedRange]
-                            replacementString: string])
-            return;
-
-        [self _replaceCharactersInRange: [self selectedRange]
-                             withString: string
-                    useTypingAttributes: NO];
-        [self didChangeText];
-    }
+    [self _pasteRestrictedToTypes: nil];
 }
 
 - (void) selectAll: sender {
@@ -1201,14 +1279,14 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) _textDidEndWithMovement: (NSInteger) movement {
-    if ([_delegate respondsToSelector: @selector(textShouldEndEditing:)]) {
-        if ([_delegate textShouldEndEditing: self] == NO) {
+    if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector(textShouldEndEditing:)]) {
+        if ([NS_EXTRA(NSTextView, self)->_delegate textShouldEndEditing: self] == NO) {
             return;
         }
     }
-    [_insertionPointTimer invalidate];
-    [_insertionPointTimer release];
-    _insertionPointTimer = nil;
+    [NS_EXTRA(NSTextView, self)->_insertionPointTimer invalidate];
+    [NS_EXTRA(NSTextView, self)->_insertionPointTimer release];
+    NS_EXTRA(NSTextView, self)->_insertionPointTimer = nil;
 
     NSDictionary *userInfo = [NSDictionary
             dictionaryWithObject: [NSNumber numberWithInt: movement]
@@ -1219,28 +1297,28 @@ static NSTextView *s_targetTextView = nil;
                           object: self
                         userInfo: userInfo];
 
-    _didSendTextDidEndNotification = YES;
+    NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification = YES;
 
     [[NSNotificationCenter defaultCenter] postNotification: note];
 
-    _didSendTextDidEndNotification = NO;
+    NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification = NO;
 }
 
 - (void) insertTab: sender {
-    if (_isFieldEditor) {
+    if (NS_EXTRA(NSTextView, self)->_isFieldEditor) {
         [self _textDidEndWithMovement: NSTabTextMovement];
         return;
     }
 
-    if (_rangeForUserCompletion.location != NSNotFound) {
-        _userCompletionSelectedItem++;
-        if (_userCompletionSelectedItem >= [_userCompletions count])
-            _userCompletionSelectedItem = 0;
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
+        NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem++;
+        if (NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem >= [NS_EXTRA(NSTextView, self)->_userCompletions count])
+            NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem = 0;
 
         [self insertCompletion:
-                        [_userCompletions
-                                objectAtIndex: _userCompletionSelectedItem]
-                forPartialWordRange: _rangeForUserCompletion
+                        [NS_EXTRA(NSTextView, self)->_userCompletions
+                                objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+                forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                            movement: NSTabTextMovement
                             isFinal: NO];
         return;
@@ -1254,22 +1332,22 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) insertBacktab: sender {
-    if (_isFieldEditor) {
+    if (NS_EXTRA(NSTextView, self)->_isFieldEditor) {
         [self _textDidEndWithMovement: NSBacktabTextMovement];
     }
 }
 
 - (void) insertNewline: sender {
-    if (_isFieldEditor) {
+    if (NS_EXTRA(NSTextView, self)->_isFieldEditor) {
         [self _textDidEndWithMovement: NSReturnTextMovement];
         return;
     }
 
-    if (_rangeForUserCompletion.location != NSNotFound) {
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
         [self insertCompletion:
-                        [_userCompletions
-                                objectAtIndex: _userCompletionSelectedItem]
-                forPartialWordRange: _rangeForUserCompletion
+                        [NS_EXTRA(NSTextView, self)->_userCompletions
+                                objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+                forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                            movement: NSReturnTextMovement
                             isFinal: YES];
         return;
@@ -1283,9 +1361,9 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) cancel: sender {
-    if (_rangeForUserCompletion.location != NSNotFound) {
-        [self insertCompletion: _userCompletionHint
-                forPartialWordRange: _rangeForUserCompletion
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
+        [self insertCompletion: NS_EXTRA(NSTextView, self)->_userCompletionHint
+                forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                            movement: NSCancelTextMovement
                             isFinal: YES];
         return;
@@ -1322,10 +1400,10 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveForwardAndModifySelection: sender {
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSUInteger length = [string length];
     NSRange range = [self selectedRange];
-    BOOL downstream = (range.location >= _selectionOrigin);
+    BOOL downstream = (range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     if (downstream) {
         if (NSMaxRange(range) < length) {
@@ -1342,8 +1420,8 @@ static NSTextView *s_targetTextView = nil;
 - (void) moveWordForward: sender {
     NSRange range = [self selectedRange];
 
-    if (range.location < [[_textStorage string] length]) {
-        range.location = [_textStorage nextWordFromIndex: range.location
+    if (range.location < [[NS_EXTRA(NSTextView, self)->_textStorage string] length]) {
+        range.location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                  forward: YES];
         range.length = 0;
 
@@ -1353,23 +1431,23 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveWordForwardAndModifySelection: sender {
     NSRange range = [self selectedRange];
-    BOOL downstream = (range.location >= _selectionOrigin);
+    BOOL downstream = (range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     if (downstream) {
-        NSUInteger location = [_textStorage nextWordFromIndex: NSMaxRange(range)
+        NSUInteger location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: NSMaxRange(range)
                                                       forward: YES];
         NSUInteger delta = location - NSMaxRange(range);
 
         range.length += delta;
     } else {
-        NSUInteger location = [_textStorage nextWordFromIndex: range.location
+        NSUInteger location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                       forward: YES];
         NSUInteger delta = location - range.location;
 
         range.location += delta;
         range.length -= delta;
-        if (range.location >= _selectionOrigin) {
-            range.location = _selectionOrigin;
+        if (range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin) {
+            range.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             range.length = 0;
         }
     }
@@ -1378,18 +1456,18 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveDown: sender {
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSUInteger length = [string length];
     NSRange range = [self selectedRange];
 
-    if (_rangeForUserCompletion.location != NSNotFound) {
-        if (_userCompletionSelectedItem < [_userCompletions count] - 1)
-            _userCompletionSelectedItem++;
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
+        if (NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem < [NS_EXTRA(NSTextView, self)->_userCompletions count] - 1)
+            NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem++;
 
         [self insertCompletion:
-                        [_userCompletions
-                                objectAtIndex: _userCompletionSelectedItem]
-                forPartialWordRange: _rangeForUserCompletion
+                        [NS_EXTRA(NSTextView, self)->_userCompletions
+                                objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+                forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                            movement: NSDownTextMovement
                             isFinal: NO];
         return;
@@ -1419,10 +1497,10 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveDownAndModifySelection: sender {
-    NSUInteger length = [[_textStorage string] length];
+    NSUInteger length = [[NS_EXTRA(NSTextView, self)->_textStorage string] length];
     NSRange range = [self selectedRange];
     NSUInteger delta;
-    BOOL downstream = (range.location >= _selectionOrigin);
+    BOOL downstream = (range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     delta = (downstream ? NSMaxRange(range) : range.location);
 
@@ -1449,7 +1527,7 @@ static NSTextView *s_targetTextView = nil;
         range.length += delta;
     } else {
         if (delta > range.length) {
-            range.location = _selectionOrigin;
+            range.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             range.length = 0;
         } else {
             range.location += delta;
@@ -1461,17 +1539,17 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveUp: sender {
-    NSUInteger length = [[_textStorage string] length];
+    NSUInteger length = [[NS_EXTRA(NSTextView, self)->_textStorage string] length];
     NSRange range = [self selectedRange];
 
-    if (_rangeForUserCompletion.location != NSNotFound) {
-        if (_userCompletionSelectedItem > 0)
-            _userCompletionSelectedItem--;
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
+        if (NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem > 0)
+            NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem--;
 
         [self insertCompletion:
-                        [_userCompletions
-                                objectAtIndex: _userCompletionSelectedItem]
-                forPartialWordRange: _rangeForUserCompletion
+                        [NS_EXTRA(NSTextView, self)->_userCompletions
+                                objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+                forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                            movement: NSUpTextMovement
                             isFinal: NO];
         return;
@@ -1502,10 +1580,10 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveUpAndModifySelection: sender {
-    NSUInteger length = [[_textStorage string] length];
+    NSUInteger length = [[NS_EXTRA(NSTextView, self)->_textStorage string] length];
     NSRange range = [self selectedRange];
     NSInteger delta;
-    BOOL upstream = (NSMaxRange(range) <= _selectionOrigin);
+    BOOL upstream = (NSMaxRange(range) <= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     delta = (upstream ? range.location : NSMaxRange(range));
 
@@ -1535,7 +1613,7 @@ static NSTextView *s_targetTextView = nil;
         if (delta < range.length) {
             range.length -= delta;
         } else {
-            range.location = _selectionOrigin;
+            range.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             range.length = 0;
         }
     }
@@ -1615,7 +1693,7 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveBackwardAndModifySelection: sender {
     NSRange range = [self selectedRange];
-    BOOL upstream = (NSMaxRange(range) <= _selectionOrigin);
+    BOOL upstream = (NSMaxRange(range) <= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     if (upstream) {
         if (range.location > 0) {
@@ -1632,10 +1710,10 @@ static NSTextView *s_targetTextView = nil;
     NSRange range = [self selectedRange];
 
     if (range.location > 0) {
-        if (range.location == [[_textStorage string] length]) // hrm
+        if (range.location == [[NS_EXTRA(NSTextView, self)->_textStorage string] length]) // hrm
             range.location--;
 
-        range.location = [_textStorage nextWordFromIndex: range.location
+        range.location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                  forward: NO];
         range.length = 0;
 
@@ -1645,17 +1723,17 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveWordBackwardAndModifySelection: sender {
     NSRange range = [self selectedRange];
-    BOOL upstream = (NSMaxRange(range) <= _selectionOrigin);
+    BOOL upstream = (NSMaxRange(range) <= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     if (upstream) {
-        NSUInteger location = [_textStorage nextWordFromIndex: range.location
+        NSUInteger location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                       forward: NO];
         NSUInteger delta = range.location - location;
 
         range.location -= delta;
         range.length += delta;
     } else {
-        NSUInteger location = [_textStorage nextWordFromIndex: NSMaxRange(range)
+        NSUInteger location = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: NSMaxRange(range)
                                                       forward: NO];
         NSUInteger delta = NSMaxRange(range) - location;
 
@@ -1673,12 +1751,12 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveToEndOfDocument: sender {
-    [self _setAndScrollToRange: NSMakeRange([_textStorage length], 0)];
+    [self _setAndScrollToRange: NSMakeRange([NS_EXTRA(NSTextView, self)->_textStorage length], 0)];
 }
 
 - (void) moveToBeginningOfDocumentAndModifySelection: sender {
-    NSUInteger origin = MIN(_selectionOrigin, [_textStorage length]);
-    _selectionOrigin = origin;
+    NSUInteger origin = MIN(NS_EXTRA(NSTextView, self)->_selectionOrigin, [NS_EXTRA(NSTextView, self)->_textStorage length]);
+    NS_EXTRA(NSTextView, self)->_selectionOrigin = origin;
     [self setSelectedRange: NSMakeRange(0, origin)
                   affinity: NSSelectionAffinityUpstream
             stillSelecting: NO];
@@ -1686,9 +1764,9 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) moveToEndOfDocumentAndModifySelection: sender {
-    NSUInteger length = [[_textStorage string] length];
+    NSUInteger length = [[NS_EXTRA(NSTextView, self)->_textStorage string] length];
     // The storage can shrink under a selection without resetting the anchor.
-    NSUInteger origin = MIN(_selectionOrigin, length);
+    NSUInteger origin = MIN(NS_EXTRA(NSTextView, self)->_selectionOrigin, length);
     [self setSelectedRange: NSMakeRange(origin, length - origin)
                   affinity: NSSelectionAffinityDownstream
             stillSelecting: NO];
@@ -1736,8 +1814,8 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) deleteBackward: sender {
     NSRange range = [self selectedRange];
-    if (range.location == NSNotFound || range.location > [_textStorage length])
-        range = NSMakeRange([_textStorage length], 0);
+    if (range.location == NSNotFound || range.location > [NS_EXTRA(NSTextView, self)->_textStorage length])
+        range = NSMakeRange([NS_EXTRA(NSTextView, self)->_textStorage length], 0);
 
     if (range.length > 0) {
 
@@ -1764,26 +1842,26 @@ static NSTextView *s_targetTextView = nil;
 
 // deleteToXXX methods use the kill buffer...
 - (void) _appendStringToKillBuffer: (NSString *) string {
-    if (_killBufferIsAdditive == YES) {
-        if (_killBuffer != nil)
-            [_killBuffer appendString: string];
+    if (NS_EXTRA(NSTextView, self)->_killBufferIsAdditive == YES) {
+        if (NS_EXTRA(NSTextView, self)->_killBuffer != nil)
+            [NS_EXTRA(NSTextView, self)->_killBuffer appendString: string];
         else
-            _killBuffer = [string mutableCopy];
+            NS_EXTRA(NSTextView, self)->_killBuffer = [string mutableCopy];
     } else {
-        [_killBuffer release];
-        _killBuffer = [string copy];
+        [NS_EXTRA(NSTextView, self)->_killBuffer release];
+        NS_EXTRA(NSTextView, self)->_killBuffer = [string copy];
     }
 }
 
 // etc
 - (BOOL) killBufferIsAdditive {
-    return _killBufferIsAdditive;
+    return NS_EXTRA(NSTextView, self)->_killBufferIsAdditive;
 }
 
 - (void) setKillBufferAdditive: (BOOL) flag {
-    _killBufferIsAdditive = flag;
-    [_killBuffer release];
-    _killBuffer = nil;
+    NS_EXTRA(NSTextView, self)->_killBufferIsAdditive = flag;
+    [NS_EXTRA(NSTextView, self)->_killBuffer release];
+    NS_EXTRA(NSTextView, self)->_killBuffer = nil;
 }
 
 - (void) deleteToBeginningOfLine: sender {
@@ -1800,7 +1878,7 @@ static NSTextView *s_targetTextView = nil;
     if (![self _delegateChangeTextInRange: range replacementString: @""])
         return;
 
-    [self _appendStringToKillBuffer: [[_textStorage string]
+    [self _appendStringToKillBuffer: [[NS_EXTRA(NSTextView, self)->_textStorage string]
                                              substringWithRange: range]];
     [self _replaceCharactersInRange: range withString: @""];
     [self didChangeText];
@@ -1819,7 +1897,7 @@ static NSTextView *s_targetTextView = nil;
     if (![self _delegateChangeTextInRange: range replacementString: @""])
         return;
 
-    [self _appendStringToKillBuffer: [[_textStorage string]
+    [self _appendStringToKillBuffer: [[NS_EXTRA(NSTextView, self)->_textStorage string]
                                              substringWithRange: range]];
     [self _replaceCharactersInRange: range withString: @""];
     [self didChangeText];
@@ -1827,7 +1905,7 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) deleteToBeginningOfParagraph: sender {
     NSRange range = [self selectedRange];
-    NSRange lineRange = [[_textStorage string] lineRangeForRange: range];
+    NSRange lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string] lineRangeForRange: range];
     NSUInteger delta = range.location - lineRange.location;
 
     // i'm not killing the newline here, not sure how this should work.
@@ -1839,7 +1917,7 @@ static NSTextView *s_targetTextView = nil;
     if (![self _delegateChangeTextInRange: range replacementString: @""])
         return;
 
-    [self _appendStringToKillBuffer: [[_textStorage string]
+    [self _appendStringToKillBuffer: [[NS_EXTRA(NSTextView, self)->_textStorage string]
                                              substringWithRange: range]];
     [self _replaceCharactersInRange: range withString: @""];
     [self didChangeText];
@@ -1847,10 +1925,10 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) deleteToEndOfParagraph: sender {
     NSRange range = [self selectedRange];
-    NSRange lineRange = [[_textStorage string] lineRangeForRange: range];
+    NSRange lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string] lineRangeForRange: range];
     NSUInteger max = NSMaxRange(lineRange);
 
-    if (max != lineRange.location && max != [[_textStorage string] length])
+    if (max != lineRange.location && max != [[NS_EXTRA(NSTextView, self)->_textStorage string] length])
         max--;
 
     // i'm not killing the newline here, not sure how this should work.
@@ -1860,7 +1938,7 @@ static NSTextView *s_targetTextView = nil;
     if (![self _delegateChangeTextInRange: range replacementString: @""])
         return;
 
-    [self _appendStringToKillBuffer: [[_textStorage string]
+    [self _appendStringToKillBuffer: [[NS_EXTRA(NSTextView, self)->_textStorage string]
                                              substringWithRange: range]];
     [self _replaceCharactersInRange: range withString: @""];
     [self didChangeText];
@@ -1872,19 +1950,19 @@ static NSTextView *s_targetTextView = nil;
 // the kill buffer, but whatever...
 
 - (void) yank: sender {
-    if (_killBuffer != nil) {
-        [self insertText: _killBuffer];
+    if (NS_EXTRA(NSTextView, self)->_killBuffer != nil) {
+        [self insertText: NS_EXTRA(NSTextView, self)->_killBuffer];
 
-        if (_killBufferIsAdditive == YES) {
-            [_killBuffer release];
-            _killBuffer = nil;
+        if (NS_EXTRA(NSTextView, self)->_killBufferIsAdditive == YES) {
+            [NS_EXTRA(NSTextView, self)->_killBuffer release];
+            NS_EXTRA(NSTextView, self)->_killBuffer = nil;
         }
     }
 }
 
 - (void) deleteWordBackward: sender {
     NSRange range = [self selectedRange];
-    NSUInteger nextWord = [_textStorage nextWordFromIndex: range.location
+    NSUInteger nextWord = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                   forward: NO];
 
     if (range.length == 0) {
@@ -1903,10 +1981,10 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) deleteWordForward: sender {
     NSRange range = [self selectedRange];
-    NSUInteger nextWord = [_textStorage nextWordFromIndex: range.location
+    NSUInteger nextWord = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location
                                                   forward: YES];
 
-    if (range.length == 0 && nextWord <= [[_textStorage string] length]) {
+    if (range.length == 0 && nextWord <= [[NS_EXTRA(NSTextView, self)->_textStorage string] length]) {
         NSUInteger delta = nextWord - range.location;
 
         range.length += delta;
@@ -1937,7 +2015,7 @@ static NSTextView *s_targetTextView = nil;
     NSUInteger index;
     BOOL upstream = NO;
 
-    if (NSMaxRange(selectedRange) <= _selectionOrigin) {
+    if (NSMaxRange(selectedRange) <= NS_EXTRA(NSTextView, self)->_selectionOrigin) {
         upstream = YES;
         index = selectedRange.location;
     } else
@@ -1976,7 +2054,7 @@ static NSTextView *s_targetTextView = nil;
     NSUInteger index;
     BOOL downstream = NO;
 
-    if (selectedRange.location >= _selectionOrigin) {
+    if (selectedRange.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin) {
         downstream = YES;
         index = NSMaxRange(selectedRange);
     } else
@@ -1995,7 +2073,7 @@ static NSTextView *s_targetTextView = nil;
             selectedRange.location += delta;
             selectedRange.length -= delta;
         } else {
-            selectedRange.location = _selectionOrigin;
+            selectedRange.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             selectedRange.length = 0;
         }
     }
@@ -2005,7 +2083,7 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveToBeginningOfParagraph: sender {
     // was moveToBeginningOfLine
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSRange range = [self selectedRange];
     NSRange lineRange = [string lineRangeForRange: range];
 
@@ -2014,18 +2092,18 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveParagraphBackwardAndModifySelection: sender {
     NSRange range = [self selectedRange];
-    BOOL upstream = (NSMaxRange(range) <= _selectionOrigin);
+    BOOL upstream = (NSMaxRange(range) <= NS_EXTRA(NSTextView, self)->_selectionOrigin);
 
     if (upstream) {
         NSRange lineRange;
         NSUInteger delta = 0;
 
-        lineRange = [[_textStorage string]
+        lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string]
                 lineRangeForRange: NSMakeRange(range.location, 0)];
 
         // ugh. newlines screw up the lineRangeForRange calculation.
         if (lineRange.location == range.location && range.location > 0)
-            lineRange = [[_textStorage string]
+            lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string]
                     lineRangeForRange: NSMakeRange(range.location - 1, 0)];
 
         delta = range.location - lineRange.location;
@@ -2033,7 +2111,7 @@ static NSTextView *s_targetTextView = nil;
         range.location -= delta;
         range.length += delta;
     } else {
-        NSRange lineRange = [[_textStorage string]
+        NSRange lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string]
                 lineRangeForRange: NSMakeRange(NSMaxRange(range) - 1, 0)];
         NSUInteger delta = NSMaxRange(range) - lineRange.location;
 
@@ -2048,7 +2126,7 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveToEndOfParagraph: sender {
     // was moveToEndOfLine
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSRange range = [self selectedRange];
     NSRange lineRange = [string lineRangeForRange: range];
     NSUInteger max = NSMaxRange(lineRange);
@@ -2061,16 +2139,16 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) moveParagraphForwardAndModifySelection: sender {
     NSRange range = [self selectedRange];
-    BOOL downstream = range.location >= _selectionOrigin;
+    BOOL downstream = range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin;
 
     if (downstream) {
-        NSRange lineRange = [[_textStorage string]
+        NSRange lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string]
                 lineRangeForRange: NSMakeRange(NSMaxRange(range), 0)];
         NSUInteger delta = NSMaxRange(lineRange) - NSMaxRange(range);
 
         range.length += delta;
     } else {
-        NSRange lineRange = [[_textStorage string]
+        NSRange lineRange = [[NS_EXTRA(NSTextView, self)->_textStorage string]
                 lineRangeForRange: NSMakeRange(range.location, 0)];
         NSUInteger delta = NSMaxRange(lineRange) - range.location;
 
@@ -2078,7 +2156,7 @@ static NSTextView *s_targetTextView = nil;
             range.location += delta;
             range.length -= delta;
         } else {
-            range.location = _selectionOrigin;
+            range.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             range.length = 0;
         }
     }
@@ -2105,11 +2183,11 @@ static NSTextView *s_targetTextView = nil;
 - (NSUInteger) glyphIndexForPoint: (NSPoint) point
         fractionOfDistanceThroughGlyph: (CGFloat *) fraction
 {
-    point.x -= _textContainerInset.width;
-    point.y -= _textContainerInset.height;
+    point.x -= NS_EXTRA(NSTextView, self)->_textContainerInset.width;
+    point.y -= NS_EXTRA(NSTextView, self)->_textContainerInset.height;
 
     return [[self layoutManager] glyphIndexForPoint: point
-                                    inTextContainer: _textContainer
+                                    inTextContainer: NS_EXTRA(NSTextView, self)->_textContainer
                      fractionOfDistanceThroughGlyph: fraction];
 }
 
@@ -2142,7 +2220,7 @@ static NSTextView *s_targetTextView = nil;
     location = [self glyphIndexForPoint: NSMakePoint(NSMinX(rect), NSMinY(rect))
             fractionOfDistanceThroughGlyph: &fraction];
 
-    upstream = (NSMaxRange(range) <= _selectionOrigin);
+    upstream = (NSMaxRange(range) <= NS_EXTRA(NSTextView, self)->_selectionOrigin);
     if (upstream) {
         NSUInteger delta = range.location - location;
 
@@ -2169,7 +2247,7 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) pageDown: sender {
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSRect rect;
     NSRange range;
     CGFloat fraction;
@@ -2200,7 +2278,7 @@ static NSTextView *s_targetTextView = nil;
     location = [self glyphIndexForPoint: NSMakePoint(NSMinX(rect), NSMaxY(rect))
             fractionOfDistanceThroughGlyph: &fraction];
 
-    downstream = (range.location >= _selectionOrigin);
+    downstream = (range.location >= NS_EXTRA(NSTextView, self)->_selectionOrigin);
     if (downstream) {
         NSUInteger delta = location - NSMaxRange(range);
 
@@ -2212,7 +2290,7 @@ static NSTextView *s_targetTextView = nil;
             range.location += delta;
             range.length -= delta;
         } else {
-            range.location = _selectionOrigin;
+            range.location = NS_EXTRA(NSTextView, self)->_selectionOrigin;
             range.length = 0;
         }
     }
@@ -2221,7 +2299,7 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) transpose: sender {
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSRange range = [self selectedRange];
 
     if (range.length > 0)
@@ -2251,7 +2329,7 @@ static NSTextView *s_targetTextView = nil;
 // whitespace should ask _delegateChangeTextInRange:replacementString: and use
 // _replaceCharactersInRange:withString:
 - (void) transposeWords: sender {
-    NSString *string = [_textStorage string];
+    NSString *string = [NS_EXTRA(NSTextView, self)->_textStorage string];
     NSRange range = [self selectedRange];
     NSUInteger nextWord, previousWord;
     NSString *a, *b, *space;
@@ -2268,8 +2346,8 @@ static NSTextView *s_targetTextView = nil;
     [self replaceCharactersInRange: NSMakeRange(range.location, 1)
                         withString: @""];
 
-    nextWord = [_textStorage nextWordFromIndex: range.location forward: YES];
-    previousWord = [_textStorage nextWordFromIndex: range.location forward: NO];
+    nextWord = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location forward: YES];
+    previousWord = [NS_EXTRA(NSTextView, self)->_textStorage nextWordFromIndex: range.location forward: NO];
 
     a = [string substringWithRange: NSMakeRange(previousWord,
                                                 range.location - previousWord)];
@@ -2290,21 +2368,21 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) complete: sender {
-    if (_rangeForUserCompletion.location !=
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location !=
         NSNotFound) { // we're already in completion mode
         NSLog(@"userCompletion STATE MISMATCH!!!");
         return;
     }
 
-    _rangeForUserCompletion = [self rangeForUserCompletion];
-    _userCompletionHint = [[[_textStorage string]
-            substringWithRange: _rangeForUserCompletion] retain];
-    _userCompletions =
-            [[self completionsForPartialWordRange: _rangeForUserCompletion
-                              indexOfSelectedItem: &_userCompletionSelectedItem]
+    NS_EXTRA(NSTextView, self)->_rangeForUserCompletion = [self rangeForUserCompletion];
+    NS_EXTRA(NSTextView, self)->_userCompletionHint = [[[NS_EXTRA(NSTextView, self)->_textStorage string]
+            substringWithRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion] retain];
+    NS_EXTRA(NSTextView, self)->_userCompletions =
+            [[self completionsForPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
+                              indexOfSelectedItem: &NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
                     retain];
 
-    if ([_userCompletions count] == 0) {
+    if ([NS_EXTRA(NSTextView, self)->_userCompletions count] == 0) {
         [self endUserCompletion];
         NSBeep();
         return;
@@ -2312,19 +2390,19 @@ static NSTextView *s_targetTextView = nil;
 
     // Hmm, what should be the initial text movement for the completion editor?
     // Docs are unclear
-    [self insertCompletion: [_userCompletions
-                                    objectAtIndex: _userCompletionSelectedItem]
-            forPartialWordRange: _rangeForUserCompletion
+    [self insertCompletion: [NS_EXTRA(NSTextView, self)->_userCompletions
+                                    objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+            forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                        movement: NSOtherTextMovement
                         isFinal: NO];
 }
 
 - (void) endUserCompletion {
-    _rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
-    [_userCompletionHint release];
-    _userCompletionHint = nil;
-    [_userCompletions release];
-    _userCompletions = nil;
+    NS_EXTRA(NSTextView, self)->_rangeForUserCompletion = NSMakeRange(NSNotFound, 0);
+    [NS_EXTRA(NSTextView, self)->_userCompletionHint release];
+    NS_EXTRA(NSTextView, self)->_userCompletionHint = nil;
+    [NS_EXTRA(NSTextView, self)->_userCompletions release];
+    NS_EXTRA(NSTextView, self)->_userCompletions = nil;
 }
 
 - (void) toggleRuler: sender {
@@ -2363,84 +2441,83 @@ static NSTextView *s_targetTextView = nil;
 // NSText
 
 - delegate {
-    return _delegate;
+    return NS_EXTRA(NSTextView, self)->_delegate;
 }
 
 - (NSString *) string {
-    return [_textStorage string];
+    return [NS_EXTRA(NSTextView, self)->_textStorage string];
 }
 
 - (NSData *) RTFFromRange: (NSRange) range {
-    return [NSRichTextWriter dataWithAttributedString: _textStorage
+    return [NSRichTextWriter dataWithAttributedString: NS_EXTRA(NSTextView, self)->_textStorage
                                                 range: range];
 }
 
 - (NSData *) RTFDFromRange: (NSRange) range {
-    return [NSRichTextWriter dataWithAttributedString: _textStorage
-                                                range: range];
+    return [NS_EXTRA(NSTextView, self)->_textStorage RTFDFromRange: range documentAttributes: nil];
 }
 
 - (BOOL) isEditable {
-    return _isEditable;
+    return NS_EXTRA(NSTextView, self)->_isEditable;
 }
 
 - (BOOL) isSelectable {
-    return _isSelectable;
+    return NS_EXTRA(NSTextView, self)->_isSelectable;
 }
 
 - (BOOL) isRichText {
-    return _isRichText;
+    return NS_EXTRA(NSTextView, self)->_isRichText;
 }
 
 - (BOOL) isFieldEditor {
-    return _isFieldEditor;
+    return NS_EXTRA(NSTextView, self)->_isFieldEditor;
 }
 
 - (NSFont *) font {
-    return _font;
+    return NS_EXTRA(NSTextView, self)->_font;
 }
 
 - (NSTextAlignment) alignment {
-    return _textAlignment;
+    return NS_EXTRA(NSTextView, self)->_textAlignment;
 }
 
 - (NSColor *) textColor {
-    return _textColor;
+    return NS_EXTRA(NSTextView, self)->_textColor;
 }
 
 - (BOOL) drawsBackground {
-    return _drawsBackground;
+    return NS_EXTRA(NSTextView, self)->_drawsBackground;
 }
 
 - (NSColor *) backgroundColor {
-    return _backgroundColor;
+    return NS_EXTRA(NSTextView, self)->_backgroundColor;
 }
 
 - (BOOL) isHorizontallyResizable {
-    return _isHorizontallyResizable;
+    return NS_EXTRA(NSTextView, self)->_isHorizontallyResizable;
 }
 
 - (BOOL) isVerticallyResizable {
-    return _isVerticallyResizable;
+    return NS_EXTRA(NSTextView, self)->_isVerticallyResizable;
 }
 
 - (NSSize) maxSize {
-    return _maxSize;
+    return NS_EXTRA(NSTextView, self)->_maxSize;
 }
 
 - (NSSize) minSize {
-    return _minSize;
+    return NS_EXTRA(NSTextView, self)->_minSize;
 }
 
 - (NSRange) selectedRange {
-    if ([_selectedRanges count] == 0)
+    if ([NS_EXTRA(NSTextView, self)->_selectedRanges count] == 0)
         return NSMakeRange(0, 0);
 
-    return [[_selectedRanges objectAtIndex: 0] rangeValue];
+    return [[NS_EXTRA(NSTextView, self)->_selectedRanges objectAtIndex: 0] rangeValue];
 }
 
 - (void) setDelegate: delegate {
-    if (delegate == _delegate)
+    if (delegate == NS_EXTRA(NSTextView, self)->_delegate)
         return;
 
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
@@ -2454,29 +2531,47 @@ static NSTextView *s_targetTextView = nil;
             {@selector(textDidChange:), NSTextDidChangeNotification},
             {@selector(textViewDidChangeSelection:),
              NSTextViewDidChangeSelectionNotification},
+            {@selector(textViewDidChangeTypingAttributes:),
+             NSTextViewDidChangeTypingAttributesNotification},
             {NULL, nil}};
     int i;
 
-    if (_delegate != nil)
+    if (NS_EXTRA(NSTextView, self)->_delegate != nil)
         for (i = 0; notes[i].selector != NULL; i++)
-            [center removeObserver: _delegate name: notes[i].name object: self];
+            [center removeObserver: NS_EXTRA(NSTextView, self)->_delegate name: notes[i].name object: self];
 
-    _delegate = delegate;
+    NS_EXTRA(NSTextView, self)->_delegate = delegate;
 
     for (i = 0; notes[i].selector != NULL; i++)
-        if ([_delegate respondsToSelector: notes[i].selector])
-            [center addObserver: _delegate
+        if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: notes[i].selector])
+            [center addObserver: NS_EXTRA(NSTextView, self)->_delegate
                        selector: notes[i].selector
                            name: notes[i].name
                          object: self];
 }
 
+// QUIRK: -setString: and -replaceCharactersInRange:withString: do not ask the
+// delegate for permission (shouldChangeTextInRange:...); the delegate is only
+// consulted for user-driven edits. Observed on macOS 10.14.4 and 26.7.3 (tier
+// 2, MAC-EVIDENCE V613).
+// Test: appkit-textview-editing-api.m (programmatic changes skip the delegate)
 - (void) setString: (NSString *) string {
-    if (![self _delegateChangeTextInRange: NSMakeRange(0, [_textStorage length])
-                        replacementString: string])
-        return;
-
-    [self _replaceCharactersInRange: NSMakeRange(0, [_textStorage length])
+    // The new text starts from the view's own attributes: typing attributes that earlier
+    // typing or pasting changed are dropped (macOS 26.7.3, black-box probe: after pasting
+    // 20 point text, setString: leaves typing attributes and text at the view's font).
+    {
+        NSMutableDictionary *reset = [NSMutableDictionary dictionary];
+        if (NS_EXTRA(NSTextView, self)->_font != nil)
+            [reset setObject: NS_EXTRA(NSTextView, self)->_font forKey: NSFontAttributeName];
+        if (NS_EXTRA(NSTextView, self)->_textColor != nil)
+            [reset setObject: NS_EXTRA(NSTextView, self)->_textColor forKey: NSForegroundColorAttributeName];
+        id paragraph = [NS_EXTRA(NSTextView, self)->_typingAttributes objectForKey: NSParagraphStyleAttributeName];
+        if (paragraph != nil)
+            [reset setObject: paragraph forKey: NSParagraphStyleAttributeName];
+        [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+        NS_EXTRA(NSTextView, self)->_typingAttributes = [reset retain];
+    }
+    [self _replaceCharactersInRange: NSMakeRange(0, [NS_EXTRA(NSTextView, self)->_textStorage length])
                          withString: string];
     // this does not didChangeText
 }
@@ -2489,7 +2584,7 @@ static NSTextView *s_targetTextView = nil;
     NSRange selectedRange = [self selectedRange];
     if (selectedRange.length == 0) {
         // Use the font from the typing attributes
-        NSFont *font = [_typingAttributes objectForKey: NSFontAttributeName];
+        NSFont *font = [NS_EXTRA(NSTextView, self)->_typingAttributes objectForKey: NSFontAttributeName];
         if (font) {
             [[NSFontManager sharedFontManager] setSelectedFont: font
                                                     isMultiple: NO];
@@ -2498,7 +2593,7 @@ static NSTextView *s_targetTextView = nil;
         // Use the font at the selection point and check if the selection is
         // using any other font
         NSRange effectiveRange;
-        NSFont *font = [_textStorage attribute: NSFontAttributeName
+        NSFont *font = [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSFontAttributeName
                                        atIndex: selectedRange.location
                                 effectiveRange: &effectiveRange];
         BOOL isMultiple =
@@ -2512,13 +2607,13 @@ static NSTextView *s_targetTextView = nil;
 
 // Update the typing attributes according to the current selection
 - (void) _updateTypingAttributes {
-    if (_isRichText == NO) {
+    if (NS_EXTRA(NSTextView, self)->_isRichText == NO) {
         NSMutableParagraphStyle *style =
                 [[[NSParagraphStyle defaultParagraphStyle] mutableCopy]
                         autorelease];
-        [style setAlignment: _textAlignment];
+        [style setAlignment: NS_EXTRA(NSTextView, self)->_textAlignment];
         NSDictionary *attributes = [NSDictionary
-                dictionaryWithObjectsAndKeys: _font, NSFontAttributeName, style,
+                dictionaryWithObjectsAndKeys: NS_EXTRA(NSTextView, self)->_font, NSFontAttributeName, style,
                                               NSParagraphStyleAttributeName,
                                               nil];
         if (attributes &&
@@ -2566,14 +2661,14 @@ static NSTextView *s_targetTextView = nil;
 - (NSDictionary *) _stringAttributes {
     NSMutableDictionary *result = [NSMutableDictionary dictionary];
 
-    [result setObject: _font forKey: NSFontAttributeName];
-    [result setObject: _textColor forKey: NSForegroundColorAttributeName];
+    [result setObject: NS_EXTRA(NSTextView, self)->_font forKey: NSFontAttributeName];
+    [result setObject: NS_EXTRA(NSTextView, self)->_textColor forKey: NSForegroundColorAttributeName];
     return result;
 }
 
 // Add attributes with undo support
 - (void) _addAttributes: (NSDictionary *) attributes range: (NSRange) range {
-    if (_allowsUndo && self.undoManager) {
+    if (NS_EXTRA(NSTextView, self)->_allowsUndo && self.undoManager) {
         [self breakUndoCoalescing];
 
         NSUndoSetAttributes *undoSetAttributes = [[[NSUndoSetAttributes alloc]
@@ -2597,7 +2692,7 @@ static NSTextView *s_targetTextView = nil;
 
 // Remove attributes with undo support
 - (void) _removeAttribute: (NSString *) key range: (NSRange) range {
-    if (_allowsUndo && self.undoManager) {
+    if (NS_EXTRA(NSTextView, self)->_allowsUndo && self.undoManager) {
         [self breakUndoCoalescing];
 
         NSUndoSetAttributes *undoSetAttributes = [[[NSUndoSetAttributes alloc]
@@ -2613,9 +2708,6 @@ static NSTextView *s_targetTextView = nil;
 - (void) replaceCharactersInRange: (NSRange) range
                        withString: (NSString *) string
 {
-    if (![self _delegateChangeTextInRange: range replacementString: string])
-        return;
-
     [self _replaceCharactersInRange: range
                          withString: string
                 useTypingAttributes: NO];
@@ -2628,41 +2720,45 @@ static NSTextView *s_targetTextView = nil;
                useTypingAttributes: (BOOL) useTypingAttributes
             allowsTypingCoalescing: (BOOL) allowsTypingCoalescing
 {
-    if (range.location == NSNotFound || range.location > [_textStorage length])
-        range = NSMakeRange([_textStorage length], 0);
-    if (range.location + range.length > [_textStorage length])
-        range.length = [_textStorage length] - range.location;
+    if (range.location == NSNotFound || range.location > [NS_EXTRA(NSTextView, self)->_textStorage length])
+        range = NSMakeRange([NS_EXTRA(NSTextView, self)->_textStorage length], 0);
+    if (range.location + range.length > [NS_EXTRA(NSTextView, self)->_textStorage length])
+        range.length = [NS_EXTRA(NSTextView, self)->_textStorage length] - range.location;
+
+    // Any change of the text other than marking ends marked text.
+    if (!NS_EXTRA(NSTextView, self)->_updatingMarkedText)
+        [self _clearMarkedText];
 
     NSUndoManager *undoManager = [self undoManager];
 
-    if (_firstResponderButNotEditingYet) {
+    if (NS_EXTRA(NSTextView, self)->_firstResponderButNotEditingYet) {
         [[NSNotificationCenter defaultCenter]
                 postNotificationName: NSTextDidBeginEditingNotification
                               object: self];
-        _firstResponderButNotEditingYet = NO;
+        NS_EXTRA(NSTextView, self)->_firstResponderButNotEditingYet = NO;
     }
 
-    if (_allowsUndo) {
-        if (_processingKeyEvent && allowsTypingCoalescing) {
-            if (_undoTyping) {
+    if (NS_EXTRA(NSTextView, self)->_allowsUndo) {
+        if (NS_EXTRA(NSTextView, self)->_processingKeyEvent && allowsTypingCoalescing) {
+            if (NS_EXTRA(NSTextView, self)->_undoTyping) {
                 // Try first to coaelesce with current undo typing object
-                if ([_undoTyping
+                if ([NS_EXTRA(NSTextView, self)->_undoTyping
                             coalesceAffectedRange: range
                                  replacementRange: NSMakeRange(range.location,
                                                                [string length])
                                     selectedRange: [self selectedRange]
-                                             text: _textStorage] == NO) {
+                                             text: NS_EXTRA(NSTextView, self)->_textStorage] == NO) {
                     [self breakUndoCoalescing];
                 }
             }
-            if (_undoTyping == nil) {
-                _undoTyping = [[NSUndoTyping alloc]
+            if (NS_EXTRA(NSTextView, self)->_undoTyping == nil) {
+                NS_EXTRA(NSTextView, self)->_undoTyping = [[NSUndoTyping alloc]
                         initWithAffectedRange: range
                                 layoutManager: self.layoutManager
                                   undoManager: self.undoManager
                              replacementRange: NSMakeRange(range.location,
                                                            [string length])];
-                [[self.undoManager prepareWithInvocationTarget: _undoTyping]
+                [[self.undoManager prepareWithInvocationTarget: NS_EXTRA(NSTextView, self)->_undoTyping]
                         undoRedo: self.textStorage];
             }
         } else {
@@ -2679,7 +2775,7 @@ static NSTextView *s_targetTextView = nil;
                     undoRedo: self.textStorage];
         }
     }
-    if (_isRichText) {
+    if (NS_EXTRA(NSTextView, self)->_isRichText) {
         NSAttributedString *attrString = nil;
         // Use the typing attributes for the inserted string
         if ([string isKindOfClass: [NSAttributedString class]]) {
@@ -2698,7 +2794,7 @@ static NSTextView *s_targetTextView = nil;
                     initWithString: string
                         attributes: [self typingAttributes]] autorelease];
         }
-        [_textStorage replaceCharactersInRange: range
+        [NS_EXTRA(NSTextView, self)->_textStorage replaceCharactersInRange: range
                           withAttributedString: attrString];
     } else {
         // Even though we're not rich text we have to set the typing attributes
@@ -2713,7 +2809,7 @@ static NSTextView *s_targetTextView = nil;
         NSAttributedString *attrString = [[[NSAttributedString alloc]
                 initWithString: string
                     attributes: [self typingAttributes]] autorelease];
-        [_textStorage replaceCharactersInRange: range
+        [NS_EXTRA(NSTextView, self)->_textStorage replaceCharactersInRange: range
                           withAttributedString: attrString];
     }
 
@@ -2761,7 +2857,7 @@ static NSTextView *s_targetTextView = nil;
     if (contents == nil)
         return NO;
 
-    [_textStorage setAttributedString: contents];
+    [NS_EXTRA(NSTextView, self)->_textStorage setAttributedString: contents];
     return YES;
 }
 
@@ -2781,8 +2877,10 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) replaceCharactersInRange: (NSRange) range withRTFD: (NSData *) rtfd {
     NSAttributedString *astring =
-            [NSRichTextReader attributedStringWithData: rtfd];
+            [[[NSAttributedString alloc] initWithRTFD: rtfd documentAttributes: NULL] autorelease];
 
+    if (astring == nil)
+        return;
     if (![self _delegateChangeTextInRange: range
                         replacementString: [astring string]])
         return;
@@ -2794,27 +2892,28 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) setEditable: (BOOL) flag {
-    _isEditable = flag;
+    NS_EXTRA(NSTextView, self)->_isEditable = flag;
+    [self updateDragTypeRegistration];
 }
 
 - (void) setSelectable: (BOOL) flag {
-    _isSelectable = flag;
+    NS_EXTRA(NSTextView, self)->_isSelectable = flag;
 }
 
 - (void) setRichText: (BOOL) flag {
-    _isRichText = flag;
+    NS_EXTRA(NSTextView, self)->_isRichText = flag;
 }
 
 - (void) setFieldEditor: (BOOL) flag {
-    _isFieldEditor = flag;
+    NS_EXTRA(NSTextView, self)->_isFieldEditor = flag;
 }
 
 - (void) setFont: (NSFont *) font {
     [font retain];
-    [_font release];
-    _font = font;
+    [NS_EXTRA(NSTextView, self)->_font release];
+    NS_EXTRA(NSTextView, self)->_font = font;
     [self _addAttribute: NSFontAttributeName
-                  value: _font
+                  value: NS_EXTRA(NSTextView, self)->_font
                   range: NSMakeRange(0, [[self textStorage] length])];
     [self _updateTypingAttributes];
 }
@@ -2822,15 +2921,15 @@ static NSTextView *s_targetTextView = nil;
 - (void) setFont: (NSFont *) font range: (NSRange) range {
     if (NSMaxRange(range) >= [[self textStorage] length]) {
         [font retain];
-        [_font release];
-        _font = font;
+        [NS_EXTRA(NSTextView, self)->_font release];
+        NS_EXTRA(NSTextView, self)->_font = font;
     }
     [self _addAttribute: NSFontAttributeName value: font range: range];
     [self _updateTypingAttributes];
 }
 
 - (NSRange) _rangeForSelectedParagraph {
-    if (!_isRichText)
+    if (!NS_EXTRA(NSTextView, self)->_isRichText)
         return NSMakeRange(0, [[self textStorage] length]);
     else {
         NSRange range = [self selectedRange];
@@ -2869,14 +2968,14 @@ static NSTextView *s_targetTextView = nil;
 - (void) setAlignment: (NSTextAlignment) alignment {
     [self _setAlignment: alignment
                   range: NSMakeRange(0, [[self textStorage] length])];
-    _textAlignment = alignment;
+    NS_EXTRA(NSTextView, self)->_textAlignment = alignment;
 }
 
 - (void) setTextColor: (NSColor *) color {
     color = [color copy];
-    [_textColor release];
-    _textColor = color;
-    [self setTextColor: _textColor
+    [NS_EXTRA(NSTextView, self)->_textColor release];
+    NS_EXTRA(NSTextView, self)->_textColor = color;
+    [self setTextColor: NS_EXTRA(NSTextView, self)->_textColor
                  range: NSMakeRange(0, [[self textStorage] length])];
 
     [self _updateTypingAttributes];
@@ -2894,42 +2993,44 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) setDrawsBackground: (BOOL) flag {
-    _drawsBackground = flag;
+    NS_EXTRA(NSTextView, self)->_drawsBackground = flag;
 }
 
 - (void) setBackgroundColor: (NSColor *) color {
     color = [color copy];
-    [_backgroundColor release];
-    _backgroundColor = color;
+    [NS_EXTRA(NSTextView, self)->_backgroundColor release];
+    NS_EXTRA(NSTextView, self)->_backgroundColor = color;
 }
 
 - (void) setHorizontallyResizable: (BOOL) flag {
-    _isHorizontallyResizable = flag;
-    [_textContainer setWidthTracksTextView: flag];
+    NS_EXTRA(NSTextView, self)->_isHorizontallyResizable = flag;
+    [NS_EXTRA(NSTextView, self)->_textContainer setWidthTracksTextView: flag];
 }
 
 - (void) setVerticallyResizable: (BOOL) flag {
-    _isVerticallyResizable = flag;
-    [_textContainer setHeightTracksTextView: flag];
+    NS_EXTRA(NSTextView, self)->_isVerticallyResizable = flag;
+    [NS_EXTRA(NSTextView, self)->_textContainer setHeightTracksTextView: flag];
 }
 
 - (void) setMaxSize: (NSSize) size {
-    _maxSize = size;
+    NS_EXTRA(NSTextView, self)->_maxSize = size;
 }
 
 - (void) setMinSize: (NSSize) size {
-    _minSize = size;
+    NS_EXTRA(NSTextView, self)->_minSize = size;
 }
 
 - (void) setSelectedRange: (NSRange) range {
+    // The plain setter resets the affinity to upstream (as on macOS 26.7.3 and 10.14.4;
+    // test appkit-textview-api-defaults)
     [self setSelectedRange: range
-                  affinity: _selectionAffinity
+                  affinity: NSSelectionAffinityUpstream
             stillSelecting: NO];
 }
 
 - (NSSize) _textContainerSizeForViewSize: (NSSize) size {
-    return NSMakeSize(size.width - _textContainerInset.width * 2,
-                      size.height - _textContainerInset.height * 2);
+    return NSMakeSize(size.width - NS_EXTRA(NSTextView, self)->_textContainerInset.width * 2,
+                      size.height - NS_EXTRA(NSTextView, self)->_textContainerInset.height * 2);
 }
 
 // This should be done in NSTextContainer with notifications
@@ -2959,10 +3060,9 @@ static NSTextView *s_targetTextView = nil;
         extraRect.size.width = NSMaxX(usedRect) - NSMinX(extraRect);
         usedRect = NSUnionRect(usedRect, extraRect);
     }
-    // Used rects start after the left padding; add the right one too.
-    size.width = NSMaxX(usedRect) + [[self textContainer] lineFragmentPadding] +
-                 _textContainerInset.width * 2;
-    size.height = usedRect.size.height + _textContainerInset.height * 2;
+    // Used rects already cover the padding on both sides of the line.
+    size.width = NSMaxX(usedRect) + NS_EXTRA(NSTextView, self)->_textContainerInset.width * 2;
+    size.height = usedRect.size.height + NS_EXTRA(NSTextView, self)->_textContainerInset.height * 2;
 
     if (![self isHorizontallyResizable])
         size.width = [self frame].size.width;
@@ -3019,19 +3119,19 @@ static NSTextView *s_targetTextView = nil;
 
         // Get each block of font attribute and switch to the font using the one
         // converted by the sender
-        [_textStorage beginEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage beginEditing];
 
         while (nextCharIndex <= maxCharIndex) {
             NSRange effectiveRange = NSMakeRange(0, 0);
 
-            NSFont *font = [_textStorage attribute: NSFontAttributeName
+            NSFont *font = [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSFontAttributeName
                                            atIndex: nextCharIndex
                                     effectiveRange: &effectiveRange];
             font = [sender convertFont: font];
             if (font) {
                 NSRange changeRange =
                         NSIntersectionRange(effectiveRange, range);
-                [_textStorage addAttribute: NSFontAttributeName
+                [NS_EXTRA(NSTextView, self)->_textStorage addAttribute: NSFontAttributeName
                                      value: font
                                      range: changeRange];
             }
@@ -3042,7 +3142,7 @@ static NSTextView *s_targetTextView = nil;
                 nextCharIndex++;
             }
         }
-        [_textStorage endEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage endEditing];
 
         [self didChangeText];
     }
@@ -3106,7 +3206,7 @@ static NSTextView *s_targetTextView = nil;
     if (range.location == NSNotFound) {
         return;
     }
-    id underline = [_textStorage attribute: NSUnderlineStyleAttributeName
+    id underline = [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSUnderlineStyleAttributeName
                                    atIndex: range.location
                             effectiveRange: NULL];
     if (underline) {
@@ -3130,15 +3230,15 @@ static NSTextView *s_targetTextView = nil;
     if (![self needsDisplay] && [self shouldDrawInsertionPoint])
         [self _displayInsertionPointWithState: YES];
     else
-        _insertionPointOn = NO;
-    _firstResponderButNotEditingYet = YES;
-    _didSendTextDidEndNotification = NO;
+        NS_EXTRA(NSTextView, self)->_insertionPointOn = NO;
+    NS_EXTRA(NSTextView, self)->_firstResponderButNotEditingYet = YES;
+    NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification = NO;
 
+    // usesRuler only allows a ruler; it does not make one appear, and becoming
+    // first responder does not change the scroll view's rulers (observed on
+    // macOS 10.14.4 and 26.7.3). An already visible ruler gets this client.
+    // Test: appkit-textview-api-defaults.m (rulers)
     NSScrollView *enclosingScrollView = [self enclosingScrollView];
-    if ([self usesRuler] == NO) {
-        BOOL usesRuler = [enclosingScrollView rulersVisible];
-        [self setUsesRuler: usesRuler];
-    }
     if ([self usesRuler]) {
         [[enclosingScrollView horizontalRulerView] setClientView: self];
         [self updateRuler];
@@ -3151,34 +3251,34 @@ static NSTextView *s_targetTextView = nil;
     if ([super resignFirstResponder] == NO) {
         return NO;
     }
-    if (_isEditable)
-        if ([_delegate respondsToSelector: @selector(textShouldEndEditing:)])
-            if ([_delegate textShouldEndEditing: self] == NO)
+    if (NS_EXTRA(NSTextView, self)->_isEditable)
+        if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector(textShouldEndEditing:)])
+            if ([NS_EXTRA(NSTextView, self)->_delegate textShouldEndEditing: self] == NO)
                 return NO;
 
     if ([self usesRuler]) {
         [[[self enclosingScrollView] horizontalRulerView] setClientView: nil];
     }
 
-    if (_insertionPointTimer) {
+    if (NS_EXTRA(NSTextView, self)->_insertionPointTimer) {
         [self _displayInsertionPointWithState: NO];
-        [_insertionPointTimer invalidate];
-        [_insertionPointTimer release];
-        _insertionPointTimer = nil;
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer invalidate];
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer release];
+        NS_EXTRA(NSTextView, self)->_insertionPointTimer = nil;
     }
 
-    if (!_didSendTextDidEndNotification) {
+    if (!NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification) {
         // Let's remember that we've notified before it goes out - otherwise we
         // could come back here again as a result of the notification and end up
         // in a death spiral.
-        _didSendTextDidEndNotification = YES;
+        NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification = YES;
         NSNotification *note = [NSNotification
                 notificationWithName: NSTextDidEndEditingNotification
                               object: self
                             userInfo: nil];
 
         [[NSNotificationCenter defaultCenter] postNotification: note];
-        _didSendTextDidEndNotification = NO;
+        NS_EXTRA(NSTextView, self)->_didSendTextDidEndNotification = NO;
     }
 
     return YES;
@@ -3192,11 +3292,11 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) resignKeyWindow {
-    if (_insertionPointTimer) {
+    if (NS_EXTRA(NSTextView, self)->_insertionPointTimer) {
         [self _displayInsertionPointWithState: NO];
-        [_insertionPointTimer invalidate];
-        [_insertionPointTimer release];
-        _insertionPointTimer = nil;
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer invalidate];
+        [NS_EXTRA(NSTextView, self)->_insertionPointTimer release];
+        NS_EXTRA(NSTextView, self)->_insertionPointTimer = nil;
     }
 }
 
@@ -3229,7 +3329,7 @@ static NSTextView *s_targetTextView = nil;
                        isFinal:YES];
     }
 #endif
-    if (_rangeForUserCompletion.location != NSNotFound) {
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
         [self endUserCompletion];
     }
     // object can be either a string or an attributed string
@@ -3239,9 +3339,12 @@ static NSTextView *s_targetTextView = nil;
         replacementString = [object string];
     }
 
-    NSRange range = [self selectedRange];
-    if (range.location == NSNotFound || range.location > [_textStorage length])
-        range = NSMakeRange([_textStorage length], 0);
+    // Inserted text replaces marked text, which the input method is committing.
+    NSRange range = NS_EXTRA(NSTextView, self)->_hasMarkedText
+            ? NS_EXTRA(NSTextView, self)->_markedRange
+            : [self selectedRange];
+    if (range.location == NSNotFound || range.location > [NS_EXTRA(NSTextView, self)->_textStorage length])
+        range = NSMakeRange([NS_EXTRA(NSTextView, self)->_textStorage length], 0);
 
     if ([self shouldChangeTextInRange: range
                     replacementString: replacementString] == NO) {
@@ -3251,6 +3354,8 @@ static NSTextView *s_targetTextView = nil;
                          withString: object
              allowsTypingCoalescing: YES];
     [self didChangeText];
+    if (NS_EXTRA(NSTextView, self)->_processingKeyEvent)
+        [self _applyTypedTextSubstitutionsForRange: NSMakeRange(range.location, [replacementString length])];
     [self scrollRangeToVisible: [self selectedRange]];
 }
 
@@ -3262,11 +3367,16 @@ static NSTextView *s_targetTextView = nil;
         return;
     }
 
-    NSUInteger length = [_textStorage length];
+    NSUInteger length = [NS_EXTRA(NSTextView, self)->_textStorage length];
+    // QUIRK: an out-of-range replacement range does not raise; the text replaces
+    // the current selection as for NSNotFound. Not documented. Evidence:
+    // black-box observation on macOS 26.7.3 (tier 2), MAC-EVIDENCE MC26.10.
+    // Test: appkit-textview-selection-anchor.m (out-of-range replacement range).
     if (replacementRange.location > length ||
-        replacementRange.length > length - replacementRange.location)
-        [NSException raise: NSRangeException
-                    format: @"Text replacement range is outside the text storage"];
+        replacementRange.length > length - replacementRange.location) {
+        [self insertText: object];
+        return;
+    }
 
     NSString *replacementString = [object isKindOfClass: [NSAttributedString class]]
             ? [object string] : object;
@@ -3274,7 +3384,7 @@ static NSTextView *s_targetTextView = nil;
                     replacementString: replacementString])
         return;
 
-    if (_rangeForUserCompletion.location != NSNotFound)
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound)
         [self endUserCompletion];
     // Do not set the selection to the replacement range: selection delegates
     // may rewrite it. The existing replacement helper updates the caret later.
@@ -3286,41 +3396,164 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (BOOL) hasMarkedText {
-    return NO;
+    return NS_EXTRA(NSTextView, self)->_hasMarkedText;
 }
 
+// QUIRK: without marked text the marked range is {length of the text, 0}, not
+// {NSNotFound, 0} as the NSTextInputClient documentation says. Observed on
+// macOS 10.14.4 and 26.7.3 (tier 2, MAC-EVIDENCE V613).
+// Test: appkit-textview-editing-api.m (marked range without marked text)
 - (NSRange) markedRange {
-    return NSMakeRange(NSNotFound, 0);
+    NSUInteger length = [NS_EXTRA(NSTextView, self)->_textStorage length];
+    if (NS_EXTRA(NSTextView, self)->_hasMarkedText) {
+        // text changed behind our back (straight in the text storage) may have
+        // cut the marked text off
+        if (NSMaxRange(NS_EXTRA(NSTextView, self)->_markedRange) <= length)
+            return NS_EXTRA(NSTextView, self)->_markedRange;
+        [self _clearMarkedText];
+    }
+    return NSMakeRange(length, 0);
 }
 
+// Forgets the marked state and takes the marked text attributes off; the text
+// stays.
+- (void) _clearMarkedText {
+    if (!NS_EXTRA(NSTextView, self)->_hasMarkedText)
+        return;
+
+    NSRange range = NSIntersectionRange(NS_EXTRA(NSTextView, self)->_markedRange,
+                                        NSMakeRange(0, [NS_EXTRA(NSTextView, self)->_textStorage length]));
+    NS_EXTRA(NSTextView, self)->_hasMarkedText = NO;
+    NS_EXTRA(NSTextView, self)->_markedRange = NSMakeRange(NSNotFound, 0);
+    if (range.length > 0) {
+        for (NSString *key in [NS_EXTRA(NSTextView, self)->_markedTextAttributes allKeys])
+            [[self layoutManager] removeTemporaryAttribute: key forCharacterRange: range];
+    }
+}
+
+// Replaces the marked range (else the replacement range, else the selection)
+// with the string, marks it, and selects selectedRange inside it, counted from
+// the start of the marked text. The text takes the typing attributes; the
+// attributes of an attributed string are not kept (observed on macOS 10.14.4
+// and 26.7.3). The delegate is asked about the change but is not told the text
+// changed until the text is committed. Marking does nothing in a view that is
+// not editable.
+// Test: appkit-textview-editing-api.m (marked text)
+- (void) setMarkedText: (id) string
+         selectedRange: (NSRange) selRange
+      replacementRange: (NSRange) replRange
+{
+    if (![self isEditable])
+        return;
+
+    NSString *plain = [string isKindOfClass: [NSAttributedString class]]
+            ? [string string] : (NSString *) string;
+    NSTextStorage *storage = NS_EXTRA(NSTextView, self)->_textStorage;
+    NSUInteger length = [storage length];
+    BOOL hadMarked = NS_EXTRA(NSTextView, self)->_hasMarkedText;
+    NSRange target;
+
+    if (hadMarked)
+        target = NS_EXTRA(NSTextView, self)->_markedRange;
+    else if (replRange.location != NSNotFound && NSMaxRange(replRange) <= length)
+        target = replRange;
+    else
+        target = [self selectedRange];
+    if (target.location > length)
+        target = NSMakeRange(length, 0);
+    if (NSMaxRange(target) > length)
+        target.length = length - target.location;
+
+    if ([plain length] == 0 && !hadMarked)
+        return;
+    if (![self shouldChangeTextInRange: target replacementString: plain])
+        return;
+
+    NS_EXTRA(NSTextView, self)->_updatingMarkedText = YES;
+    [self _clearMarkedText];
+
+    NSAttributedString *marked = [[[NSAttributedString alloc]
+            initWithString: plain
+                attributes: [self typingAttributes]] autorelease];
+    [storage replaceCharactersInRange: target withAttributedString: marked];
+
+    NSRange markedRange = NSMakeRange(target.location, [plain length]);
+    if ([plain length] > 0) {
+        NS_EXTRA(NSTextView, self)->_hasMarkedText = YES;
+        NS_EXTRA(NSTextView, self)->_markedRange = markedRange;
+        NSDictionary *attributes = NS_EXTRA(NSTextView, self)->_markedTextAttributes;
+        if (attributes != nil)
+            [[self layoutManager] addTemporaryAttributes: attributes
+                                       forCharacterRange: markedRange];
+    }
+
+    if (selRange.location > markedRange.length)
+        selRange.location = markedRange.length;
+    if (NSMaxRange(selRange) > markedRange.length)
+        selRange.length = markedRange.length - selRange.location;
+    [self setSelectedRange: NSMakeRange(markedRange.location + selRange.location,
+                                        selRange.length)];
+    NS_EXTRA(NSTextView, self)->_updatingMarkedText = NO;
+
+    [self setNeedsDisplay: YES];
+}
+
+// Commits the marked text: it stays and stops being marked, and the delegate
+// is told the text changed.
 - (void) unmarkText {
+    if (!NS_EXTRA(NSTextView, self)->_hasMarkedText)
+        return;
+    [self _clearMarkedText];
+    [self didChangeText];
 }
 
-- (void) setMarkedText: (id) string selectedRange: (NSRange) selRange replacementRange: (NSRange) replRange {
-}
-
+// The attributes an input method may put in marked text (names as seen in the
+// list macOS returns, 10.14.4 and 26.7.3).
 - (NSArray *) validAttributesForMarkedText {
-    return [NSArray array];
+    return [NSArray arrayWithObjects: NSAttachmentAttributeName, NSBackgroundColorAttributeName,
+                                      NSForegroundColorAttributeName,
+                                      NSFontAttributeName, NSGlyphInfoAttributeName,
+                                      @"NSLanguage", NSMarkedClauseSegmentAttributeName,
+                                      NSTextAlternativesAttributeName,
+                                      @"NSTextInputReplacementRangeAttributeName",
+                                      @"NSTextInsertionUndoable",
+                                      NSUnderlineStyleAttributeName,
+                                      NSUnderlineColorAttributeName, nil];
 }
 
 - (NSAttributedString *) attributedSubstringForProposedRange: (NSRange) range actualRange: (NSRangePointer) actualRange {
-    NSRange textRange = NSMakeRange(0, [_textStorage length]);
+    NSRange textRange = NSMakeRange(0, [NS_EXTRA(NSTextView, self)->_textStorage length]);
     NSRange intersection = NSIntersectionRange(range, textRange);
     if (actualRange != NULL)
         *actualRange = intersection;
     if (intersection.length > 0)
-        return [_textStorage attributedSubstringFromRange: intersection];
+        return [NS_EXTRA(NSTextView, self)->_textStorage attributedSubstringFromRange: intersection];
     return nil;
+}
+
+// Optional NSTextInputClient methods (attributedString is below).
+- (CGFloat) fractionOfDistanceThroughGlyphForPoint: (NSPoint) point {
+    CGFloat fraction = 0;
+    [self glyphIndexForPoint: point fractionOfDistanceThroughGlyph: &fraction];
+    return fraction;
+}
+
+- (BOOL) drawsVerticallyForCharacterAtIndex: (NSUInteger) charIndex {
+    return NS_EXTRA(NSTextView, self)->_layoutOrientation == NSTextLayoutOrientationVertical;
+}
+
+- (NSInteger) windowLevel {
+    return [[self window] level];
 }
 
 - (NSRect) firstRectForCharacterRange: (NSRange) range actualRange: (NSRangePointer) actualRange {
     if (actualRange != NULL)
         *actualRange = range;
     NSLayoutManager *layoutManager = [self layoutManager];
-    if (layoutManager && [_textStorage length] > 0) {
+    if (layoutManager && [NS_EXTRA(NSTextView, self)->_textStorage length] > 0) {
         NSRange glyphRange = [layoutManager glyphRangeForCharacterRange: range actualCharacterRange: actualRange];
         if (glyphRange.location != NSNotFound) {
-            NSRect glyphRect = [layoutManager boundingRectForGlyphRange: glyphRange inTextContainer: _textContainer];
+            NSRect glyphRect = [layoutManager boundingRectForGlyphRange: glyphRange inTextContainer: NS_EXTRA(NSTextView, self)->_textContainer];
             NSPoint origin = [self textContainerOrigin];
             glyphRect.origin.x += origin.x;
             glyphRect.origin.y += origin.y;
@@ -3335,6 +3568,7 @@ static NSTextView *s_targetTextView = nil;
         return [[self window] convertRectToScreen: r];
     return r;
 }
+
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event {
     if ([event type] == NSKeyDown) {
@@ -3365,12 +3599,11 @@ static NSTextView *s_targetTextView = nil;
     }
     return [super performKeyEquivalent: event];
 }
-
 - (void) keyDown: (NSEvent *) event {
     if ([event type] == NSKeyDown && [self isEditable]) {
-        _processingKeyEvent = YES;
+        NS_EXTRA(NSTextView, self)->_processingKeyEvent = YES;
         [self interpretKeyEvents: [NSArray arrayWithObject: event]];
-        _processingKeyEvent = NO;
+        NS_EXTRA(NSTextView, self)->_processingKeyEvent = NO;
     }
 }
 
@@ -3380,21 +3613,21 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) doCommandBySelector: (SEL) selector {
-    if ([_delegate respondsToSelector: @selector(textView:
+    if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector(textView:
                                                doCommandBySelector:)])
-        if ([_delegate textView: self doCommandBySelector: selector] == YES)
+        if ([NS_EXTRA(NSTextView, self)->_delegate textView: self doCommandBySelector: selector] == YES)
             return;
 
-    if (_rangeForUserCompletion.location != NSNotFound) {
+    if (NS_EXTRA(NSTextView, self)->_rangeForUserCompletion.location != NSNotFound) {
         if (selector != @selector(moveDown:) &&
             selector != @selector(moveUp:) &&
             selector != @selector(insertTab:) &&
             selector != @selector(insertNewline:) &&
             selector != @selector(cancel:))
             [self insertCompletion:
-                            [_userCompletions
-                                    objectAtIndex: _userCompletionSelectedItem]
-                    forPartialWordRange: _rangeForUserCompletion
+                            [NS_EXTRA(NSTextView, self)->_userCompletions
+                                    objectAtIndex: NS_EXTRA(NSTextView, self)->_userCompletionSelectedItem]
+                    forPartialWordRange: NS_EXTRA(NSTextView, self)->_rangeForUserCompletion
                                movement: NSOtherTextMovement
                                 isFinal: YES];
     }
@@ -3406,24 +3639,21 @@ static NSTextView *s_targetTextView = nil;
     NSLayoutManager *layoutManager = [self layoutManager];
     NSPoint origin = [self textContainerOrigin];
     NSRect glyphRect = rect;
-    glyphRect.origin.x -= _textContainerInset.width;
-    glyphRect.origin.y -= _textContainerInset.height;
+    glyphRect.origin.x -= NS_EXTRA(NSTextView, self)->_textContainerInset.width;
+    glyphRect.origin.y -= NS_EXTRA(NSTextView, self)->_textContainerInset.height;
     NSRange gRange = [layoutManager glyphRangeForBoundingRect: glyphRect
                                      inTextContainer: [self textContainer]];
     if (gRange.location == NSNotFound)
         gRange = [layoutManager glyphRangeForTextContainer: [self textContainer]];
 
-    if ([self drawsBackground]) {
-        [_backgroundColor setFill];
-        NSRectFill(rect);
-    }
+    [self drawViewBackgroundInRect: rect];
     [layoutManager drawBackgroundForGlyphRange: gRange atPoint: origin];
     [layoutManager drawGlyphsForGlyphRange: gRange atPoint: origin];
     if ([self shouldDrawInsertionPoint]) {
         [self updateInsertionPointStateAndRestartTimer: NO];
-        [self drawInsertionPointInRect: _insertionPointRect
-                                 color: _insertionPointColor
-                              turnedOn: _insertionPointOn];
+        [self drawInsertionPointInRect: NS_EXTRA(NSTextView, self)->_insertionPointRect
+                                 color: NS_EXTRA(NSTextView, self)->_insertionPointColor
+                              turnedOn: NS_EXTRA(NSTextView, self)->_insertionPointOn];
     }
 }
 
@@ -3433,7 +3663,9 @@ static NSTextView *s_targetTextView = nil;
     CGFloat fraction = 0;
     NSRange firstRange = NSMakeRange(0, 0), lastRange = NSMakeRange(0, 0), selection = NSMakeRange(0, 0);
     NSSelectionAffinity affinity = NSSelectionAffinityUpstream;
-    NSSelectionGranularity granularity = [event clickCount] - 1;
+    NSSelectionGranularity granularity = [event clickCount] > 0 ? [event clickCount] - 1 : 0;
+    if (granularity > NSSelectByParagraph)
+        granularity = NSSelectByParagraph;
     // Set when the press carries Shift, so the tracking loop keeps extending from the existing
     // selection's anchor instead of unioning with the press point.
     BOOL shiftExtend = NO;
@@ -3441,6 +3673,41 @@ static NSTextView *s_targetTextView = nil;
 
     if (![self isSelectable])
         return;
+
+    // A plain click on a link follows it on release and leaves the selection
+    // alone (observed on macOS 10.14.4 and 26.7.3, in editable and read-only
+    // text alike); a drag that starts on a link selects text as usual.
+    // Test: appkit-textview-editing-api.m (clicking a link)
+    if ([event clickCount] == 1 && !([event modifierFlags] & NSShiftKeyMask)) {
+        NSUInteger linkIndex = [self _linkedCharacterIndexAtPoint: point];
+        if (linkIndex != NSNotFound) {
+            NSEvent *tracked;
+            BOOL dragged = NO;
+            do {
+                tracked = [[self window] nextEventMatchingMask: NSLeftMouseUpMask |
+                                                                NSLeftMouseDraggedMask];
+                if ([tracked type] == NSLeftMouseDragged) {
+                    NSPoint now = [self convertPoint: [tracked locationInWindow]
+                                            fromView: nil];
+                    if (fabs(now.x - point.x) > 3 || fabs(now.y - point.y) > 3) {
+                        dragged = YES;
+                        break;
+                    }
+                }
+            } while ([tracked type] != NSLeftMouseUp);
+
+            if (!dragged) {
+                NSPoint up = [self convertPoint: [tracked locationInWindow] fromView: nil];
+                if ([self _linkedCharacterIndexAtPoint: up] == linkIndex)
+                    [self clickedOnLink: [NS_EXTRA(NSTextView, self)->_textStorage
+                                                 attribute: NSLinkAttributeName
+                                                   atIndex: linkIndex
+                                            effectiveRange: NULL]
+                                atIndex: linkIndex];
+                return;
+            }
+        }
+    }
 
     firstRange.location = [self glyphIndexForPoint: point
                     fractionOfDistanceThroughGlyph: &fraction];
@@ -3451,7 +3718,7 @@ static NSTextView *s_targetTextView = nil;
     if (fraction >= 0.5)
         firstRange.location++;
 
-    if (firstRange.location < [_textStorage length])
+    if (firstRange.location < [NS_EXTRA(NSTextView, self)->_textStorage length])
         firstRange = [self selectionRangeForProposedRange: firstRange
                                               granularity: granularity];
 
@@ -3464,7 +3731,7 @@ static NSTextView *s_targetTextView = nil;
     // The same arithmetic serves shift-drag, so this does not return: it records the anchor and
     // falls into the tracking loop below, which keeps extending from that anchor while the
     // button is held. Returning here made a shift-drag select only up to the press point.
-    if ([event modifierFlags] & NSEventModifierFlagShift) {
+    if ([event modifierFlags] & NSShiftKeyMask) {
         NSRange existing = [self selectedRange];
         NSUInteger click = firstRange.location;
         NSUInteger shiftAnchor;
@@ -3501,7 +3768,7 @@ static NSTextView *s_targetTextView = nil;
         [self setSelectedRange: selection affinity: affinity stillSelecting: YES];
     }
 
-    _selectionOrigin = anchor;
+    NS_EXTRA(NSTextView, self)->_selectionOrigin = anchor;
     lastRange = firstRange;
 
     [NSEvent startPeriodicEventsAfterDelay: 0.1 withPeriod: 0.2];
@@ -3527,7 +3794,7 @@ static NSTextView *s_targetTextView = nil;
         if (fraction >= 0.5)
             lastRange.location++;
 
-        if (lastRange.location < [_textStorage length])
+        if (lastRange.location < [NS_EXTRA(NSTextView, self)->_textStorage length])
             lastRange = [self selectionRangeForProposedRange: lastRange
                                                  granularity: granularity];
 
@@ -3554,42 +3821,138 @@ static NSTextView *s_targetTextView = nil;
     [NSEvent stopPeriodicEvents];
 
     [self setSelectedRange: selection affinity: affinity stillSelecting: NO];
+    // The selection command that extended by words or paragraphs is kept until
+    // the selection changes again.
+    NS_EXTRA(NSTextView, self)->_selectionGranularity = granularity;
+}
+
+// The index of the character at the point (in view coordinates) when it has a
+// link attribute, else NSNotFound.
+- (NSUInteger) _linkedCharacterIndexAtPoint: (NSPoint) point {
+    NSTextStorage *storage = NS_EXTRA(NSTextView, self)->_textStorage;
+    NSLayoutManager *layoutManager = [self layoutManager];
+    if ([storage length] == 0 || layoutManager == nil)
+        return NSNotFound;
+
+    CGFloat fraction = 0;
+    NSUInteger glyph = [self glyphIndexForPoint: point fractionOfDistanceThroughGlyph: &fraction];
+    if (glyph == NSNotFound || glyph >= [layoutManager numberOfGlyphs])
+        return NSNotFound;
+
+    NSRect rect = [layoutManager boundingRectForGlyphRange: NSMakeRange(glyph, 1)
+                                           inTextContainer: NS_EXTRA(NSTextView, self)->_textContainer];
+    NSPoint origin = [self textContainerOrigin];
+    rect.origin.x += origin.x;
+    rect.origin.y += origin.y;
+    if (!NSPointInRect(point, rect))
+        return NSNotFound;
+
+    NSUInteger index = [layoutManager characterIndexForGlyphAtIndex: glyph];
+    if (index >= [storage length])
+        return NSNotFound;
+    return [storage attribute: NSLinkAttributeName atIndex: index effectiveRange: NULL] != nil
+            ? index : NSNotFound;
+}
+
+// Gives the delegate the chance to handle the link; otherwise opens it.
+- (void) clickedOnLink: (id) link atIndex: (NSUInteger) charIndex {
+    id delegate = NS_EXTRA(NSTextView, self)->_delegate;
+
+    if ([delegate respondsToSelector: @selector(textView:clickedOnLink:atIndex:)]) {
+        if ([delegate textView: self clickedOnLink: link atIndex: charIndex])
+            return;
+    } else if ([delegate respondsToSelector: @selector(textView:clickedOnLink:)]) {
+        // the form that predates the index
+        if ([delegate textView: self clickedOnLink: link])
+            return;
+    }
+
+    NSURL *url = nil;
+    if ([link isKindOfClass: [NSURL class]])
+        url = link;
+    else if ([link isKindOfClass: [NSString class]])
+        url = [NSURL URLWithString: link];
+    if (url != nil)
+        [[NSWorkspace sharedWorkspace] openURL: url];
 }
 
 - (NSUndoManager *) undoManager {
-    if ([_delegate respondsToSelector: @selector(undoManagerForTextView:)])
-        return [_delegate undoManagerForTextView: self];
+    if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector(undoManagerForTextView:)])
+        return [NS_EXTRA(NSTextView, self)->_delegate undoManagerForTextView: self];
 
-    if (_fieldEditorUndoManager)
-        return _fieldEditorUndoManager;
+    if (NS_EXTRA(NSTextView, self)->_fieldEditorUndoManager)
+        return NS_EXTRA(NSTextView, self)->_fieldEditorUndoManager;
 
     return [super undoManager];
 }
 
 - (BOOL) validateMenuItem: (NSMenuItem *) item {
     if ([item action] == @selector(cut:))
-        return _isEditable && [self selectedRange].length > 0;
+        return NS_EXTRA(NSTextView, self)->_isEditable && [self selectedRange].length > 0;
     else if ([item action] == @selector(copy:))
-        return _isSelectable && [self selectedRange].length > 0;
+        return NS_EXTRA(NSTextView, self)->_isSelectable && [self selectedRange].length > 0;
     else if ([item action] == @selector(paste:))
-        return _isEditable;
+        return NS_EXTRA(NSTextView, self)->_isEditable;
     else if ([item action] == @selector(selectAll:))
-        return _isSelectable && [_textStorage length] > 0;
+        return NS_EXTRA(NSTextView, self)->_isSelectable && [NS_EXTRA(NSTextView, self)->_textStorage length] > 0;
     else if ([item action] == @selector(undo:))
-        return _allowsUndo ? [[self undoManager] canUndo] : NO;
+        return NS_EXTRA(NSTextView, self)->_allowsUndo ? [[self undoManager] canUndo] : NO;
     else if ([item action] == @selector(redo:))
-        return _allowsUndo ? [[self undoManager] canRedo] : NO;
+        return NS_EXTRA(NSTextView, self)->_allowsUndo ? [[self undoManager] canRedo] : NO;
     else if ([item action] == @selector(orderFrontFindPanel:))
         return YES;
     else if ([item action] == @selector(performFindPanelAction:)) {
         NSInteger tag = [item tag];
-        if (tag == 7)
+        if (tag == NSFindPanelActionSetFindString)
             return [self selectedRange].length > 0;
         return YES;
     }
     else if ([item action] == @selector(toggleContinuousSpellChecking:)) {
         [item setState: [self isContinuousSpellCheckingEnabled]];
     }
+
+    // The toggles show their state; they and the commands that change the text
+    // or its attributes are only available in an editable view (observed on
+    // macOS 10.14.4 and 26.7.3).
+    // Test: appkit-textview-editing-api.m (validating menu items)
+    SEL action = [item action];
+    if (action == @selector(toggleAutomaticQuoteSubstitution:) ||
+        action == @selector(toggleAutomaticDashSubstitution:) ||
+        action == @selector(toggleAutomaticLinkDetection:) ||
+        action == @selector(toggleAutomaticDataDetection:) ||
+        action == @selector(toggleAutomaticTextReplacement:) ||
+        action == @selector(toggleAutomaticSpellingCorrection:) ||
+        action == @selector(toggleSmartInsertDelete:) ||
+        action == @selector(toggleGrammarChecking:)) {
+        BOOL on = NO;
+        if (action == @selector(toggleAutomaticQuoteSubstitution:))
+            on = [self isAutomaticQuoteSubstitutionEnabled];
+        else if (action == @selector(toggleAutomaticDashSubstitution:))
+            on = [self isAutomaticDashSubstitutionEnabled];
+        else if (action == @selector(toggleAutomaticLinkDetection:))
+            on = [self isAutomaticLinkDetectionEnabled];
+        else if (action == @selector(toggleAutomaticDataDetection:))
+            on = [self isAutomaticDataDetectionEnabled];
+        else if (action == @selector(toggleAutomaticTextReplacement:))
+            on = [self isAutomaticTextReplacementEnabled];
+        else if (action == @selector(toggleAutomaticSpellingCorrection:))
+            on = [self isAutomaticSpellingCorrectionEnabled];
+        else if (action == @selector(toggleSmartInsertDelete:))
+            on = [self smartInsertDeleteEnabled];
+        else
+            on = [self isGrammarCheckingEnabled];
+        [item setState: on ? NSOnState : NSOffState];
+        return NS_EXTRA(NSTextView, self)->_isEditable;
+    }
+    if (action == @selector(turnOffKerning:) || action == @selector(tightenKerning:) ||
+        action == @selector(loosenKerning:) || action == @selector(useStandardKerning:) ||
+        action == @selector(turnOffLigatures:) || action == @selector(useStandardLigatures:) ||
+        action == @selector(useAllLigatures:) || action == @selector(raiseBaseline:) ||
+        action == @selector(lowerBaseline:) || action == @selector(outline:) ||
+        action == @selector(superscript:) || action == @selector(subscript:) ||
+        action == @selector(unscript:) || action == @selector(pasteAsPlainText:) ||
+        action == @selector(pasteAsRichText:))
+        return NS_EXTRA(NSTextView, self)->_isEditable;
     return YES;
 }
 
@@ -3598,10 +3961,10 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) performFindPanelAction: (id) sender {
-    NSInteger action = [sender respondsToSelector: @selector(tag)] ? [sender tag] : 1;
+    NSInteger action = [sender respondsToSelector: @selector(tag)] ? [sender tag] : NSFindPanelActionShowFindPanel;
     NSPasteboard *findPboard = [NSPasteboard pasteboardWithName: NSFindPboard];
 
-    if (action == 7) { // NSFindPanelActionSetFindString (Use Selection for Find)
+    if (action == NSFindPanelActionSetFindString) { // Use Selection for Find
         if ([self selectedRange].length > 0) {
             NSString *str = [[self string] substringWithRange: [self selectedRange]];
             [findPboard declareTypes: [NSArray arrayWithObject: NSStringPboardType] owner: nil];
@@ -3610,12 +3973,12 @@ static NSTextView *s_targetTextView = nil;
         return;
     }
 
-    if (action == 1) { // NSFindPanelActionShowFindPanel (Find...)
+    if (action == NSFindPanelActionShowFindPanel) {
         [_NSFindPanelController showFindPanelForTextView: self];
         return;
     }
 
-    if (action == 2 || action == 3) { // NSFindPanelActionNext / NSFindPanelActionPrevious
+    if (action == NSFindPanelActionNext || action == NSFindPanelActionPrevious) {
         NSString *findString = [findPboard stringForType: NSStringPboardType];
         if ([findString length] == 0) {
             NSBeep();
@@ -3630,7 +3993,7 @@ static NSTextView *s_targetTextView = nil;
         NSRange searchRange;
         NSStringCompareOptions options = NSCaseInsensitiveSearch;
 
-        if (action == 2) { // Next
+        if (action == NSFindPanelActionNext) {
             NSUInteger start = NSMaxRange(currentRange);
             if (start < totalLen) {
                 searchRange = NSMakeRange(start, totalLen - start);
@@ -3675,8 +4038,8 @@ static NSTextView *s_targetTextView = nil;
     if (fraction >= 0.5)
         location++;
 
-    [_selectedRanges removeAllObjects];
-    [_selectedRanges
+    [NS_EXTRA(NSTextView, self)->_selectedRanges removeAllObjects];
+    [NS_EXTRA(NSTextView, self)->_selectedRanges
             addObject: [NSValue valueWithRange: NSMakeRange(location, 0)]];
     [self setNeedsDisplay: YES];
 
@@ -3766,48 +4129,68 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (void) _setFieldEditorUndoManager: (NSUndoManager *) undoManager {
-    [_fieldEditorUndoManager autorelease];
-    _fieldEditorUndoManager = [undoManager retain];
+    [NS_EXTRA(NSTextView, self)->_fieldEditorUndoManager autorelease];
+    NS_EXTRA(NSTextView, self)->_fieldEditorUndoManager = [undoManager retain];
 }
 
 - (void) breakUndoCoalescing {
-    [_undoTyping release];
-    _undoTyping = nil;
+    [NS_EXTRA(NSTextView, self)->_undoTyping release];
+    NS_EXTRA(NSTextView, self)->_undoTyping = nil;
+}
+
+// textView:shouldChangeTextInRanges:replacementStrings: supersedes the single
+// range method: a delegate that has both is asked only the first (observed on
+// macOS 10.14.4 and 26.7.3).
+// Test: appkit-textview-editing-api.m (delegate prefers the multiple-range form)
+- (BOOL) _delegateChangeTextInRanges: (NSArray *) ranges
+                   replacementStrings: (NSArray *) strings
+{
+    id delegate = NS_EXTRA(NSTextView, self)->_delegate;
+    if ([delegate respondsToSelector: @selector
+                  (textView:shouldChangeTextInRanges:replacementStrings:)])
+        return [delegate textView: self
+                shouldChangeTextInRanges: ranges
+                      replacementStrings: strings];
+
+    if ([delegate respondsToSelector: @selector
+                  (textView:shouldChangeTextInRange:replacementString:)]) {
+        NSRange range = [[ranges objectAtIndex: 0] rangeValue];
+        NSString *string = strings != nil ? [strings objectAtIndex: 0] : nil;
+        return [delegate textView: self
+                shouldChangeTextInRange: range
+                      replacementString: string];
+    }
+
+    return YES;
 }
 
 - (BOOL) _delegateChangeTextInRange: (NSRange) range
                   replacementString: (NSString *) string
 {
-    if ([_delegate respondsToSelector: @selector
-                   (textView:shouldChangeTextInRange:replacementString:)]) {
-        if ([_delegate textView: self
-                    shouldChangeTextInRange: range
-                          replacementString: string] == NO)
-            return NO;
-    }
-
-    return YES;
+    NSArray *ranges = [NSArray arrayWithObject: [NSValue valueWithRange: range]];
+    NSArray *strings = string != nil ? [NSArray arrayWithObject: string] : nil;
+    return [self _delegateChangeTextInRanges: ranges replacementStrings: strings];
 }
 
 - (NSArray *) _delegateChangeSelectionFromRanges: (NSArray *) from
                                         toRanges: (NSArray *) to
 {
     NSArray *result = to;
-    if ([_delegate
+    if ([NS_EXTRA(NSTextView, self)->_delegate
                 respondsToSelector: @selector
                 (textView:
                         willChangeSelectionFromCharacterRanges:toCharacterRanges
                                                               :)])
-        result = [_delegate textView: self
+        result = [NS_EXTRA(NSTextView, self)->_delegate textView: self
                 willChangeSelectionFromCharacterRanges: from
                                      toCharacterRanges: to];
-    else if ([_delegate respondsToSelector: @selector
+    else if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector
                         (textView:
                                 willChangeSelectionFromCharacterRange:
                                 toCharacterRange:)]) {
         NSRange fromRange = [[from objectAtIndex: 0] rangeValue];
         NSRange toRange = [[to objectAtIndex: 0] rangeValue];
-        NSRange resultRange = [_delegate textView: self
+        NSRange resultRange = [NS_EXTRA(NSTextView, self)->_delegate textView: self
                 willChangeSelectionFromCharacterRange: fromRange
                                      toCharacterRange: toRange];
 
@@ -3820,9 +4203,9 @@ static NSTextView *s_targetTextView = nil;
 
 - (void) setAttributedString: (NSAttributedString *) attrString {
     if (!NSIsControllerMarker(attrString)) {
-        [_textStorage setAttributedString: attrString];
+        [NS_EXTRA(NSTextView, self)->_textStorage setAttributedString: attrString];
     } else {
-        [_textStorage
+        [NS_EXTRA(NSTextView, self)->_textStorage
                 setAttributedString:
                         [[[NSAttributedString alloc]
                                 initWithString:
@@ -3838,7 +4221,7 @@ static NSTextView *s_targetTextView = nil;
 }
 
 - (NSAttributedString *) attributedString {
-    return [[_textStorage copy] autorelease];
+    return [[NS_EXTRA(NSTextView, self)->_textStorage copy] autorelease];
 }
 
 - (void) changeSpelling: sender {
@@ -3897,7 +4280,7 @@ static NSTextView *s_targetTextView = nil;
                 removeTemporaryAttribute: NSSpellingStateAttributeName
                        forCharacterRange: invalidatedRange];
     }
-    if (_isContinuousSpellCheckingEnabled) {
+    if (NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled) {
         NSSpellChecker *checker = [NSSpellChecker sharedSpellChecker];
 
         NSArray *checking = [checker checkString: string
@@ -3979,10 +4362,12 @@ static NSTextView *s_targetTextView = nil;
     CGFloat fraction;
 
     NSMenu *menu = [[[NSMenu alloc] initWithTitle: @""] autorelease];
+    NSUInteger clickedIndex = NSNotFound;
 
     @try {
-        NSUInteger clickedIndex = [self glyphIndexForPoint: point
-                                fractionOfDistanceThroughGlyph: &fraction];
+        clickedIndex = [self glyphIndexForPoint: point
+                    fractionOfDistanceThroughGlyph: &fraction];
+        NSRange range = [NS_EXTRA(NSTextView, self)->_textStorage doubleClickAtIndex: clickedIndex];
 
         // A contextual click inside an existing selection should operate on
         // that selection (as on macOS). Only move the selection to the word
@@ -3992,8 +4377,7 @@ static NSTextView *s_targetTextView = nil;
         BOOL clickInSelection = selection.length != 0 &&
                 clickedIndex >= selection.location &&
                 clickedIndex < NSMaxRange(selection);
-        if (!clickInSelection && clickedIndex < [_textStorage length]) {
-            NSRange range = [_textStorage doubleClickAtIndex: clickedIndex];
+        if (!clickInSelection) {
             [self setSelectedRange: range];
 
             NSSpellChecker *checker = [NSSpellChecker sharedSpellChecker];
@@ -4061,6 +4445,14 @@ static NSTextView *s_targetTextView = nil;
                     action: @selector(selectAll:)
              keyEquivalent: @""];
 
+    // The delegate may adjust or replace the menu.
+    if ([NS_EXTRA(NSTextView, self)->_delegate respondsToSelector: @selector
+                  (textView:menu:forEvent:atIndex:)])
+        menu = [NS_EXTRA(NSTextView, self)->_delegate textView: self
+                                                          menu: menu
+                                                      forEvent: event
+                                                       atIndex: clickedIndex];
+
     return menu;
 }
 
@@ -4068,7 +4460,7 @@ static NSTextView *s_targetTextView = nil;
     /* There is no explicity invalid document tag, this is indirectly documented
      as zero in the full checkSpellingOfString: method. and supported by
      behavior. */
-    if (_spellCheckerDocumentTag == 0) {
+    if (NS_EXTRA(NSTextView, self)->_spellCheckerDocumentTag == 0) {
 
         /* Check if any other text view in the group has a document tag and use
          * it. */
@@ -4078,74 +4470,137 @@ static NSTextView *s_targetTextView = nil;
              [[self textStorage] layoutManagers])
             for (NSTextContainer *checkContainer in
                  [checkLayout textContainers])
-                if ([checkContainer textView]->_spellCheckerDocumentTag != 0) {
+                if (NS_EXTRA(NSTextView, [checkContainer textView])->_spellCheckerDocumentTag != 0) {
                     // Direct access the ivar to avoid the method logic here.
-                    _spellCheckerDocumentTag =
-                            [checkContainer textView]->_spellCheckerDocumentTag;
+                    NS_EXTRA(NSTextView, self)->_spellCheckerDocumentTag =
+                            NS_EXTRA(NSTextView, [checkContainer textView])->_spellCheckerDocumentTag;
                 }
 
-        if (_spellCheckerDocumentTag == 0)
-            _spellCheckerDocumentTag = [NSSpellChecker uniqueSpellDocumentTag];
+        if (NS_EXTRA(NSTextView, self)->_spellCheckerDocumentTag == 0)
+            NS_EXTRA(NSTextView, self)->_spellCheckerDocumentTag = [NSSpellChecker uniqueSpellDocumentTag];
     }
 
-    return _spellCheckerDocumentTag;
+    return NS_EXTRA(NSTextView, self)->_spellCheckerDocumentTag;
 }
 
 - (BOOL) isContinuousSpellCheckingEnabled {
-    return _isContinuousSpellCheckingEnabled;
+    return NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled;
 }
 
 - (void) setContinuousSpellCheckingEnabled: (BOOL) value {
-    _isContinuousSpellCheckingEnabled = value;
+    NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled = value;
 
     [self _continuousSpellCheck];
 }
 
 - (void) toggleContinuousSpellChecking: sender {
-    _isContinuousSpellCheckingEnabled = !_isContinuousSpellCheckingEnabled;
+    NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled = !NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled;
 
     [self _continuousSpellCheck];
 }
 
 - (BOOL) isAutomaticSpellingCorrectionEnabled {
-    return _isAutomaticSpellingCorrectionEnabled;
+    return NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled;
 }
 
 - (void) setAutomaticSpellingCorrectionEnabled: (BOOL) value {
-    _isAutomaticSpellingCorrectionEnabled = value;
+    NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled = value;
 }
 
 - (void) toggleAutomaticSpellingCorrection: sender {
-    _isAutomaticSpellingCorrectionEnabled =
-            !_isAutomaticSpellingCorrectionEnabled;
-    NSUnimplementedMethod();
+    NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled =
+            !NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled;
 }
 
+// The checking types are the substitution and checking switches plus a few
+// bits that no switch covers. _enabledTextCheckingTypes holds only those other
+// bits; the switches are folded in when the types are read and split out when
+// they are set. Layout read off a text view whose switches and types were set
+// one at a time (black-box observation on macOS 10.14.4 and 26.7.3, same on
+// both): spelling 0x2 is continuous checking, grammar 0x4 only shows while
+// spelling is on, link 0x20, quote 0x40, dash 0x80, replacement 0x100,
+// correction 0x200, date/address 0x18 together with 0x1800 mean data
+// detection. A fresh text view has 0x2001 as the other bits.
+// Test: appkit-textview-api-defaults.m (text checking types)
+enum {
+    _NSTextViewTypeSpelling = 0x2,
+    _NSTextViewTypeGrammar = 0x4,
+    _NSTextViewTypeLink = 0x20,
+    _NSTextViewTypeQuote = 0x40,
+    _NSTextViewTypeDash = 0x80,
+    _NSTextViewTypeReplacement = 0x100,
+    _NSTextViewTypeCorrection = 0x200,
+    _NSTextViewTypeDataDetection = 0x18,
+    _NSTextViewTypeDataDetectionExtra = 0x1800,
+    _NSTextViewTypesWithSwitch = 0x2 | 0x4 | 0x20 | 0x40 | 0x80 | 0x100 | 0x200,
+    _NSTextViewDefaultOtherTypes = 0x2001,
+};
+
 - (NSTextCheckingTypes) enabledTextCheckingTypes {
-    return _enabledTextCheckingTypes;
+    NSTextCheckingTypes types = NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes;
+    if (NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled) {
+        types |= _NSTextViewTypeSpelling;
+        if (NS_EXTRA(NSTextView, self)->_grammarCheckingEnabled)
+            types |= _NSTextViewTypeGrammar;
+    }
+    if (NS_EXTRA(NSTextView, self)->_automaticLinkDetectionEnabled)
+        types |= _NSTextViewTypeLink;
+    if (NS_EXTRA(NSTextView, self)->_automaticQuoteSubstitutionEnabled)
+        types |= _NSTextViewTypeQuote;
+    if (NS_EXTRA(NSTextView, self)->_automaticDashSubstitutionEnabled)
+        types |= _NSTextViewTypeDash;
+    if (NS_EXTRA(NSTextView, self)->_automaticTextReplacementEnabled)
+        types |= _NSTextViewTypeReplacement;
+    if (NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled)
+        types |= _NSTextViewTypeCorrection;
+    // Data detection reads back with the date/address bits that were set; with none set, both
+    if (NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled && (types & _NSTextViewTypeDataDetection) == 0)
+        types |= _NSTextViewTypeDataDetection;
+    return types;
 }
 
 - (void) setEnabledTextCheckingTypes: (NSTextCheckingTypes) checkingTypes {
-    _enabledTextCheckingTypes = checkingTypes;
+    BOOL wasChecking = NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled;
+    NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled = (checkingTypes & _NSTextViewTypeSpelling) != 0;
+    NS_EXTRA(NSTextView, self)->_grammarCheckingEnabled = (checkingTypes & _NSTextViewTypeGrammar) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticLinkDetectionEnabled = (checkingTypes & _NSTextViewTypeLink) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticQuoteSubstitutionEnabled = (checkingTypes & _NSTextViewTypeQuote) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticDashSubstitutionEnabled = (checkingTypes & _NSTextViewTypeDash) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticTextReplacementEnabled = (checkingTypes & _NSTextViewTypeReplacement) != 0;
+    NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled = (checkingTypes & _NSTextViewTypeCorrection) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled = (checkingTypes & _NSTextViewTypeDataDetection) != 0;
+
+    NSTextCheckingTypes other = checkingTypes & ~(NSTextCheckingTypes) _NSTextViewTypesWithSwitch;
+    if (NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled)
+        other |= _NSTextViewTypeDataDetectionExtra;
+    NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes = other;
+    if (wasChecking != NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled)
+        [self _continuousSpellCheck];
 }
 
 - (BOOL) smartInsertDeleteEnabled {
-    return _smartInsertDeleteEnabled;
+    return NS_EXTRA(NSTextView, self)->_smartInsertDeleteEnabled;
 }
 
 - (void) setSmartInsertDeleteEnabled: (BOOL) boolForKey {
-    _smartInsertDeleteEnabled = boolForKey;
+    NS_EXTRA(NSTextView, self)->_smartInsertDeleteEnabled = boolForKey;
 }
 
 - (BOOL) allowsDocumentBackgroundColorChange {
-    return _allowsDocumentBackgroundColorChange;
+    return NS_EXTRA(NSTextView, self)->_allowsDocumentBackgroundColorChange;
 }
 
 - (void) setAllowsDocumentBackgroundColorChange: (BOOL) value {
-    _allowsDocumentBackgroundColorChange = value;
+    NS_EXTRA(NSTextView, self)->_allowsDocumentBackgroundColorChange = value;
 }
 
 - (void) setSpellingState: (NSInteger) value range: (NSRange) characterRange {
+    id delegate = NS_EXTRA(NSTextView, self)->_delegate;
+    if ([delegate respondsToSelector: @selector
+                  (textView:shouldSetSpellingState:range:)])
+        value = [delegate textView: self
+                shouldSetSpellingState: value
+                                 range: characterRange];
     [[self layoutManager]
             addTemporaryAttribute: NSSpellingStateAttributeName
                             value: [NSNumber numberWithLong: value]
@@ -4213,11 +4668,11 @@ static NSTextView *s_targetTextView = nil;
 
         // Change the tab stop value for all of the selection
         NSUInteger location = range.location;
-        [_textStorage beginEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage beginEditing];
         while (location < NSMaxRange(range)) {
             NSRange effectiveRange;
             NSParagraphStyle *style =
-                    [_textStorage attribute: NSParagraphStyleAttributeName
+                    [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSParagraphStyleAttributeName
                                     atIndex: location
                              effectiveRange: &effectiveRange];
             NSRange rangeToChange = NSIntersectionRange(effectiveRange, range);
@@ -4241,17 +4696,17 @@ static NSTextView *s_targetTextView = nil;
                                                                  ascending:
                                                                          YES]]];
             [newStyle setTabStops: tabstops];
-            [_textStorage addAttribute: NSParagraphStyleAttributeName
+            [NS_EXTRA(NSTextView, self)->_textStorage addAttribute: NSParagraphStyleAttributeName
                                  value: newStyle
                                  range: rangeToChange];
             location = NSMaxRange(effectiveRange);
         }
-        [_textStorage endEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage endEditing];
         [self didChangeText];
 
         // Update the typing attributes too
         NSParagraphStyle *style =
-                [_typingAttributes objectForKey: NSParagraphStyleAttributeName];
+                [NS_EXTRA(NSTextView, self)->_typingAttributes objectForKey: NSParagraphStyleAttributeName];
         if (style == nil) {
             style = [NSParagraphStyle defaultParagraphStyle];
         }
@@ -4270,12 +4725,12 @@ static NSTextView *s_targetTextView = nil;
                                                          @"location"
                                                              ascending: YES]]];
         [newStyle setTabStops: tabstops];
-        if (![_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
-            NSDictionary *dict = [_typingAttributes mutableCopy];
-            [_typingAttributes release];
-            _typingAttributes = dict;
+        if (![NS_EXTRA(NSTextView, self)->_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
+            NSDictionary *dict = [NS_EXTRA(NSTextView, self)->_typingAttributes mutableCopy];
+            [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+            NS_EXTRA(NSTextView, self)->_typingAttributes = dict;
         }
-        [(NSMutableDictionary *) _typingAttributes
+        [(NSMutableDictionary *) NS_EXTRA(NSTextView, self)->_typingAttributes
                 setObject: newStyle
                    forKey: NSParagraphStyleAttributeName];
 
@@ -4329,11 +4784,11 @@ static NSTextView *s_targetTextView = nil;
         // Change the tab stop value for all of the selection
         NSRange range = [self rangeForUserParagraphAttributeChange];
         NSUInteger location = range.location;
-        [_textStorage beginEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage beginEditing];
         while (location < NSMaxRange(range)) {
             NSRange effectiveRange;
             NSParagraphStyle *style =
-                    [_textStorage attribute: NSParagraphStyleAttributeName
+                    [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSParagraphStyleAttributeName
                                     atIndex: location
                              effectiveRange: &effectiveRange];
             NSRange rangeToChange = NSIntersectionRange(effectiveRange, range);
@@ -4356,16 +4811,16 @@ static NSTextView *s_targetTextView = nil;
                                                                  ascending:
                                                                          YES]]];
             [newStyle setTabStops: tabstops];
-            [_textStorage addAttribute: NSParagraphStyleAttributeName
+            [NS_EXTRA(NSTextView, self)->_textStorage addAttribute: NSParagraphStyleAttributeName
                                  value: newStyle
                                  range: rangeToChange];
             location = NSMaxRange(effectiveRange);
         }
-        [_textStorage endEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage endEditing];
 
         // Update the typing attributes too
         NSParagraphStyle *style =
-                [_typingAttributes objectForKey: NSParagraphStyleAttributeName];
+                [NS_EXTRA(NSTextView, self)->_typingAttributes objectForKey: NSParagraphStyleAttributeName];
         if (style == nil) {
             style = [NSParagraphStyle defaultParagraphStyle];
         }
@@ -4383,12 +4838,12 @@ static NSTextView *s_targetTextView = nil;
                                                          @"location"
                                                              ascending: YES]]];
         [newStyle setTabStops: tabstops];
-        if (![_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
-            NSDictionary *dict = [_typingAttributes mutableCopy];
-            [_typingAttributes release];
-            _typingAttributes = dict;
+        if (![NS_EXTRA(NSTextView, self)->_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
+            NSDictionary *dict = [NS_EXTRA(NSTextView, self)->_typingAttributes mutableCopy];
+            [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+            NS_EXTRA(NSTextView, self)->_typingAttributes = dict;
         }
-        [(NSMutableDictionary *) _typingAttributes
+        [(NSMutableDictionary *) NS_EXTRA(NSTextView, self)->_typingAttributes
                 setObject: newStyle
                    forKey: NSParagraphStyleAttributeName];
 
@@ -4416,11 +4871,11 @@ static NSTextView *s_targetTextView = nil;
         NSRange range = [self rangeForUserParagraphAttributeChange];
         NSUInteger location = range.location;
 
-        [_textStorage beginEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage beginEditing];
         while (location < NSMaxRange(range)) {
             NSRange effectiveRange;
             NSParagraphStyle *style =
-                    [_textStorage attribute: NSParagraphStyleAttributeName
+                    [NS_EXTRA(NSTextView, self)->_textStorage attribute: NSParagraphStyleAttributeName
                                     atIndex: location
                              effectiveRange: &effectiveRange];
             NSRange rangeToChange = NSIntersectionRange(effectiveRange, range);
@@ -4434,16 +4889,16 @@ static NSTextView *s_targetTextView = nil;
                     [[[newStyle tabStops] mutableCopy] autorelease];
             [tabstops removeObject: textTab];
             [newStyle setTabStops: tabstops];
-            [_textStorage addAttribute: NSParagraphStyleAttributeName
+            [NS_EXTRA(NSTextView, self)->_textStorage addAttribute: NSParagraphStyleAttributeName
                                  value: newStyle
                                  range: rangeToChange];
             location = NSMaxRange(effectiveRange);
         }
-        [_textStorage endEditing];
+        [NS_EXTRA(NSTextView, self)->_textStorage endEditing];
 
         // Update the typing attributes
         NSParagraphStyle *style =
-                [_typingAttributes objectForKey: NSParagraphStyleAttributeName];
+                [NS_EXTRA(NSTextView, self)->_typingAttributes objectForKey: NSParagraphStyleAttributeName];
         if (style == nil) {
             style = [NSParagraphStyle defaultParagraphStyle];
         }
@@ -4453,12 +4908,12 @@ static NSTextView *s_targetTextView = nil;
                 [[[newStyle tabStops] mutableCopy] autorelease];
         [tabstops removeObject: textTab];
         [newStyle setTabStops: tabstops];
-        if (![_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
-            NSDictionary *dict = [_typingAttributes mutableCopy];
-            [_typingAttributes release];
-            _typingAttributes = dict;
+        if (![NS_EXTRA(NSTextView, self)->_typingAttributes isKindOfClass: [NSMutableDictionary class]]) {
+            NSDictionary *dict = [NS_EXTRA(NSTextView, self)->_typingAttributes mutableCopy];
+            [NS_EXTRA(NSTextView, self)->_typingAttributes release];
+            NS_EXTRA(NSTextView, self)->_typingAttributes = dict;
         }
-        [(NSMutableDictionary *) _typingAttributes
+        [(NSMutableDictionary *) NS_EXTRA(NSTextView, self)->_typingAttributes
                 setObject: newStyle
                    forKey: NSParagraphStyleAttributeName];
 
@@ -4473,92 +4928,332 @@ static NSTextView *s_targetTextView = nil;
     return self;
 }
 - (NSTextLayoutOrientation) layoutOrientation {
-    return _layoutOrientation;
+    return NS_EXTRA(NSTextView, self)->_layoutOrientation;
 }
 
 - (void) setLayoutOrientation: (NSTextLayoutOrientation) orientation {
-    _layoutOrientation = orientation;
+    NS_EXTRA(NSTextView, self)->_layoutOrientation = orientation;
 }
 
 - (BOOL) isIncrementalSearchingEnabled {
-    return _incrementalSearchingEnabled;
+    return NS_EXTRA(NSTextView, self)->_incrementalSearchingEnabled;
 }
 
 - (BOOL) usesFindBar {
-    return _usesFindBar;
+    return NS_EXTRA(NSTextView, self)->_usesFindBar;
 }
 
 - (BOOL) usesInspectorBar {
-    return _usesInspectorBar;
+    return NS_EXTRA(NSTextView, self)->_usesInspectorBar;
 }
 
 - (void) setIncrementalSearchingEnabled: (BOOL) value {
-    _incrementalSearchingEnabled = value;
+    NS_EXTRA(NSTextView, self)->_incrementalSearchingEnabled = value;
 }
 
 - (void) setUsesFindBar: (BOOL) value {
-    _usesFindBar = value;
+    NS_EXTRA(NSTextView, self)->_usesFindBar = value;
 }
 
 - (void) setUsesInspectorBar: (BOOL) value {
-    _usesInspectorBar = value;
+    NS_EXTRA(NSTextView, self)->_usesInspectorBar = value;
 }
 
 - (BOOL) isGrammarCheckingEnabled {
-    return _grammarCheckingEnabled;
+    return NS_EXTRA(NSTextView, self)->_grammarCheckingEnabled;
 }
 
 - (BOOL) isAutomaticQuoteSubstitutionEnabled {
-    return _automaticQuoteSubstitutionEnabled;
+    return NS_EXTRA(NSTextView, self)->_automaticQuoteSubstitutionEnabled;
 }
 
 - (BOOL) isAutomaticDashSubstitutionEnabled {
-    return _automaticDashSubstitutionEnabled;
+    return NS_EXTRA(NSTextView, self)->_automaticDashSubstitutionEnabled;
 }
 
 - (BOOL) isAutomaticLinkDetectionEnabled {
-    return _automaticLinkDetectionEnabled;
+    return NS_EXTRA(NSTextView, self)->_automaticLinkDetectionEnabled;
 }
 
 - (BOOL) isAutomaticDataDetectionEnabled {
-    return _automaticDataDetectionEnabled;
+    return NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled;
 }
 
 - (BOOL) isAutomaticTextReplacementEnabled {
-    return _automaticTextReplacementEnabled;
+    return NS_EXTRA(NSTextView, self)->_automaticTextReplacementEnabled;
 }
 
 - (void) setGrammarCheckingEnabled: (BOOL) value {
-    _grammarCheckingEnabled = value;
+    NS_EXTRA(NSTextView, self)->_grammarCheckingEnabled = value;
 }
 
 - (void) setAutomaticQuoteSubstitutionEnabled: (BOOL) value {
-    _automaticQuoteSubstitutionEnabled = value;
+    NS_EXTRA(NSTextView, self)->_automaticQuoteSubstitutionEnabled = value;
 }
 
 - (void) setAutomaticDashSubstitutionEnabled: (BOOL) value {
-    _automaticDashSubstitutionEnabled = value;
+    NS_EXTRA(NSTextView, self)->_automaticDashSubstitutionEnabled = value;
 }
 
 - (void) setAutomaticLinkDetectionEnabled: (BOOL) value {
-    _automaticLinkDetectionEnabled = value;
+    NS_EXTRA(NSTextView, self)->_automaticLinkDetectionEnabled = value;
 }
 
 - (void) setAutomaticDataDetectionEnabled: (BOOL) value {
-    _automaticDataDetectionEnabled = value;
+    NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled = value;
+    if (value)
+        NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes |= _NSTextViewTypeDataDetectionExtra;
+    else
+        NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes &= ~(NSTextCheckingTypes) (_NSTextViewTypeDataDetectionExtra | _NSTextViewTypeDataDetection);
 }
 
 - (void) setAutomaticTextReplacementEnabled: (BOOL) value {
-    _automaticTextReplacementEnabled = value;
+    NS_EXTRA(NSTextView, self)->_automaticTextReplacementEnabled = value;
+}
+
+// The bit positions of NSFlags were read off keyed archives of text views whose
+// settings were changed one at a time (black-box observation on macOS 10.14.4
+// and 26.7.3, same layout on both): selectable 0x1, editable 0x2, rich text 0x4,
+// imports graphics 0x8, field editor 0x10, uses font panel 0x20, uses ruler 0x40,
+// continuous spell checking 0x80, draws background 0x100, smart insert/delete
+// 0x200, allows undo 0x400, uses find panel 0x2000, allows document background
+// colour change 0x4000, grammar checking 0x8000, allows image editing 0x10000,
+// quote substitution 0x20000, link detection 0x40000, link tool tips off
+// 0x80000, ruler visible 0x100000, orthography checking off 0x200000, data
+// detection 0xC00000, dash substitution 0x1000000, text replacement 0x2000000,
+// spelling correction 0x4000000, incremental searching 0x40000000, inspector
+// bar 0x80000000. NSMoreFlags: bit 0 rollover button on, bit 1 character picker
+// item off. Not applied: the ruler bits and the field editor bit (the text view
+// derives the ruler state from its scroll view, and field editors are made by
+// their owner), and the text replacement and spelling correction bits, which
+// are written but not read back: a text view made from an archive has both on
+// whatever the bits say (observed on both systems).
+// Test: appkit-textview-archive-flags.m
+- (void) _applySharedData: (NSTextViewSharedData *) sharedData {
+    unsigned f = [sharedData flags];
+
+    NS_EXTRA(NSTextView, self)->_importsGraphics = (f & 0x8) != 0;
+    NS_EXTRA(NSTextView, self)->_usesFontPanel = (f & 0x20) != 0;
+    NS_EXTRA(NSTextView, self)->_isContinuousSpellCheckingEnabled = (f & 0x80) != 0;
+    NS_EXTRA(NSTextView, self)->_smartInsertDeleteEnabled = (f & 0x200) != 0;
+    NS_EXTRA(NSTextView, self)->_usesFindPanel = (f & 0x2000) != 0;
+    NS_EXTRA(NSTextView, self)->_allowsDocumentBackgroundColorChange = (f & 0x4000) != 0;
+    NS_EXTRA(NSTextView, self)->_grammarCheckingEnabled = (f & 0x8000) != 0;
+    NS_EXTRA(NSTextView, self)->_allowsImageEditing = (f & 0x10000) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticQuoteSubstitutionEnabled = (f & 0x20000) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticLinkDetectionEnabled = (f & 0x40000) != 0;
+    NS_EXTRA(NSTextView, self)->_displaysLinkToolTipsDisabled = (f & 0x80000) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticDataDetectionEnabled = (f & 0xC00000) != 0;
+    NS_EXTRA(NSTextView, self)->_automaticDashSubstitutionEnabled = (f & 0x1000000) != 0;
+    if (f & 0x200000)
+        NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes &= ~(NSTextCheckingTypes) 0x1;
+    NS_EXTRA(NSTextView, self)->_incrementalSearchingEnabled = (f & 0x40000000) != 0;
+    NS_EXTRA(NSTextView, self)->_usesInspectorBar = (f & 0x80000000) != 0;
+
+    if ([sharedData hasMoreFlags]) {
+        NS_EXTRA(NSTextView, self)->_usesRolloverButtonDisabled = ([sharedData moreFlags] & 0x1) == 0;
+        NS_EXTRA(NSTextView, self)->_allowsCharacterPickerDisabled = ([sharedData moreFlags] & 0x2) != 0;
+    }
+    // NSPreferredTextFinderStyle: 1 find panel, 2 find bar (observed alongside the flag above)
+    if ([sharedData finderStyle] == 2)
+        NS_EXTRA(NSTextView, self)->_usesFindBar = YES;
+    NS_EXTRA(NSTextView, self)->_automaticTextCompletionDisabled = [sharedData automaticTextCompletionDisabled];
+
+    if ([sharedData linkAttributes] != nil) {
+        [NS_EXTRA(NSTextView, self)->_linkTextAttributes release];
+        NS_EXTRA(NSTextView, self)->_linkTextAttributes = [[sharedData linkAttributes] copy];
+    }
+    if ([sharedData markedAttributes] != nil) {
+        [NS_EXTRA(NSTextView, self)->_markedTextAttributes release];
+        NS_EXTRA(NSTextView, self)->_markedTextAttributes = [[sharedData markedAttributes] copy];
+    }
+    if ([sharedData selectedAttributes] != nil) {
+        [NS_EXTRA(NSTextView, self)->_selectedTextAttributes release];
+        NS_EXTRA(NSTextView, self)->_selectedTextAttributes = [[sharedData selectedAttributes] retain];
+    }
+}
+
+// Settings a text view starts with. Found on a fresh text view on macOS
+// 10.14.4 and 26.7.3 (black-box observation, MAC-EVIDENCE V613): rulers
+// allowed, smart insert/delete, text replacement and spelling correction on, quote
+// and dash substitution, link and data detection and grammar checking off.
+// macOS 26.7.3 differs from 10.14.4 in having quote and dash substitution and
+// grammar checking on; the older values are used here. usesRuler is YES
+// (it only allows a ruler; isRulerVisible stays NO).
+// Test: appkit-textview-api-defaults.m
+- (void) _setDefaultSettings {
+    NS_EXTRA(NSTextView, self)->_usesRuler = YES;
+    NS_EXTRA(NSTextView, self)->_smartInsertDeleteEnabled = YES;
+    NS_EXTRA(NSTextView, self)->_automaticTextReplacementEnabled = YES;
+    NS_EXTRA(NSTextView, self)->_isAutomaticSpellingCorrectionEnabled = YES;
+    NS_EXTRA(NSTextView, self)->_enabledTextCheckingTypes = _NSTextViewDefaultOtherTypes;
+    // markedTextAttributes: the fixed defaults of a text view
+    NS_EXTRA(NSTextView, self)->_markedTextAttributes = [[NSDictionary
+            dictionaryWithObjectsAndKeys: [NSColor textColor],
+                                          NSForegroundColorAttributeName,
+                                          [NSColor yellowColor],
+                                          NSBackgroundColorAttributeName, nil]
+            retain];
+}
+
+- (NSSelectionAffinity) selectionAffinity {
+    return NS_EXTRA(NSTextView, self)->_selectionAffinity;
+}
+
+- (NSSelectionGranularity) selectionGranularity {
+    return NS_EXTRA(NSTextView, self)->_selectionGranularity;
+}
+
+- (void) setSelectionGranularity: (NSSelectionGranularity) granularity {
+    NS_EXTRA(NSTextView, self)->_selectionGranularity = granularity;
+}
+
+- (BOOL) displaysLinkToolTips {
+    return !NS_EXTRA(NSTextView, self)->_displaysLinkToolTipsDisabled;
+}
+
+- (void) setDisplaysLinkToolTips: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_displaysLinkToolTipsDisabled = !value;
+}
+
+// Stored only: there is no image editing UI.
+- (BOOL) allowsImageEditing {
+    return NS_EXTRA(NSTextView, self)->_allowsImageEditing;
+}
+
+- (void) setAllowsImageEditing: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_allowsImageEditing = value;
+}
+
+// Stored only: there are no extension services to offer in a selection.
+- (BOOL) usesRolloverButtonForSelection {
+    return !NS_EXTRA(NSTextView, self)->_usesRolloverButtonDisabled;
+}
+
+- (void) setUsesRolloverButtonForSelection: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_usesRolloverButtonDisabled = !value;
+}
+
+// Stored only: there is no Touch Bar.
+- (BOOL) isAutomaticTextCompletionEnabled {
+    return !NS_EXTRA(NSTextView, self)->_automaticTextCompletionDisabled;
+}
+
+- (void) setAutomaticTextCompletionEnabled: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_automaticTextCompletionDisabled = !value;
+}
+
+- (void) toggleAutomaticTextCompletion: (id) sender {
+    [self setAutomaticTextCompletionEnabled: ![self isAutomaticTextCompletionEnabled]];
+}
+
+- (BOOL) allowsCharacterPickerTouchBarItem {
+    return !NS_EXTRA(NSTextView, self)->_allowsCharacterPickerDisabled;
+}
+
+- (void) setAllowsCharacterPickerTouchBarItem: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_allowsCharacterPickerDisabled = !value;
+}
+
+// Stored only: input sources are not switched per text view.
+- (NSArray *) allowedInputSourceLocales {
+    return NS_EXTRA(NSTextView, self)->_allowedInputSourceLocales;
+}
+
+- (void) setAllowedInputSourceLocales: (NSArray *) locales {
+    NSArray *copy = [locales copy];
+    [NS_EXTRA(NSTextView, self)->_allowedInputSourceLocales release];
+    NS_EXTRA(NSTextView, self)->_allowedInputSourceLocales = copy;
+}
+
+// Stored only: the find bar is not shown; find actions use the find panel.
+- (BOOL) usesFindPanel {
+    return NS_EXTRA(NSTextView, self)->_usesFindPanel;
+}
+
+- (void) setUsesFindPanel: (BOOL) value {
+    NS_EXTRA(NSTextView, self)->_usesFindPanel = value;
+}
+
+- (BOOL) isCoalescingUndo {
+    return NS_EXTRA(NSTextView, self)->_undoTyping != nil;
 }
 
 // Stored only: dropped or pasted graphics aren't handled differently.
 - (BOOL) importsGraphics {
-    return _importsGraphics;
+    return NS_EXTRA(NSTextView, self)->_importsGraphics;
 }
 
 - (void) setImportsGraphics: (BOOL) value {
-    _importsGraphics = value;
+    NS_EXTRA(NSTextView, self)->_importsGraphics = value;
+}
+
+@end
+
+@implementation NSTextView (NSTextViewLayoutOrientationAndHighlights)
+
++ (NSArray *) _textHighlightMenuItems {
+    return [NSArray array];
+}
+
+- (BOOL) usesAdaptiveColorMappingForDarkAppearance {
+    return NS_EXTRA(NSTextView, self)->_usesAdaptiveColorMappingForDarkAppearance;
+}
+
+- (void) setUsesAdaptiveColorMappingForDarkAppearance: (BOOL) flag {
+    NS_EXTRA(NSTextView, self)->_usesAdaptiveColorMappingForDarkAppearance = flag;
+}
+
+- (void) changeLayoutOrientation: (id) sender {
+    [self setLayoutOrientation: [self layoutOrientation] ==
+                                                NSTextLayoutOrientationVertical
+                                        ? NSTextLayoutOrientationHorizontal
+                                        : NSTextLayoutOrientationVertical];
+}
+
+// Sets the paragraph styles' writing direction over the range, with undo, and
+// in the typing attributes when the insertion point is in the range.
+- (void) setBaseWritingDirection: (NSWritingDirection) direction
+                           range: (NSRange) range
+{
+    NSTextStorage *storage = [self textStorage];
+    if (NSMaxRange(range) > [storage length])
+        [NSException raise: NSRangeException
+                    format: @"%@: range %@ beyond length %lu",
+                            NSStringFromSelector(_cmd),
+                            NSStringFromRange(range),
+                            (unsigned long) [storage length]];
+
+    if (range.length > 0) {
+        if (![self shouldChangeTextInRange: range replacementString: nil])
+            return;
+        if (NS_EXTRA(NSTextView, self)->_allowsUndo && self.undoManager) {
+            [self breakUndoCoalescing];
+            NSUndoSetAttributes *undoSetAttributes = [[[NSUndoSetAttributes alloc]
+                    initWithAffectedRange: range
+                            layoutManager: self.layoutManager
+                              undoManager: self.undoManager] autorelease];
+            [[self.undoManager prepareWithInvocationTarget: undoSetAttributes]
+                    undoRedo: storage];
+        }
+        [storage setBaseWritingDirection: direction range: range];
+        [self didChangeText];
+    }
+
+    NSRange selection = [self selectedRange];
+    if (selection.location >= range.location &&
+        selection.location <= NSMaxRange(range)) {
+        NSMutableDictionary *attributes =
+                [[[self typingAttributes] mutableCopy] autorelease];
+        NSParagraphStyle *style =
+                [attributes objectForKey: NSParagraphStyleAttributeName];
+        NSMutableParagraphStyle *changed =
+                [[(style ? style : [NSParagraphStyle defaultParagraphStyle])
+                        mutableCopy] autorelease];
+        [changed setBaseWritingDirection: direction];
+        [attributes setObject: changed forKey: NSParagraphStyleAttributeName];
+        [self setTypingAttributes: attributes];
+    }
 }
 
 @end
@@ -4611,70 +5306,3 @@ static NSTextView *s_targetTextView = nil;
 
 @end
 
-@implementation NSTextView (NSTextViewLayoutOrientationAndHighlights)
-
-+ (NSArray *) _textHighlightMenuItems {
-    return [NSArray array];
-}
-
-- (BOOL) usesAdaptiveColorMappingForDarkAppearance {
-    return _usesAdaptiveColorMappingForDarkAppearance;
-}
-
-- (void) setUsesAdaptiveColorMappingForDarkAppearance: (BOOL) flag {
-    _usesAdaptiveColorMappingForDarkAppearance = flag;
-}
-
-- (void) changeLayoutOrientation: (id) sender {
-    [self setLayoutOrientation: [self layoutOrientation] ==
-                                                NSTextLayoutOrientationVertical
-                                        ? NSTextLayoutOrientationHorizontal
-                                        : NSTextLayoutOrientationVertical];
-}
-
-// Sets the paragraph styles' writing direction over the range, with undo, and
-// in the typing attributes when the insertion point is in the range.
-- (void) setBaseWritingDirection: (NSWritingDirection) direction
-                           range: (NSRange) range
-{
-    NSTextStorage *storage = [self textStorage];
-    if (NSMaxRange(range) > [storage length])
-        [NSException raise: NSRangeException
-                    format: @"%@: range %@ beyond length %lu",
-                            NSStringFromSelector(_cmd),
-                            NSStringFromRange(range),
-                            (unsigned long) [storage length]];
-
-    if (range.length > 0) {
-        if (![self shouldChangeTextInRange: range replacementString: nil])
-            return;
-        if (_allowsUndo && self.undoManager) {
-            [self breakUndoCoalescing];
-            NSUndoSetAttributes *undoSetAttributes = [[[NSUndoSetAttributes alloc]
-                    initWithAffectedRange: range
-                            layoutManager: self.layoutManager
-                              undoManager: self.undoManager] autorelease];
-            [[self.undoManager prepareWithInvocationTarget: undoSetAttributes]
-                    undoRedo: storage];
-        }
-        [storage setBaseWritingDirection: direction range: range];
-        [self didChangeText];
-    }
-
-    NSRange selection = [self selectedRange];
-    if (selection.location >= range.location &&
-        selection.location <= NSMaxRange(range)) {
-        NSMutableDictionary *attributes =
-                [[[self typingAttributes] mutableCopy] autorelease];
-        NSParagraphStyle *style =
-                [attributes objectForKey: NSParagraphStyleAttributeName];
-        NSMutableParagraphStyle *changed =
-                [[(style ? style : [NSParagraphStyle defaultParagraphStyle])
-                        mutableCopy] autorelease];
-        [changed setBaseWritingDirection: direction];
-        [attributes setObject: changed forKey: NSParagraphStyleAttributeName];
-        [self setTypingAttributes: attributes];
-    }
-}
-
-@end

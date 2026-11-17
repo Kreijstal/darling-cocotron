@@ -20,6 +20,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import "NSKeyValueBinding/NSTextFieldBinder.h"
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSCursor.h>
+#import <AppKit/NSAttributedString.h>
+#import <AppKit/NSParagraphStyle.h>
 #import <AppKit/NSDragging.h>
 #import <AppKit/NSPasteboard.h>
 #import <AppKit/NSTextField.h>
@@ -39,23 +41,78 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @implementation NSTextField
 
-@synthesize preferredMaxLayoutWidth = _preferredMaxLayoutWidth;
+NS_EXTRA_SYNTHESIZE_ASSIGN(NSTextField, preferredMaxLayoutWidth, _preferredMaxLayoutWidth, CGFloat, preferredMaxLayoutWidth, setPreferredMaxLayoutWidth:)
+NS_EXTRA_DEALLOC(NSTextField)
 
-+ (instancetype)labelWithString:(NSString *)stringValue {
-    NSTextField *field = [[[self alloc] initWithFrame:NSZeroRect] autorelease];
-    [field setStringValue:stringValue];
-    [field setEditable:NO];
-    [field setSelectable:NO];
-    [field setBezeled:NO];
-    [field setBordered:NO];
-    [field setDrawsBackground:NO];
-    [field setLineBreakMode:NSLineBreakByClipping];
-    [field sizeToFit];
-    return field;
+// A non-editable, non-selectable, borderless field without background that shows
+// the attributed text, sized to fit it. The line break mode comes from the
+// string's paragraph style; without one the cell's default (word wrapping)
+// stays, as observed on macOS.
++ (instancetype) labelWithAttributedString: (NSAttributedString *) attributedStringValue {
+    NSTextField *label = [[[self alloc] initWithFrame: NSZeroRect] autorelease];
+    [label setAttributedStringValue: attributedStringValue];
+    [label setBezeled: NO];
+    [label setBordered: NO];
+    [label setDrawsBackground: NO];
+    [label setEditable: NO];
+    [label setSelectable: NO];
+    if ([attributedStringValue length] > 0) {
+        NSParagraphStyle *style = [attributedStringValue attribute: NSParagraphStyleAttributeName
+                                                           atIndex: 0
+                                                    effectiveRange: NULL];
+        // QUIRK: the field's lineBreakMode follows the paragraph style of the text. Not
+        // documented beyond the header saying the mode is "determined by" the style.
+        // Evidence: black-box observation on macOS 10.14.4 (tier 2; macOS 26.7.3 reports
+        // word wrapping for every style, the wider older behaviour is followed).
+        // Test: tests/appkit-text-field-label-attributed.m
+        if (style != nil)
+            [label setLineBreakMode: [style lineBreakMode]];
+    }
+    [label sizeToFit];
+    return label;
 }
 
 + (Class) cellClass {
     return [NSTextFieldCell class];
+}
+
++ (instancetype) labelWithString: (NSString *) stringValue {
+    NSTextField *label = [[[self alloc] initWithFrame: NSZeroRect] autorelease];
+    [label setStringValue: (stringValue != nil) ? stringValue : @""];
+    [label setBezeled: NO];
+    [label setBordered: NO];
+    [label setDrawsBackground: NO];
+    [label setEditable: NO];
+    [label setSelectable: NO];
+    [label setFont: [NSFont systemFontOfSize: [NSFont systemFontSize]]];
+    // A label stays on one line: it clips rather than wraps.
+    [label setLineBreakMode: NSLineBreakByClipping];
+    [label sizeToFit];
+    return label;
+}
+
++ (instancetype) wrappingLabelWithString: (NSString *) stringValue {
+    NSTextField *label = [[[self alloc] initWithFrame: NSZeroRect] autorelease];
+    [label setStringValue: (stringValue != nil) ? stringValue : @""];
+    [label setBezeled: NO];
+    [label setDrawsBackground: NO];
+    [label setEditable: NO];
+    [label setSelectable: YES];
+    [label setFont: [NSFont systemFontOfSize: [NSFont systemFontSize]]];
+    [label setLineBreakMode: NSLineBreakByWordWrapping];
+    return label;
+}
+
++ (instancetype) textFieldWithString: (NSString *) stringValue {
+    NSTextField *field = [[[self alloc] initWithFrame: NSZeroRect] autorelease];
+    [field setStringValue: (stringValue != nil) ? stringValue : @""];
+    [field setBezeled: YES];
+    [field setDrawsBackground: YES];
+    [field setEditable: YES];
+    [field setSelectable: YES];
+    [field setFont: [NSFont systemFontOfSize: [NSFont systemFontSize]]];
+    [field sizeToFit];
+    return field;
 }
 
 + (Class) _binderClassForBinding: (id) binding {
@@ -66,20 +123,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - initWithCoder: (NSCoder *) coder {
-    NSLog(@"NSTextField initWithCoder");
     [super initWithCoder: coder];
     [self registerForDraggedTypes:
                     [NSArray arrayWithObject: NSStringPboardType]];
-    _automaticTextCompletionEnabled = YES;
+    NS_EXTRA(NSTextField, self)->_automaticTextCompletionEnabled = YES;
 
     if ([coder allowsKeyedCoding]) {
         NSKeyedUnarchiver *keyed = (NSKeyedUnarchiver *) coder;
 
         [self setDelegate: [keyed decodeObjectForKey: @"NSDelegate"]];
-        _errorAction = NSSelectorFromString(
+        NS_EXTRA(NSTextField, self)->_errorAction = NSSelectorFromString(
                 [keyed decodeObjectForKey: @"NSErrorAction"]);
 
-        _preferredMaxLayoutWidth =
+        NS_EXTRA(NSTextField, self)->_preferredMaxLayoutWidth =
                 [keyed decodeDoubleForKey: @"NSPreferredMaxLayoutWidth"];
         // TODO
     } else {
@@ -91,7 +147,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         }
 
         [self setDelegate: [coder decodeObject]];
-        [coder decodeValuesOfObjCTypes: ":", &_errorAction];
+        [coder decodeValuesOfObjCTypes: ":", &NS_EXTRA(NSTextField, self)->_errorAction];
     }
     return self;
 }
@@ -101,9 +157,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
     if (coder.allowsKeyedCoding) {
         [coder encodeObject: _delegate forKey: @"NSDelegate"];
-        [coder encodeObject: NSStringFromSelector(_errorAction)
+        [coder encodeObject: NSStringFromSelector(NS_EXTRA(NSTextField, self)->_errorAction)
                      forKey: @"NSErrorAction"];
-        [coder encodeDouble: _preferredMaxLayoutWidth
+        [coder encodeDouble: NS_EXTRA(NSTextField, self)->_preferredMaxLayoutWidth
                      forKey: @"NSPreferredMaxLayoutWidth"];
         // TODO
     } else {
@@ -118,7 +174,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [_cell setEditable: YES];
     [_cell setSelectable: YES];
     [_cell setBezeled: YES];
-    _automaticTextCompletionEnabled = YES;
+    NS_EXTRA(NSTextField, self)->_automaticTextCompletionEnabled = YES;
     [self registerForDraggedTypes:
                     [NSArray arrayWithObject: NSStringPboardType]];
     return self;
@@ -130,15 +186,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 // Stored only: field editing offers no completions yet.
 - (BOOL) isAutomaticTextCompletionEnabled {
-    return _automaticTextCompletionEnabled;
+    return NS_EXTRA(NSTextField, self)->_automaticTextCompletionEnabled;
 }
 
 - (void) setAutomaticTextCompletionEnabled: (BOOL) value {
-    _automaticTextCompletionEnabled = value;
+    NS_EXTRA(NSTextField, self)->_automaticTextCompletionEnabled = value;
 }
 
 - (BOOL) isOpaque {
     return [_cell drawsBackground] || [_cell isBezeled];
+}
+
+// See the QUIRK in NSControl: a text field follows the view rule, so a
+// label lets clicks through and a bezeled, editable field does not.
+- (BOOL) mouseDownCanMoveWindow {
+    return ![self isOpaque];
 }
 
 - (void) resetCursorRects {
@@ -219,6 +281,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setPlaceholderString: (NSString *) placeholderString {
     [_cell setPlaceholderString: placeholderString];
+    [self setNeedsDisplay: YES];
 }
 
 - (NSAttributedString *) placeholderAttributedString {
@@ -229,6 +292,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         (NSAttributedString *) placeholderAttributedString
 {
     [_cell setPlaceholderAttributedString: placeholderAttributedString];
+    [self setNeedsDisplay: YES];
 }
 
 - (NSInteger) maximumNumberOfLines {
@@ -267,17 +331,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         return;
 
     if ([cell isEditable] || [cell isSelectable]) {
-        if (_currentEditor == nil) {
+        if (NS_EXTRA(NSControl, self)->_currentEditor == nil) {
             NSText *editor = [[self window] fieldEditor: YES forObject: self];
-            _currentEditor = [[cell setUpFieldEditorAttributes: editor] retain];
-            [_currentEditor setDelegate: self];
-            [_currentEditor registerForDraggedTypes: [self _draggedTypes]];
-            [[self window] makeFirstResponder: _currentEditor];
+            NS_EXTRA(NSControl, self)->_currentEditor = [[cell setUpFieldEditorAttributes: editor] retain];
+            [NS_EXTRA(NSControl, self)->_currentEditor setDelegate: self];
+            [NS_EXTRA(NSControl, self)->_currentEditor registerForDraggedTypes: [self _draggedTypes]];
+            [[self window] makeFirstResponder: NS_EXTRA(NSControl, self)->_currentEditor];
         }
 
         [cell selectWithFrame: [self bounds]
                        inView: self
-                       editor: _currentEditor
+                       editor: NS_EXTRA(NSControl, self)->_currentEditor
                      delegate: self
                         start: range.location
                        length: range.length];
@@ -306,8 +370,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) validateEditing {
-    if (_currentEditor) {
-        NSString *string = [_currentEditor string];
+    if (NS_EXTRA(NSControl, self)->_currentEditor) {
+        NSString *string = [NS_EXTRA(NSControl, self)->_currentEditor string];
         BOOL acceptsString = YES;
         NSFormatter *formatter = [self formatter];
         if (formatter) {
@@ -331,9 +395,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             }
         }
         if (acceptsString) {
-            if ([_currentEditor isRichText]) {
-                if ([_currentEditor isKindOfClass: [NSTextView class]]) {
-                    NSTextView *textview = (NSTextView *) _currentEditor;
+            if ([NS_EXTRA(NSControl, self)->_currentEditor isRichText]) {
+                if ([NS_EXTRA(NSControl, self)->_currentEditor isKindOfClass: [NSTextView class]]) {
+                    NSTextView *textview = (NSTextView *) NS_EXTRA(NSControl, self)->_currentEditor;
                     NSAttributedString *text = [textview textStorage];
                     NSAttributedString *string = [[[NSAttributedString alloc]
                             initWithAttributedString: text] autorelease];
@@ -381,9 +445,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
     // In case we get the mouse down because we hadn't an editor yet, propagate
     // the mouse event to the editor
-    if (_currentEditor &&
+    if (NS_EXTRA(NSControl, self)->_currentEditor &&
         NSMouseInRect(point, editingFrame, [self isFlipped])) {
-        [_currentEditor mouseDown: event];
+        [NS_EXTRA(NSControl, self)->_currentEditor mouseDown: event];
     } else {
         [super mouseDown: event];
     }
@@ -478,31 +542,31 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setEditable: (BOOL) flag {
     [super setEditable: flag];
-    [_currentEditor setEditable: [self isEditable]];
+    [NS_EXTRA(NSControl, self)->_currentEditor setEditable: [self isEditable]];
 }
 
 - (void) setSelectable: (BOOL) flag {
     [super setSelectable: flag];
-    [_currentEditor setSelectable: [self isSelectable]];
+    [NS_EXTRA(NSControl, self)->_currentEditor setSelectable: [self isSelectable]];
 }
 
 - (void) setStringValue: (NSString *) value {
-    if (!_currentEditor)
+    if (!NS_EXTRA(NSControl, self)->_currentEditor)
         [super setStringValue: value];
     else {
-        NSRange selectedRange = [_currentEditor selectedRange];
+        NSRange selectedRange = [NS_EXTRA(NSControl, self)->_currentEditor selectedRange];
         BOOL isEntireString =
                 NSEqualRanges(selectedRange,
-                              NSMakeRange(0, [[_currentEditor string] length]));
+                              NSMakeRange(0, [[NS_EXTRA(NSControl, self)->_currentEditor string] length]));
 
         [super setStringValue: value];
-        [_currentEditor setString: [self stringValue]];
-        NSRange entireString = NSMakeRange(0, [[_currentEditor string] length]);
+        [NS_EXTRA(NSControl, self)->_currentEditor setString: [self stringValue]];
+        NSRange entireString = NSMakeRange(0, [[NS_EXTRA(NSControl, self)->_currentEditor string] length]);
 
         if (isEntireString) {
             // NSTextField will re-select entire string on a setString: if the
             // previous value is completely selected
-            [_currentEditor setSelectedRange: entireString];
+            [NS_EXTRA(NSControl, self)->_currentEditor setSelectedRange: entireString];
         } else {
             // otherwise it will re-select what it can
             selectedRange = NSIntersectionRange(selectedRange, entireString);
@@ -510,7 +574,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             if (selectedRange.length == 0) // 0 on intersection is undefined
                                            // location, so we have to set it
                 selectedRange.location = 0;
-            [_currentEditor setSelectedRange: entireString];
+            [NS_EXTRA(NSControl, self)->_currentEditor setSelectedRange: entireString];
         }
     }
 }
@@ -519,13 +583,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     // Don't do extra work if we don't need to...
     if (font != [self font]) {
         [super setFont: font];
-        [_currentEditor setFont: [self font]];
+        [NS_EXTRA(NSControl, self)->_currentEditor setFont: [self font]];
     }
 }
 
 - (void) setAlignment: (NSTextAlignment) alignment {
     [super setAlignment: alignment];
-    [_currentEditor setAlignment: [self alignment]];
+    [NS_EXTRA(NSControl, self)->_currentEditor setAlignment: [self alignment]];
 }
 
 - (void) setRefusesFirstResponder: (BOOL) flag {
@@ -547,7 +611,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     if ([_delegate respondsToSelector: @selector(control:
                                                 textView:doCommandBySelector:)])
         didSelector = [_delegate control: self
-                                textView: (NSTextView *) _currentEditor
+                                textView: (NSTextView *) NS_EXTRA(NSControl, self)->_currentEditor
                      doCommandBySelector: selector];
 
     if (!didSelector)

@@ -2,15 +2,13 @@
 // Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
 // Host test for CGWarpMouseCursorPosition / CGDisplayMoveCursorToPoint on the X11 backend: the conversion from
 // CoreGraphics' global space (origin at the main display's top-left, y down, points) to the pointer's device
-// pixel and back to what CGEventGetLocation reports. It calls the pure helpers the backends use
-// (CoreGraphics/CGDisplayGeometry.h, AppKit/X11.backend/X11Monitors.h) and re-implements the Objective-C glue
-// around them (warpToGlobalPoint in CGDirectDisplay.m, -[X11Display warpMouse:]), which it does not compile or
-// run: the argument checks, the display lookup and the NO-to-kCGErrorCannotComplete mapping are untested here.
+// pixel and back to what CGEventGetLocation reports, using the same functions the backends use
+// (CoreGraphics/CGDisplayGeometry.h, CoreGraphics/X11.backend/X11Monitors.h).
 //
 // Multi-monitor layouts are a pure-C model: Xvfb exposes one CRTC, so secondary monitors with negative or offset
 // origins are synthetic arrays of root rectangles. The single-monitor case, the moved main CRTC and the clipping
 // also run against a real pointer on Xvfb. Use tests/cg-warp-mouse.sh. Build: cc cg-warp-mouse.c -lX11 -lXrandr -lm
-#include "../AppKit/X11.backend/X11Monitors.h"
+#include "../CoreGraphics/X11.backend/X11Monitors.h"
 #include "../CoreGraphics/CGDisplayGeometry.h"
 #include <stdio.h>
 #include <string.h>

@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSGraphics.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Foundation/Foundation.h>
 
@@ -50,18 +51,20 @@ APPKIT_EXPORT NSGraphicsContextAttributeKey const NSGraphicsContextRepresentatio
 APPKIT_EXPORT NSGraphicsContextRepresentationFormatAttributeKey const NSGraphicsContextPSFormat;
 APPKIT_EXPORT NSGraphicsContextRepresentationFormatAttributeKey const NSGraphicsContextPDFFormat;
 
+#define _NS_SIDE_NSGraphicsContext 0, 1,
 @interface NSGraphicsContext : NSObject {
+    NS_EXTRA_IVARS_BEGIN(NSGraphicsContext)
     CGContextRef _graphicsPort;
     CIContext *_ciContext;
     NSMutableArray *_focusStack;
     BOOL _isDrawingToScreen;
     BOOL _isFlipped;
     NSDictionary *_deviceDescription;
-
     BOOL _shouldAntialias;
     NSColorRenderingIntent _renderingIntent;
     NSCompositingOperation _compOperation;
     NSPoint _patternPhase;
+    NS_SIDE_IVARS_END(NSGraphicsContext)
 }
 
 + (NSGraphicsContext *) graphicsContextWithWindow: (NSWindow *) window;
@@ -73,7 +76,7 @@ APPKIT_EXPORT NSGraphicsContextRepresentationFormatAttributeKey const NSGraphics
                                              flipped: (BOOL) flipped;
 + (NSGraphicsContext *) graphicsContextWithAttributes: (NSDictionary *) attributes;
 
-@property (class, readonly, retain) NSGraphicsContext *currentContext;
+@property (class, readonly, retain) NSGraphicsContext *currentContext NS_SWIFT_NAME(current);
 + (void) setCurrentContext: (NSGraphicsContext *) context;
 
 + (void) saveGraphicsState;
@@ -81,24 +84,19 @@ APPKIT_EXPORT NSGraphicsContextRepresentationFormatAttributeKey const NSGraphics
 
 + (BOOL) currentContextDrawingToScreen;
 
-- (CGContextRef) graphicsPort;
-@property (readonly) CGContextRef CGContext;
+@property (readonly) void *graphicsPort;
+@property (readonly) CGContextRef CGContext NS_SWIFT_NAME(cgContext);
 - (NSMutableArray *) focusStack;
 
 @property (readonly) BOOL isDrawingToScreen;
 @property (readonly) BOOL isFlipped;
 
-- (void) setShouldAntialias: (BOOL) value;
-- (void) setImageInterpolation: (NSImageInterpolation) value;
-- (void) setColorRenderingIntent: (NSColorRenderingIntent) value;
-- (void) setCompositingOperation: (NSCompositingOperation) value;
-- (void) setPatternPhase: (NSPoint) phase;
 
-- (BOOL) shouldAntialias;
-- (NSImageInterpolation) imageInterpolation;
-- (NSColorRenderingIntent) colorRenderingIntent;
-- (NSCompositingOperation) compositingOperation;
-- (NSPoint) patternPhase;
+@property(nonatomic) BOOL shouldAntialias;
+@property(nonatomic) NSImageInterpolation imageInterpolation;
+@property(nonatomic) NSColorRenderingIntent colorRenderingIntent;
+@property NSCompositingOperation compositingOperation;
+@property(nonatomic) NSPoint patternPhase;
 
 - (CIContext *) CIContext;
 

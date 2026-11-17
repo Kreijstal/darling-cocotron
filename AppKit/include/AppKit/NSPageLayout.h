@@ -18,10 +18,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/Foundation.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSPrintInfo, NSWindow;
 
+typedef NS_ENUM(NSInteger, NSPageLayoutResult) {
+    NSPageLayoutResultCancelled = 0,
+    NSPageLayoutResultChanged,
+};
+
 @interface NSPageLayout : NSObject {
+    NS_LEGACY_IVAR_PAD(_NSPageLayoutReserved, 184)
 }
 
 + (NSPageLayout *) pageLayout;

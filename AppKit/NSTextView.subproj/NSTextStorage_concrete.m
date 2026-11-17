@@ -36,8 +36,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         NSRangeEntryInsert(_rangeToAttributes, NSMakeRange(0, [_string length]),
                            [NSDictionary dictionary]);
     } else {
-        // Typedstream: the string, then "iI" runs of (1-based attribute dictionary number, length) covering it; a
-        // dictionary is archived right after the first run that uses it.
+        // QUIRK: NSArchiver (typedstream) layout of a text storage: the string,
+        // then "iI" runs of (1-based attribute dictionary number, length)
+        // covering it; a dictionary is archived right after the first run that
+        // uses it. Not documented.
+        // Evidence: archives written by NSArchiver on macOS 27 (tier 2, MC13.7,
+        // fixtures textstorage.typedstream and attributedstring.typedstream).
+        // Test: test_quirk_typedstream_text_storage in
+        // tests/appkit-typedstream-text.m
         NSString *decoded = [coder decodeObject];
         _string = decoded ? [decoded mutableCopy] : [NSMutableString new];
         _rangeToAttributes = NSCreateRangeToCopiedObjectEntries(0);
@@ -74,11 +80,17 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return self;
 }
 
-- initWithAttributedString: (NSAttributedString *) other {
-    self = [self initWithString: [other string] ?: @""];
-    if (self && other) {
-        [self setAttributedString: other];
-    }
+- initWithString: (NSString *) string attributes: (NSDictionary *) attributes {
+    // NSAttributedString only provides this initializer for its own concrete
+    // classes, so the text storage supplies it for itself.
+    if ((self = [self initWithString: string]) != nil && [attributes count] > 0)
+        [self setAttributes: attributes range: NSMakeRange(0, [string length])];
+    return self;
+}
+
+- initWithAttributedString: (NSAttributedString *) attributedString {
+    if ((self = [self initWithString: @""]) != nil)
+        [self setAttributedString: attributedString];
     return self;
 }
 

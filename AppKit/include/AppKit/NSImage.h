@@ -17,9 +17,11 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSBitmapImageRep.h>
 #import <AppKit/NSFontDescriptor.h>
 #import <AppKit/NSGraphics.h>
+#import <AppKit/NSPasteboard.h>
 
 @class NSImageRep;
 @class NSImageSymbolConfiguration;
@@ -27,43 +29,65 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 typedef NSString *NSImageHintKey NS_TYPED_ENUM NS_SWIFT_NAME(NSImageRep.HintKey);
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSImageCacheMode) {
     NSImageCacheDefault,
     NSImageCacheAlways,
     NSImageCacheBySize,
     NSImageCacheNever,
-} NSImageCacheMode;
-
-typedef NS_ENUM(NSInteger, NSImageResizingMode) {
-    NSImageResizingModeTile = 0,
-    NSImageResizingModeStretch = 1,
 };
 
-@interface NSImage : NSObject <NSCopying, NSCoding> {
+typedef NS_ENUM(NSInteger, NSImageResizingMode) {
+    NSImageResizingModeStretch = 0,
+    NSImageResizingModeTile = 1,
+};
+
+typedef NS_ENUM(NSUInteger, NSImageLoadStatus) {
+    NSImageLoadStatusCompleted,
+    NSImageLoadStatusCancelled,
+    NSImageLoadStatusInvalidData,
+    NSImageLoadStatusUnexpectedEOF,
+    NSImageLoadStatusReadError,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x1c, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
+@interface NSImage : NSObject <NSCopying, NSCoding, NSPasteboardWriting, NSPasteboardReading> {
     NSString *_name;
     NSSize _size;
-    NSRect _alignmentRect;
-    BOOL _hasCustomAlignmentRect;
-    NSEdgeInsets _capInsets;
-    NSImageResizingMode _resizingMode;
-    NSColor *_backgroundColor;
-    NSMutableArray *_representations;
-    id _delegate;
-    BOOL _isFlipped;
-    BOOL _isTemplate;
-    BOOL _scalesWhenResized;
-    BOOL _matchesOnMultipleResolution;
-    BOOL _usesEPSOnResolutionMismatch;
-    BOOL _prefersColorMatch;
-    BOOL _isCachedSeparately;
-    BOOL _cacheDepthMatchesImageDepth;
-    BOOL _isDataRetained;
-    BOOL _cacheIsValid;
-    NSImageCacheMode _cacheMode;
-    NSString *_accessibilityDescription;
-    NSImageSymbolConfiguration *_symbolConfiguration;
-    NSMutableArray *_scaledRepCache;
-    id _drawingHandlerRepCache;
+    NS_LEGACY_IVAR_PAD(_NSImageReserved1, 8)
+    NS_EXTRA_IVARS_BEGIN(NSImage)
+        NSRect _alignmentRect;
+        BOOL _hasCustomAlignmentRect;
+        NSEdgeInsets _capInsets;
+        NSImageResizingMode _resizingMode;
+        NSColor *_backgroundColor;
+        NSMutableArray *_representations;
+        id _delegate;
+        BOOL _isFlipped;
+        BOOL _isTemplate;
+        BOOL _scalesWhenResized;
+        BOOL _matchesOnMultipleResolution;
+        BOOL _usesEPSOnResolutionMismatch;
+        BOOL _matchesOnlyOnBestFittingAxis;
+        // lockFocusFlipped: holds the flippedness until the matching unlockFocus
+        BOOL _lockedFlippedActive;
+        BOOL _lockedFlippedPrevious;
+        BOOL _prefersColorMatch;
+        BOOL _isCachedSeparately;
+        BOOL _cacheDepthMatchesImageDepth;
+        BOOL _isDataRetained;
+        BOOL _cacheIsValid;
+        NSImageCacheMode _cacheMode;
+        NSString *_accessibilityDescription;
+        NSImageSymbolConfiguration *_symbolConfiguration;
+        NSMutableArray *_scaledRepCache;
+        id _drawingHandlerRepCache;
+        // the bitmap an image-level -lockFocus draws into, and its context
+        NSBitmapImageRep *_focusSnapshot;
+        NSGraphicsContext *_focusSnapshotContext;
+        BOOL _focusSnapshotDropsAlpha;
+    NS_EXTRA_IVARS_END(NSImage)
 }
 
 + (NSArray *) imageFileTypes;
@@ -89,6 +113,9 @@ typedef NS_ENUM(NSInteger, NSImageResizingMode) {
                               context: (NSGraphicsContext *) context
                                 hints: (NSDictionary<NSImageHintKey, id> *) hints CF_RETURNS_NOT_RETAINED;
 
+// As -initWithData:, but a TIFF or JPEG orientation tag is not applied to the pixels.
+- initWithDataIgnoringOrientation: (NSData *) data;
+
 - initWithPasteboard: (NSPasteboard *) pasteboard;
 - initByReferencingFile: (NSString *) path;
 - initByReferencingURL: (NSURL *) url;
@@ -98,38 +125,48 @@ typedef NS_ENUM(NSInteger, NSImageResizingMode) {
 @property NSRect alignmentRect;
 @property NSEdgeInsets capInsets;
 @property NSImageResizingMode resizingMode;
-- (NSColor *) backgroundColor;
+@property(nonatomic, retain) NSColor *backgroundColor;
 @property (getter=isFlipped) BOOL flipped;
 @property (setter=setTemplate:) BOOL isTemplate;
-- (BOOL) scalesWhenResized;
-- (BOOL) matchesOnMultipleResolution;
-- (BOOL) usesEPSOnResolutionMismatch;
-- (BOOL) prefersColorMatch;
-- (NSImageCacheMode) cacheMode;
-- (BOOL) isCachedSeparately;
-- (BOOL) cacheDepthMatchesImageDepth;
-- (BOOL) isDataRetained;
+@property(nonatomic) BOOL scalesWhenResized;
+@property(nonatomic) BOOL matchesOnMultipleResolution;
+@property(nonatomic) BOOL matchesOnlyOnBestFittingAxis;
+@property(nonatomic) BOOL usesEPSOnResolutionMismatch;
+@property(nonatomic) BOOL prefersColorMatch;
+@property(nonatomic) NSImageCacheMode cacheMode;
+@property(nonatomic, getter=isCachedSeparately) BOOL cachedSeparately;
+@property(nonatomic) BOOL cacheDepthMatchesImageDepth;
+@property(nonatomic, getter=isDataRetained) BOOL dataRetained;
 - delegate;
 
 - (BOOL) setName: (NSString *) value;
-- (void) setBackgroundColor: (NSColor *) value;
-- (void) setScalesWhenResized: (BOOL) value;
-- (void) setMatchesOnMultipleResolution: (BOOL) value;
-- (void) setUsesEPSOnResolutionMismatch: (BOOL) value;
-- (void) setPrefersColorMatch: (BOOL) value;
-- (void) setCacheMode: (NSImageCacheMode) value;
-- (void) setCachedSeparately: (BOOL) value;
-- (void) setCacheDepthMatchesImageDepth: (BOOL) value;
-- (void) setDataRetained: (BOOL) value;
 - (void) setDelegate: delegate;
 
-- (BOOL) isValid;
+@property(nonatomic, getter=isValid, readonly) BOOL valid;
 
-- (NSArray *) representations;
+@property(nonatomic, readonly) NSArray *representations;
 - (void) addRepresentation: (NSImageRep *) representation;
 - (void) addRepresentations: (NSArray *) array;
 - (void) removeRepresentation: (NSImageRep *) representation;
 - (NSImageRep *) bestRepresentationForDevice: (NSDictionary *) device;
+
+// The representation to draw into rect of a context, by the scale of the context (or of the
+// NSImageHintCTM hint).
+- (NSImageRep *) bestRepresentationForRect: (NSRect) rect
+                                   context: (NSGraphicsContext *) referenceContext
+                                     hints: (NSDictionary<NSImageHintKey, id> *) hints;
+// Whether a non-transparent pixel of the image drawn into imageRectDestSpace lies within
+// testRectDestSpace.
+- (BOOL) hitTestRect: (NSRect) testRectDestSpace
+        withImageDestinationRect: (NSRect) imageRectDestSpace
+                         context: (NSGraphicsContext *) context
+                           hints: (NSDictionary<NSImageHintKey, id> *) hints
+                         flipped: (BOOL) flipped;
+
+// For CALayer contents: the scale (1x, 2x ...) of the representation that suits a layer with the
+// preferred contents scale, and an object (a CGImage) to assign to the layer for that scale.
+- (CGFloat) recommendedLayerContentsScale: (CGFloat) preferredContentsScale;
+- (id) layerContentsForContentsScale: (CGFloat) layerContentsScale;
 
 - (void) recache;
 - (void) cancelIncrementalLoad;
@@ -139,6 +176,7 @@ typedef NS_ENUM(NSInteger, NSImageResizingMode) {
                                          factor: (float) factor;
 
 - (void) lockFocus;
+- (void) lockFocusFlipped: (BOOL) flipped;
 - (void) lockFocusOnRepresentation: (NSImageRep *) representation;
 - (void) unlockFocus;
 
@@ -168,6 +206,7 @@ typedef NS_ENUM(NSInteger, NSImageResizingMode) {
             fromRect: (NSRect) source
            operation: (NSCompositingOperation) operation
             fraction: (CGFloat) fraction;
+- (void) drawInRect: (NSRect) rect;
 - (void) drawInRect: (NSRect) rect
            fromRect: (NSRect) source
           operation: (NSCompositingOperation) operation
@@ -190,7 +229,7 @@ typedef NS_ENUM(NSInteger, NSImageResizingMode) {
                   accessibilityDescription: (NSString *) description;
 - (NSImage *) imageWithSymbolConfiguration:
         (NSImageSymbolConfiguration *) configuration;
-- (NSImageSymbolConfiguration *) symbolConfiguration;
+@property(nonatomic, readonly) NSImageSymbolConfiguration *symbolConfiguration;
 // Private AppKit spelling of imageWithSystemSymbolName:accessibilityDescription:.
 + (instancetype) _imageWithSystemSymbolName: (NSString *) name;
 + (NSImage *) imageWithSize: (NSSize) size
@@ -211,6 +250,8 @@ typedef NS_ENUM(NSInteger, NSImageSymbolScale) {
     NSFontWeight _weight;
     NSImageSymbolScale _scale;
     NSArray<NSColor *> *_paletteColors;
+    NSColor *_hierarchicalColor;
+    BOOL _prefersMulticolor;
 }
 
 + (instancetype) configurationWithPointSize: (CGFloat) pointSize
@@ -220,6 +261,8 @@ typedef NS_ENUM(NSInteger, NSImageSymbolScale) {
                                       scale: (NSImageSymbolScale) scale;
 + (instancetype) configurationWithScale: (NSImageSymbolScale) scale;
 + (instancetype) configurationWithPaletteColors: (NSArray<NSColor *> *) colors;
++ (instancetype) configurationWithHierarchicalColor: (NSColor *) color;
++ (instancetype) configurationPreferringMulticolor;
 - (NSImageSymbolConfiguration *) configurationByApplyingConfiguration:
         (NSImageSymbolConfiguration *) configuration;
 
@@ -227,17 +270,24 @@ typedef NS_ENUM(NSInteger, NSImageSymbolScale) {
 
 @interface NSBundle (NSImage)
 - (NSString *) pathForImageResource: (NSString *) name;
+// The file URL of pathForImageResource:, or nil.
+- (NSURL *) URLForImageResource: (NSString *) name;
 // A new image from pathForImageResource:, or nil.
 - (NSImage *) imageForResource: (NSString *) name;
 @end
 
 @protocol NSImageDelegate <NSObject>
-
-// TODO
-
+@optional
+// Asked when the image has nothing to draw into rect: the image to draw there instead, or nil.
+- (NSImage *) imageDidNotDraw: (NSImage *) sender inRect: (NSRect) rect;
+// Progressive loading (10.0 - 10.3); images are decoded when created, so none of these is sent.
+- (void) image: (NSImage *) image willLoadRepresentation: (NSImageRep *) rep;
+- (void) image: (NSImage *) image didLoadRepresentationHeader: (NSImageRep *) rep;
+- (void) image: (NSImage *) image didLoadPartOfRepresentation: (NSImageRep *) rep withValidRows: (NSInteger) rows;
+- (void) image: (NSImage *) image didLoadRepresentation: (NSImageRep *) rep withStatus: (NSImageLoadStatus) status;
 @end
 
-typedef NSString *NSImageName;
+typedef NSString *NSImageName NS_SWIFT_BRIDGED_TYPEDEF;
 
 APPKIT_EXPORT NSImageName const NSImageNameActionTemplate;
 APPKIT_EXPORT NSImageName const NSImageNameAddTemplate;
@@ -317,3 +367,77 @@ APPKIT_EXPORT NSImage *_NSGetThemePartImages(id arg1, ...);
 APPKIT_EXPORT NSImageHintKey const NSImageHintInterpolation;
 APPKIT_EXPORT NSImageHintKey const NSImageHintCTM NS_SWIFT_NAME(ctm);
 APPKIT_EXPORT NSImageHintKey const NSImageHintSymbolScale;
+
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAddDetailTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAddTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAlarmTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioInputMuteTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioInputTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioOutputMuteTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioOutputVolumeHighTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioOutputVolumeLowTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioOutputVolumeMediumTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarAudioOutputVolumeOffTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarBookmarksTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarColorPickerFill;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarColorPickerFont;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarColorPickerStroke;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarCommunicationAudioTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarCommunicationVideoTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarComposeTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarDownloadTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarEnterFullScreenTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarExitFullScreenTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarFastForwardTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarFolderCopyToTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarFolderMoveToTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarFolderTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarGetInfoTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarGoBackTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarGoDownTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarGoForwardTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarGoUpTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarHistoryTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarIconViewTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarListViewTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarMailTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarNewFolderTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarNewMessageTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarOpenInBrowserTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarPlayPauseTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarQuickLookTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRecordStartTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRefreshTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRemoveTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRewindTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRotateLeftTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarRotateRightTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSearchTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarShareTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSidebarTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipAhead15SecondsTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipAhead30SecondsTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipAheadTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipBack15SecondsTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipBack30SecondsTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipBackTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipToEndTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSkipToStartTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarSlideshowTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTagIconTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextBoldTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextBoxTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextCenterAlignTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextItalicTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextJustifiedAlignTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextLeftAlignTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextListTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextRightAlignTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextStrikethroughTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarTextUnderlineTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarUserAddTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarUserGroupTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarUserTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarVolumeDownTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarVolumeUpTemplate;
+APPKIT_EXPORT NSImageName const NSImageNameTouchBarPlayheadTemplate;

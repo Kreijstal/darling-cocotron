@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/Foundation.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSFont, NSFontDescriptor, NSFontPanel;
 
@@ -49,6 +50,10 @@ enum {
     NSUnitalicFontMask = 0x01000000,
 };
 
+typedef NS_OPTIONS(NSUInteger, NSFontCollectionOptions) {
+    NSFontCollectionApplicationOnlyMask = 1 << 0,
+};
+
 @interface NSFontManager : NSObject {
     NSFontPanel *_panel;
     id _delegate;
@@ -59,20 +64,20 @@ enum {
     BOOL _isMultiple;
     NSFontAction _currentFontAction;
     int _currentTrait;
+    NS_LEGACY_IVAR_PAD(_NSFontManagerReserved, 16)
 }
 
-+ (NSFontManager *) sharedFontManager;
+@property(class, readonly, retain, nonnull) NSFontManager *sharedFontManager;
 
 + (void) setFontManagerFactory: (Class) value;
 + (void) setFontPanelFactory: (Class) value;
 
 - delegate;
 - target;
-- (SEL) action;
+@property(nonatomic) SEL action;
 
 - (void) setDelegate: delegate;
 - (void) setTarget: target;
-- (void) setAction: (SEL) value;
 
 - (NSFontAction) currentFontAction;
 

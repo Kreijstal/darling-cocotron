@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSCell.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Foundation/Foundation.h>
@@ -56,13 +57,20 @@ typedef enum {
     NSFontAntialiasedIntegerAdvancementsRenderingMode,
 } NSFontRenderingMode;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x18, Apple's; the ivars
+// before the extras keep their position in the original order. Add new state
+// to the extra struct, never as an ivar.
 @interface NSFont : NSObject <NSCopying, NSSecureCoding> {
     NSString *_name;
     CGFloat _pointSize;
-    CGFloat _matrix[6];
-    NSStringEncoding _encoding;
+    NS_LEGACY_IVAR_PAD(_NSFontReserved1, 8)
+    NS_EXTRA_IVARS_BEGIN(NSFont)
+        CGFloat _matrix[6];
+        NSStringEncoding _encoding;
 
-    CGFontRef _cgFont;
+        CGFontRef _cgFont;
+        // There is no separate CTFont: an NSFont is its own CTFontRef.
+    NS_EXTRA_IVARS_END(NSFont)
 }
 
 + (CGFloat) systemFontSize;
@@ -73,6 +81,12 @@ typedef enum {
 + (NSFont *) boldSystemFontOfSize: (CGFloat) size;
 + (NSFont *) controlContentFontOfSize: (CGFloat) size;
 
+// Monospaced system fonts (10.15 / 10.11).
++ (NSFont *) monospacedSystemFontOfSize: (CGFloat) size
+                                  weight: (CGFloat) weight;
++ (NSFont *) monospacedDigitSystemFontOfSize: (CGFloat) size
+                                       weight: (CGFloat) weight;
+
 + (NSFont *) labelFontOfSize: (CGFloat) size;
 + (NSFont *) menuFontOfSize: (CGFloat) size;
 + (NSFont *) menuBarFontOfSize: (CGFloat) size;
@@ -81,8 +95,6 @@ typedef enum {
 + (NSFont *) paletteFontOfSize: (CGFloat) size;
 + (NSFont *) systemFontOfSize: (CGFloat) size;
 + (NSFont *) systemFontOfSize: (CGFloat) size weight: (CGFloat) weight;
-+ (NSFont *) monospacedSystemFontOfSize: (CGFloat) size weight: (CGFloat) weight;
-+ (NSFont *) monospacedDigitSystemFontOfSize: (CGFloat) size weight: (CGFloat) weight;
 + (NSFont *) titleBarFontOfSize: (CGFloat) size;
 + (NSFont *) toolTipsFontOfSize: (CGFloat) size;
 + (NSFont *) userFontOfSize: (CGFloat) size;
@@ -102,42 +114,41 @@ typedef enum {
 + (NSArray *) preferredFontNames;
 + (void) setPreferredFontNames: (NSArray *) fontNames;
 
-- (CGFloat) pointSize;
-- (NSString *) fontName;
-- (const CGFloat *) matrix;
-- (NSAffineTransform *) textTransform;
-- (NSFontRenderingMode) renderingMode;
-- (NSCharacterSet *) coveredCharacterSet;
-- (NSStringEncoding) mostCompatibleStringEncoding;
-- (NSString *) familyName;
-- (NSString *) displayName;
-- (NSFontDescriptor *) fontDescriptor;
+@property(nonatomic, readonly) CGFloat pointSize;
+@property(nonatomic, readonly) NSString *fontName;
+@property(nonatomic, readonly) const CGFloat *matrix;
+@property(nonatomic, readonly) NSAffineTransform *textTransform;
+@property(nonatomic, readonly) NSFontRenderingMode renderingMode;
+@property(nonatomic, readonly) NSCharacterSet *coveredCharacterSet;
+@property(nonatomic, readonly) NSStringEncoding mostCompatibleStringEncoding;
+@property(nonatomic, readonly) NSString *familyName;
+@property(nonatomic, readonly) NSString *displayName;
+@property(nonatomic, readonly) NSFontDescriptor *fontDescriptor;
 
-- (NSFont *) printerFont;
-- (NSFont *) screenFont;
+@property(nonatomic, readonly) NSFont *printerFont;
+@property(nonatomic, readonly) NSFont *screenFont;
 - (NSFont *) screenFontWithRenderingMode: (NSFontRenderingMode) mode;
 
-- (NSRect) boundingRectForFont;
+@property(nonatomic, readonly) NSRect boundingRectForFont;
 - (NSRect) boundingRectForGlyph: (NSGlyph) glyph;
 
 - (NSMultibyteGlyphPacking) glyphPacking;
-- (NSUInteger) numberOfGlyphs;
+@property(nonatomic, readonly) NSUInteger numberOfGlyphs;
 - (NSGlyph) glyphWithName: (NSString *) name;
 - (BOOL) glyphIsEncoded: (NSGlyph) glyph;
 - (NSSize) advancementForGlyph: (NSGlyph) glyph;
 
-- (NSSize) maximumAdvancement;
-- (CGFloat) underlinePosition;
-- (CGFloat) underlineThickness;
-- (CGFloat) ascender;
-- (CGFloat) descender;
-- (CGFloat) leading;
+@property(nonatomic, readonly) NSSize maximumAdvancement;
+@property(nonatomic, readonly) CGFloat underlinePosition;
+@property(nonatomic, readonly) CGFloat underlineThickness;
+@property(nonatomic, readonly) CGFloat ascender;
+@property(nonatomic, readonly) CGFloat descender;
+@property(nonatomic, readonly) CGFloat leading;
 - (CGFloat) defaultLineHeightForFont;
-- (BOOL) isFixedPitch;
-- (CGFloat) italicAngle;
-- (CGFloat) leading;
-- (CGFloat) xHeight;
-- (CGFloat) capHeight;
+@property(nonatomic, getter=isFixedPitch, readonly) BOOL fixedPitch;
+@property(nonatomic, readonly) CGFloat italicAngle;
+@property(nonatomic, readonly) CGFloat xHeight;
+@property(nonatomic, readonly) CGFloat capHeight;
 
 - (void) setInContext: (NSGraphicsContext *) context;
 - (void) set;

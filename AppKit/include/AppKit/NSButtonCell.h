@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSActionCell.h>
 #import <AppKit/NSImageCell.h>
 
@@ -30,7 +31,7 @@ enum {
     NSChangeBackgroundCellMask = 0x08,
 };
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSButtonType) {
     NSButtonTypeMomentaryLight = 0,
     NSButtonTypePushOnPushOff = 1,
     NSButtonTypeToggle = 2,
@@ -41,8 +42,10 @@ typedef enum {
     NSButtonTypeMomentaryPushIn = 7,
     NSButtonTypeAccelerator = 8,
     NSButtonTypeMultiLevelAccelerator = 9,
+};
 
-    // Deprecated / legacy names:
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
     NSMomentaryLightButton = NSButtonTypeMomentaryLight,
     NSPushOnPushOffButton = NSButtonTypePushOnPushOff,
     NSToggleButton = NSButtonTypeToggle,
@@ -52,72 +55,82 @@ typedef enum {
     NSOnOffButton = NSButtonTypeOnOff,
     NSMomentaryPushInButton = NSButtonTypeMomentaryPushIn,
     NSMomentaryPushButton = 0,
-    NSMomentaryLight = 7
-} NSButtonType;
+    NSMomentaryLight = 7,
+};
 
-typedef enum {
-    NSRoundedBezelStyle = 1,
-    NSRegularSquareBezelStyle = 2,
-    NSThickSquareBezelStyle = 3,
-    NSThickerSquareBezelStyle = 4,
-    NSDisclosureBezelStyle = 5,
-    NSShadowlessSquareBezelStyle = 6,
-    NSCircularBezelStyle = 7,
-    NSTexturedSquareBezelStyle = 8,
-    NSHelpButtonBezelStyle = 9,
-    NSSmallSquareBezelStyle = 10,
-    NSTexturedRoundedBezelStyle = 11,
-    NSRoundRectBezelStyle = 12,
-    NSRecessedBezelStyle = 13,
-    NSRoundedDisclosureBezelStyle = 14,
-    NSInlineBezelStyle = 15,
+typedef NS_ENUM(NSUInteger, NSBezelStyle) {
+    NSBezelStyleRounded = 1,
+    NSBezelStyleRegularSquare = 2,
+    NSBezelStyleThickSquare = 3,
+    NSBezelStyleThickerSquare = 4,
+    NSBezelStyleDisclosure = 5,
+    NSBezelStyleShadowlessSquare = 6,
+    NSBezelStyleCircular = 7,
+    NSBezelStyleTexturedSquare = 8,
+    NSBezelStyleHelpButton = 9,
+    NSBezelStyleSmallSquare = 10,
+    NSBezelStyleTexturedRounded = 11,
+    NSBezelStyleRoundRect = 12,
+    NSBezelStyleRecessed = 13,
+    NSBezelStyleRoundedDisclosure = 14,
+    NSBezelStyleInline = 15,
+};
 
-    // Names used by the macOS 10.14+ SDK.
-    NSBezelStyleRounded = NSRoundedBezelStyle,
-    NSBezelStyleRegularSquare = NSRegularSquareBezelStyle,
-    NSBezelStyleDisclosure = NSDisclosureBezelStyle,
-    NSBezelStyleShadowlessSquare = NSShadowlessSquareBezelStyle,
-    NSBezelStyleCircular = NSCircularBezelStyle,
-    NSBezelStyleTexturedSquare = NSTexturedSquareBezelStyle,
-    NSBezelStyleHelpButton = NSHelpButtonBezelStyle,
-    NSBezelStyleSmallSquare = NSSmallSquareBezelStyle,
-    NSBezelStyleTexturedRounded = NSTexturedRoundedBezelStyle,
-    NSBezelStyleRoundRect = NSRoundRectBezelStyle,
-    NSBezelStyleRecessed = NSRecessedBezelStyle,
-    NSBezelStyleRoundedDisclosure = NSRoundedDisclosureBezelStyle,
-    NSBezelStyleInline = NSInlineBezelStyle,
-} NSBezelStyle;
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSRoundedBezelStyle = NSBezelStyleRounded,
+    NSRegularSquareBezelStyle = NSBezelStyleRegularSquare,
+    NSDisclosureBezelStyle = NSBezelStyleDisclosure,
+    NSShadowlessSquareBezelStyle = NSBezelStyleShadowlessSquare,
+    NSCircularBezelStyle = NSBezelStyleCircular,
+    NSTexturedSquareBezelStyle = NSBezelStyleTexturedSquare,
+    NSHelpButtonBezelStyle = NSBezelStyleHelpButton,
+    NSSmallSquareBezelStyle = NSBezelStyleSmallSquare,
+    NSTexturedRoundedBezelStyle = NSBezelStyleTexturedRounded,
+    NSRoundRectBezelStyle = NSBezelStyleRoundRect,
+    NSRecessedBezelStyle = NSBezelStyleRecessed,
+    NSRoundedDisclosureBezelStyle = NSBezelStyleRoundedDisclosure,
+    NSInlineBezelStyle = NSBezelStyleInline,
+    NSThickSquareBezelStyle = NSBezelStyleThickSquare,
+    NSThickerSquareBezelStyle = NSBezelStyleThickerSquare,
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSGradientType) {
     NSGradientNone = 0,
     NSGradientConcaveWeak = 1,
     NSGradientConcaveStrong = 2,
     NSGradientConvexWeak = 3,
     NSGradientConvexStrong = 4,
-} NSGradientType;
+};
 
+// Legacy ObjC ABI (i386): instance size must stay 0x44, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSButtonCell : NSActionCell {
-    NSImage *_normalImage;
     NSString *_alternateTitle;
-    NSImage *_alternateImage;
-    int _imagePosition;
-    unsigned _highlightsBy : 4;
-    unsigned _showsStateBy : 4;
-    NSBezelStyle _bezelStyle;
-    BOOL _isTransparent;
-    BOOL _imageDimsWhenDisabled;
-    NSString *_keyEquivalent;
-    unsigned _keyEquivalentModifierMask;
-    BOOL _showsBorderOnlyWhileMouseInside;
     NSSound *_sound;
-    NSGradientType _gradientType;
-    NSImageScaling _imageScaling;
-    NSFont *_keyEquivalentFont;
-    NSColor *_backgroundColor;
-    float _periodicDelay, _periodicInterval;
-    NSImage *_alternateImageOrKeyEquivalentFont;
-    NSUInteger _bcFlags;
-    id _buttonImageSource;
+    NSString *_keyEquivalent;
+    NS_LEGACY_IVAR_PAD(_NSButtonCellReserved1, 12)
+    NSImage *_normalImage;
+    NS_EXTRA_IVARS_BEGIN(NSButtonCell)
+        NSImage *_alternateImage;
+        int _imagePosition;
+        unsigned _highlightsBy : 4;
+        unsigned _showsStateBy : 4;
+        NSBezelStyle _bezelStyle;
+        BOOL _isTransparent;
+        BOOL _imageDimsWhenDisabled;
+        unsigned _keyEquivalentModifierMask;
+        BOOL _showsBorderOnlyWhileMouseInside;
+        NSGradientType _gradientType;
+        NSImageScaling _imageScaling;
+        NSFont *_keyEquivalentFont;
+        NSColor *_backgroundColor;
+        float _periodicDelay, _periodicInterval;
+        NSImage *_alternateImageOrKeyEquivalentFont;
+        NSUInteger _bcFlags;
+        id _buttonImageSource;
+    NS_EXTRA_IVARS_END(NSButtonCell)
 }
 
 - (id) _buttonImageSource;

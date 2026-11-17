@@ -18,47 +18,49 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
-#import <Foundation/NSArray.h>
-#import <Foundation/NSDictionary.h>
 #import <Foundation/NSString.h>
 
-typedef NSString *NSVoiceGenderName;
+typedef NSString *NSVoiceGenderName NS_STRING_ENUM;
 
 APPKIT_EXPORT NSVoiceGenderName const NSVoiceGenderFemale;
 APPKIT_EXPORT NSVoiceGenderName const NSVoiceGenderMale;
 
-typedef NSString *NSVoiceAttributeKey;
+typedef NSString *NSVoiceAttributeKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSVoiceAttributeKey const NSVoiceName;
 APPKIT_EXPORT NSVoiceAttributeKey const NSVoiceGender;
 APPKIT_EXPORT NSVoiceAttributeKey const NSVoiceDemoText;
 APPKIT_EXPORT NSVoiceAttributeKey const NSVoiceLocaleIdentifier;
 
-typedef NSString *NSSpeechPropertyKey;
+typedef NSString *NSSpeechPropertyKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSSpeechPropertyKey const NSSpeechRateProperty;
 APPKIT_EXPORT NSSpeechPropertyKey const NSSpeechPitchBaseProperty;
 APPKIT_EXPORT NSSpeechPropertyKey const NSSpeechVolumeProperty;
 
-@interface NSSpeechSynthesizer : NSObject {
-    NSString *_voice;
-}
+@class NSArray, NSDictionary;
 
-// The voice query API. There is no speech synthesis engine here, so the voice list is
-// empty and per-voice lookups come back empty rather than reporting voices that cannot
-// speak.
-//
-// These return objects, which matters: the catch-all stub below answers every unimplemented
-// selector with a "v@:" signature, so an object-returning method left to it hands back
-// whatever happened to be in the return register.
-+ (NSArray *) availableVoices;
+@interface NSSpeechSynthesizer : NSObject {
+    // Apple's footprint is one word; it holds the pointer to the extras.
+    NS_EXTRA_IVARS_BEGIN(NSSpeechSynthesizer)
+    NSString *_voice;
+    NS_EXTRA_IVARS_END(NSSpeechSynthesizer)
+}
++ (NSArray<NSString *> *) availableVoices;
++ (NSString *) defaultVoice;
++ (NSDictionary<NSVoiceAttributeKey, id> *) attributesForVoice: (NSString *) voice;
+
+// There is no speech synthesis engine here, so the voice list is empty and
+// per-voice lookups come back empty rather than reporting voices that cannot
+// speak. These return objects on purpose: the catch-all stub answers every
+// unimplemented selector with a "v@:" signature, so an object-returning method
+// left to it would hand back whatever was in the return register.
 + (NSString *) voiceAtIndex: (NSInteger) index;
-+ (NSDictionary *) attributesForVoice: (NSString *) voiceIdentifier;
-- (NSDictionary *) attributesForVoice: (NSString *) voiceIdentifier;
+- (NSDictionary<NSVoiceAttributeKey, id> *) attributesForVoice: (NSString *) voice;
 - (instancetype) initWithVoice: (NSString *) voice;
 @property (nonatomic, readonly) NSString *voice;
-
 @end
 
 @protocol NSSpeechSynthesizerDelegate <NSObject>

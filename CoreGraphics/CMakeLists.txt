@@ -24,6 +24,7 @@ set_property(SOURCE
 	CGDataConsumer.m
 	CGDataProvider.m
 	CGDirectDisplay.m
+	CGDirectPalette.m
 	CGDisplayConfiguration.m
 	CGFont.m
 	CGFunction.m
@@ -54,6 +55,7 @@ set_property(SOURCE
 	CGSSurface.m
 	CGSRegion.m
 	CGSServerSPI.m
+	CGSSymbolicHotKeys.m
 
 	APPEND PROPERTY COMPILE_FLAGS "-include Foundation/Foundation.h"
 )
@@ -78,6 +80,7 @@ set(CoreGraphics_sources
 	CGDataConsumer.m
 	CGDataProvider.m
 	CGDirectDisplay.m
+	CGDirectPalette.m
 	CGDisplayConfiguration.m
 	CGDisplayStream.m
 	src/CGEvent.c
@@ -107,9 +110,11 @@ set(CoreGraphics_sources
 	CGSWindow.m
 	CGSSurface.m
 	CGSKeyboardLayout.m
+	CGSKeySymToUnicode.m
 	CGSRegion.m
 	CGSScreen.m
 	CGSServerSPI.m
+	CGSSymbolicHotKeys.m
 	CGEvent.m
 	CGEventSource.m
 	CGEventTap.m
@@ -129,7 +134,7 @@ generate_sdk_framework(CoreGraphics
     HEADER "include/CoreGraphics"
 )
 
-add_framework(CoreGraphics
+add_separated_framework(CoreGraphics
 	FAT
 	CURRENT_VERSION
 	SOURCES
@@ -145,14 +150,41 @@ add_framework(CoreGraphics
 		IOKit
 )
 
-# Since macOS 14 the CoreGraphics Swift overlay is part of CoreGraphics.framework, so apps bind symbols such as
-# $sSo12CGContextRefa12CoreGraphicsE7addLine2toySo7CGPointV_tF to CoreGraphics. Re-export the overlay from
-# src/external/swift (installed as /usr/lib/swift/libswiftCoreGraphics.dylib) so those binds resolve.
-set_property(TARGET CoreGraphics APPEND_STRING PROPERTY
-	LINK_FLAGS " -Wl,-reexport_library,${CMAKE_SOURCE_DIR}/src/external/swift/libswiftCoreGraphics.dylib -Wl,-rpath,/usr/lib/swift ")
-
 # NSBundle finds the backends through the framework's Resources link.
 InstallSymlink("Versions/Current/Resources" "${CMAKE_INSTALL_PREFIX}/libexec/darling/System/Library/Frameworks/CoreGraphics.framework/Resources")
+
+# Since macOS 14 the CoreGraphics Swift overlay is part of CoreGraphics.framework, so applications bind symbols such
+# as $sSo12CGContextRefa12CoreGraphicsE7addLine2toySo7CGPointV_tF to CoreGraphics. CoreGraphics therefore re-exports
+# the overlay, /usr/lib/swift/libswiftCoreGraphics.dylib, which darling-swift builds from source (target
+# swiftCoreGraphics) when a Swift toolchain is available (cmake/swift_toolchain.cmake).
+#
+# The overlay links against CoreGraphics, so CoreGraphics cannot link against the finished overlay. It re-exports an
+# empty placeholder dylib with the overlay's install name instead, which is all the re-export load command needs; the
+# overlay is installed at that install name and dyld loads it from there. ld64 follows the re-export by install name
+# when a client links CoreGraphics, so the Swift dylib install-name map in cmake/swift_dylib_map.cmake (-dylib_file)
+# is applied to the framework's link.
+#
+# Without a Swift toolchain the prebuilt overlay in src/external/swift is re-exported instead.
+if (SWIFT_TOOLCHAIN_FOUND AND BUILD_TARGET_64BIT)
+	set(DYLIB_INSTALL_NAME "/usr/lib/swift/libswiftCoreGraphics.dylib")
+	set(DARLING_LIB_64BIT_ONLY TRUE)
+	add_darling_library(swiftCoreGraphics_placeholder SHARED swift_overlay_placeholder.c)
+	set(DARLING_LIB_64BIT_ONLY FALSE)
+	unset(DYLIB_INSTALL_NAME)
+	target_link_libraries(swiftCoreGraphics_placeholder system)
+	set_target_properties(swiftCoreGraphics_placeholder PROPERTIES
+		LINKER_LANGUAGE C
+		OUTPUT_NAME "swiftCoreGraphics_placeholder")
+	reexport(CoreGraphics_${APPLE_ARCH_64BIT} swiftCoreGraphics_placeholder
+		"${CMAKE_CURRENT_BINARY_DIR}/libswiftCoreGraphics_placeholder.dylib")
+else ()
+	# No Swift toolchain to build the overlay from: re-export the prebuilt one.
+	# Since macOS 14 the CoreGraphics Swift overlay is part of CoreGraphics.framework, so apps bind symbols such as
+	# $sSo12CGContextRefa12CoreGraphicsE7addLine2toySo7CGPointV_tF to CoreGraphics. Re-export the overlay from
+	# src/external/swift (installed as /usr/lib/swift/libswiftCoreGraphics.dylib) so those binds resolve.
+	set_property(TARGET CoreGraphics APPEND_STRING PROPERTY
+		LINK_FLAGS " -Wl,-reexport_library,${CMAKE_SOURCE_DIR}/src/external/swift/libswiftCoreGraphics.dylib -Wl,-rpath,/usr/lib/swift ")
+endif ()
 
 function(add_backend name)
 	cmake_parse_arguments(BACKEND "" "INFO_PLIST" "SOURCES;DEPENDENCIES;RESOURCES" ${ARGN})

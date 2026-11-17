@@ -8,6 +8,17 @@
     return NULL;
 }
 
+// Backends without a parent drawable to lend never lend one.
+- (void) setAllowsParentDrawable: (BOOL) allowed {
+}
+
+- (void) setSyncsToDisplay: (BOOL) syncs {
+}
+
+- (void *) sharedCGLWindow {
+    return NULL;
+}
+
 - (CGFloat) backingScaleFactor { return 1.0; }
 - (CGSize) drawablePixelSize { return CGSizeZero; }
 - (void) flush {}

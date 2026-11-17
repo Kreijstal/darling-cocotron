@@ -22,6 +22,8 @@
 #import <CoreGraphics/CGSConnection.h>
 #import <X11/Xlib.h>
 #import <CoreFoundation/CFRunLoop.h>
+#import <Foundation/NSArray.h>
+#import <Foundation/NSSet.h>
 #import <CoreFoundation/CFSocket.h>
 // X11Frame, for the cached main monitor below.
 #import "../../AppKit/X11.backend/X11Monitors.h"
@@ -49,13 +51,22 @@
 	int _xkbEventBase;
 	int _xrrEventBase;
 
+	// Registered global hot keys (X11HotKeyEntry), the combinations grabbed on the X server
+	// (as NSNumbers) and the uids whose press was reported and release is still due.
+	// Guarded by @synchronized(self).
+	NSMutableArray* _hotKeys;
+	NSMutableSet<NSNumber*>* _grabbedHotKeys;
+	NSMutableSet<NSNumber*>* _pressedHotKeys;
+	BOOL _detectableAutoRepeat;
+
 @private
-	// The main monitor in root coordinates (device pixels) and the backing scale,
-	// cached for -mouseLocation. Guarded by @synchronized(self); the cache is dropped
-	// when XRandR reports a reconfiguration, like _screens. Declared here, not in
-	// @implementation: the i386 slice uses the fragile ABI, which forbids that.
+	// The main monitor in root coordinates, cached for -mouseLocation. Guarded by
+	// @synchronized(self); the cache is dropped when XRandR reports a
+	// reconfiguration, like _screens.
 	X11Frame _primaryRoot;
 	BOOL _primaryRootValid;
+	// The main monitor's backing scale, cached with it. Declared here, not in
+	// @implementation: the i386 slice uses the fragile ABI, which forbids that.
 	double _backingScale;
 }
 
@@ -64,6 +75,7 @@
 -(CGSWindow*) newWindow:(CGSRegionRef)region;
 
 -(void) processPendingEvents;
+-(NSArray<NSDictionary*>*) copyWindowDescriptions;
 
 +(BOOL) isAvailable;
 

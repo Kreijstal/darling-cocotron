@@ -18,18 +18,22 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSUserInterfaceValidation.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 
 @class NSDocument, NSOpenPanel, NSWindow, NSMenuItem;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x18, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
 @interface NSDocumentController : NSObject <NSCoding> {
     NSMutableArray *_documents;
     NSArray *_fileTypes;
     NSTimeInterval _autosavingDelay;
+    NS_LEGACY_IVAR_PAD(_NSDocumentControllerReserved1, 4)
 }
 
 + sharedDocumentController;
-+ (BOOL) shouldCreateUI;
 + (BOOL) shouldCreateUI;
 
 - init;
@@ -50,7 +54,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) addDocument: (NSDocument *) document;
 - (void) removeDocument: (NSDocument *) document;
 - documentForURL: (NSURL *) url;
-- (id) documentForFileName: (NSString *) fileName;
 - (id) documentForFileName: (NSString *) fileName;
 
 - currentDocument;
@@ -110,7 +113,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (NSArray *) recentDocumentURLs;
 - (NSArray *) _recentDocumentURLsForKey: (NSString *) key;
-- (NSArray *) _recentDocumentURLsForKey: (NSString *) key;
 - (unsigned) maximumRecentDocumentCount;
 - (void) noteNewRecentDocumentURL: (NSURL *) url;
 - (void) _noteNewRecentDocumentURL: (NSURL *) url forKey: (NSString *) key;
@@ -123,7 +125,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (BOOL) validateMenuItem: (NSMenuItem *) item;
 - (BOOL) validateUserInterfaceItem: (id<NSValidatedUserInterfaceItem>) item;
-- (BOOL) shouldCreateUI;
 - (BOOL) shouldCreateUI;
 
 // deprecated

@@ -39,6 +39,9 @@ id _NSTabViewFloatingCell = nil;
 @implementation NSTabView
 
 - initWithCoder: (NSCoder *) coder {
+    // The class version is asked before the superclass part is decoded.
+    NSInteger version = [coder allowsKeyedCoding] ? 0 : [coder versionForClassName: @"NSTabView"];
+
     [super initWithCoder: coder];
 
     if ([coder allowsKeyedCoding]) {
@@ -91,35 +94,34 @@ id _NSTabViewFloatingCell = nil;
             break;
         }
     } else {
-        NSInteger version = [coder versionForClassName: @"NSTabView"];
-        id items = nil;
-        [coder decodeValueOfObjCType: @encode(id) at: &items];
-        _items = [items mutableCopy];
-        if (!_items)
-            _items = [[NSMutableArray alloc] init];
-        [coder decodeValueOfObjCType: @encode(id) at: &_font];
-        [_font retain];
+        // Layout per class version as recorded from Mac archives: the tab view items, the
+        // selected item and the font, the tab type, the allows-truncated-labels byte
+        // and, from version 2, the draws-background byte, then the delegate. Before
+        // version 2 the background is always drawn.
+        id items = nil, selectedItem = nil;
         int type = 0;
-        [coder decodeValueOfObjCType: @encode(int) at: &type];
-        _type = (NSTabViewType)type;
-        [coder decodeValueOfObjCType: @encode(BOOL) at: &_drawsBackground];
-        [coder decodeValueOfObjCType: @encode(BOOL) at: &_allowsTruncatedLabels];
+        char allowsTruncatedLabels = 0, drawsBackground = 1;
+
+        if (version >= 2) {
+            [coder decodeValuesOfObjCTypes: "@@@icc", &items, &selectedItem, &_font, &type, &allowsTruncatedLabels,
+                                            &drawsBackground];
+        } else {
+            [coder decodeValuesOfObjCTypes: "@@@ic", &items, &selectedItem, &_font, &type, &allowsTruncatedLabels];
+        }
         _delegate = [coder decodeObject];
 
-        NSUInteger selected_item = NSNotFound;
-        if (version < 3) {
-            int tmp = 0;
-            [coder decodeValueOfObjCType: @encode(int) at: &tmp];
-            selected_item = tmp;
-        } else {
-            [coder decodeValueOfObjCType: @encode(NSUInteger) at: &selected_item];
-        }
-
-        if (selected_item != NSNotFound && selected_item < [_items count]) {
-            [self selectTabViewItemAtIndex: selected_item];
-        } else if ([_items count] > 0) {
-            [self selectTabViewItemAtIndex: 0];
-        }
+        _items = [items isKindOfClass: [NSArray class]] ? [items mutableCopy] : [[NSMutableArray alloc] init];
+        [items release];
+        // The selected item's view is among the decoded subviews already.
+        _selectedItem = [_items containsObject: selectedItem] ? selectedItem : nil;
+        [selectedItem release];
+        for (NSTabViewItem *item in _items)
+            [item setTabState: item == _selectedItem ? NSSelectedTab : NSBackgroundTab];
+        _type = (NSTabViewType) type;
+        _allowsTruncatedLabels = allowsTruncatedLabels != 0;
+        _drawsBackground = drawsBackground != 0;
+        if (_font == nil)
+            _font = [[NSFont boldSystemFontOfSize: 13] retain];
     }
 
     return self;
@@ -405,13 +407,14 @@ id _NSTabViewFloatingCell = nil;
     return _selectedItem;
 }
 
-- (void) setFrame: (NSRect) frame {
+- (void) setFrameSize: (NSSize) size {
     /* A tab view will autoresize the selected view regardless of whether
        autoresizesSubviews is enabled We do it here because
        resizeSubviewsWithOldSize: won't be called if autoresizesSubviews is off.
+       -setFrame: goes through -setFrameSize: as well.
      */
 
-    [super setFrame: frame];
+    [super setFrameSize: size];
     if (_selectedItem != nil)
         [[_selectedItem view] setFrame: [self contentRect]];
 }

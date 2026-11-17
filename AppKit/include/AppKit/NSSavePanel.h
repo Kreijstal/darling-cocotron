@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSNibLoading.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSPanel.h>
 #import <Foundation/NSURL.h>
 
@@ -28,6 +29,9 @@ enum {
     NSFileHandlingPanelOKButton = NSOKButton,
 };
 
+// Legacy ObjC ABI (i386): instance size must stay 0xf8, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
 @interface NSSavePanel : NSPanel {
     NSString *_dialogTitle;
 
@@ -47,12 +51,15 @@ enum {
     NSView *_accessoryView;
 
     IBOutlet NSOutlineView *_outlineView;
-    NSArray *_allowedContentTypes;
     NSTextField *_nameField;
     BOOL _allowsOtherFileTypes;
     BOOL _runsAsSheet;
     NSUInteger _styleMaskBeforeSheet;
     id _sheetCompletionHandler;
+    BOOL _runsModeless;
+    id _modelessCompletionHandler;
+    NSArray *_allowedContentTypes;
+    NS_LEGACY_IVAR_PAD(_NSSavePanelReserved1, 44)
 }
 
 @property (copy) NSString *nameFieldStringValue;
@@ -72,47 +79,36 @@ enum {
 - (void) beginSheetModalForWindow: (NSWindow *) window
                 completionHandler: (void (^)(NSModalResponse result)) handler;
 
-- (NSInteger) runModalForDirectory: (NSString *) directory
-                              file: (NSString *) file;
-- (NSInteger) runModal;
+- (NSModalResponse) runModalForDirectory: (NSString *) directory
+                                    file: (NSString *) file;
+- (NSModalResponse) runModal;
 
-- (NSString *) directory;
-- (BOOL) treatsFilePackagesAsDirectories;
-- (NSView *) accessoryView;
+@property(nonatomic, copy) NSString *directory;
+@property(nonatomic) BOOL treatsFilePackagesAsDirectories;
+@property(nonatomic, retain) NSView *accessoryView;
 
 - (void) setTitle: (NSString *) title;
 
-- (void) setDirectory: (NSString *) directory;
 
 - (void) setRequiredFileType: (NSString *) type;
-- (void) setTreatsFilePackagesAsDirectories: (BOOL) flag;
 
-- (void) setDirectoryURL: (NSURL *) url;
-- (NSURL *) directoryURL;
+@property(nonatomic, copy) NSURL *directoryURL;
 
-- (NSArray *) allowedFileTypes;
+@property(nonatomic, copy) NSArray *allowedFileTypes;
 
-- (void) setAccessoryView: (NSView *) view;
 - (void) setCanCreateDirectories: (BOOL) value;
-- (void) setAllowedFileTypes: (NSArray *) value;
 // UTType objects (macOS 11). Setting them also sets allowedFileTypes to their
 // preferred filename extensions, or nil (any file) when none has one.
-- (NSArray *) allowedContentTypes;
-- (void) setAllowedContentTypes: (NSArray *) types;
+@property(nonatomic, copy) NSArray *allowedContentTypes;
 - (void) setAllowsOtherFileTypes: (BOOL) value;
 
-- (void) setMessage: (NSString *) message;
-- (NSString *) message;
+@property(nonatomic, copy) NSString *message;
 
-- (void) setPrompt: (NSString *) message;
-- (NSString *) prompt;
+@property(nonatomic, copy) NSString *prompt;
 
-- (void) setNameFieldLabel: (NSString *) label;
-- (NSString *) nameFieldLabel;
-- (void) setShowsTagField: (BOOL) flag;
-- (BOOL) showsTagField;
-- (void) setTagNames: (NSArray *) names;
-- (NSArray *) tagNames;
+@property(nonatomic, copy) NSString *nameFieldLabel;
+@property(nonatomic) BOOL showsTagField;
+@property(nonatomic, copy) NSArray *tagNames;
 - (void) setExtensionHidden: (BOOL) flag;
 - (BOOL) isExtensionHidden;
 - (void) setCanSelectHiddenExtension: (BOOL) flag;

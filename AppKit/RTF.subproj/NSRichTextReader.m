@@ -22,6 +22,7 @@
 #import <AppKit/NSColor.h>
 #import <AppKit/NSFont.h>
 #import <AppKit/NSFontManager.h>
+#import <AppKit/NSDisplay.h>
 #import <AppKit/NSRichTextReader.h>
 #import <AppKit/NSTextAttachment.h>
 
@@ -64,7 +65,7 @@ static const unsigned char kAttachmentPlaceholder = 0xAC;
     _bytes = [_data bytes];
     _length = [_data length];
     _range = NSMakeRange(0, 0);
-    _attachmentPlaceholder = NSNotFound;
+    _attachmentTail = NSMakeRange(NSNotFound, 0);
     _state = STATE_SCANNING;
     _fontTable = [NSMutableDictionary new];
     _colorTable = [NSMutableDictionary new];
@@ -106,6 +107,7 @@ static const unsigned char kAttachmentPlaceholder = 0xAC;
 - (void) dealloc {
     [_bufferIn release];
     [_imageDirectory release];
+    [_attachmentWrappers release];
     [_fontTable release];
     [_currentFontInfo release];
     [_colorTable release];
@@ -119,6 +121,18 @@ static const unsigned char kAttachmentPlaceholder = 0xAC;
 
 + (NSAttributedString *) attributedStringWithData: (NSData *) data {
     NSRichTextReader *reader = [[self alloc] initWithData: data];
+    NSAttributedString *result =
+            [[[reader parseAttributedString] retain] autorelease];
+
+    [reader release];
+
+    return result;
+}
+
++ (NSAttributedString *) attributedStringWithData: (NSData *) data
+                           attachmentFileWrappers: (NSDictionary *) wrappers {
+    NSRichTextReader *reader = [[self alloc] initWithData: data];
+    reader->_attachmentWrappers = [wrappers copy];
     NSAttributedString *result =
             [[[reader parseAttributedString] retain] autorelease];
 
@@ -274,6 +288,17 @@ static inline void flushPreviousString(NSRichTextReader *self) {
     }
 }
 
+// Whether a font of this name is installed: a face of an installed family, or
+// a name the font system maps to an installed family (such as an alias for a
+// metric-compatible font).
+- (BOOL) _installedFontNamed: (NSString *) name {
+    if ([[[NSFontManager sharedFontManager] availableFonts]
+                containsObject: name])
+        return YES;
+    return [[NSDisplay currentDisplay] fontFamilyNameForGenericFamily: name] !=
+           nil;
+}
+
 - (void) flushFontName {
     _range.length--;
     if ([_bufferIn length] > 0) {
@@ -348,6 +373,9 @@ static inline void flushPreviousString(NSRichTextReader *self) {
 
 // An RTFD attachment is a file in the .rtfd bundle.
 - (NSTextAttachment *) _attachmentWithFileName: (NSString *) name {
+    NSFileWrapper *held = [_attachmentWrappers objectForKey: name];
+    if (held != nil)
+        return [[[NSTextAttachment alloc] initWithFileWrapper: held] autorelease];
     if (_imageDirectory == nil)
         return nil;
     NSURL *url = [NSURL
@@ -471,13 +499,11 @@ static inline void flushPreviousString(NSRichTextReader *self) {
 
             _currentCharset = [[info objectForKey: @"charset"] integerValue];
 
-            // Turns out fontWithName:size: is still returning fonts for font
-            // names it doesn't have For example "Helvetica". This check ensures
-            // that we only ask for fonts we have... Of course this is a general
-            // problem... so the full fix is elsewhere...
-            NSArray *availableFonts =
-                    [[NSFontManager sharedFontManager] availableFonts];
-            if ([availableFonts containsObject: fontname]) {
+            // fontWithName:size: answers for names that no installed font
+            // has (the font system substitutes one), so only a name of an
+            // installed face, or one the font system has an alias for, is
+            // used; the family of the table entry picks a default otherwise.
+            if ([fontname length] > 0 && [self _installedFontNamed: fontname]) {
                 font = [NSFont fontWithName: fontname size: 12];
             }
 
@@ -506,11 +532,18 @@ static inline void flushPreviousString(NSRichTextReader *self) {
                 NSFont *currentFont =
                         [_currentAttributes objectForKey: NSFontAttributeName];
                 if (currentFont) {
-                    // We'll try to keep the traits, size of the current font
-                    // and just change the family name
-                    font = [[NSFontManager sharedFontManager]
-                            convertFont: currentFont
-                               toFamily: [font familyName]];
+                    // The font keeps its own name, and takes the size and the
+                    // bold and italic switches that are in effect.
+                    NSFontManager *manager = [NSFontManager sharedFontManager];
+                    NSFontTraitMask mask = NSBoldFontMask | NSItalicFontMask;
+                    NSFontTraitMask missing =
+                            [manager traitsOfFont: currentFont] & mask &
+                            ~[manager traitsOfFont: font];
+
+                    font = [NSFont fontWithName: [font fontName]
+                                           size: [currentFont pointSize]];
+                    if (missing != 0)
+                        font = [manager convertFont: font toHaveTrait: missing];
                 }
                 [_currentAttributes setObject: font
                                        forKey: NSFontAttributeName];
@@ -574,14 +607,24 @@ static inline void flushPreviousString(NSRichTextReader *self) {
                 [_currentAttributes
                         removeObjectForKey: NSAttachmentAttributeName];
             }
-            // Apple's writer follows the group with a placeholder:
-            // {{\NeXTGraphic name ...}<placeholder>}
+            // QUIRK: the RTFD writer on macOS follows the attachment group with
+            // one raw 0xAC byte inside the enclosing group:
+            // {{\NeXTGraphic name ...}<0xAC>}. The reader ignores whatever
+            // sits between the attachment group's end and the enclosing
+            // group's end (a missing byte, another letter, a repeated byte or
+            // the \'ac escape all read back as the same text). Not documented.
+            // Evidence: black-box observation on macOS 27 of RTFD files written
+            // by NSAttributedString and variants of them (tier 2, MC13.9 and
+            // MC13.10 in the project's evidence notes).
+            // Test: test_quirk_rtfd_attachment_placeholder_ignored in
+            // tests/appkit-rtfd-attachments.m
             NSUInteger close = NSMaxRange(_range);
             while (close < _length && _bytes[close] != '}')
                 close++;
-            if (close + 1 < _length &&
-                _bytes[close + 1] == kAttachmentPlaceholder)
-                _attachmentPlaceholder = close + 1;
+            NSUInteger outer = close + 1;
+            while (outer < _length && _bytes[outer] != '}' && _bytes[outer] != '{')
+                outer++;
+            _attachmentTail = NSMakeRange(close + 1, outer - (close + 1));
         }
         _range.length++;
         save = _range;
@@ -643,7 +686,7 @@ static inline void flushPreviousString(NSRichTextReader *self) {
                 if (_bufferIn == nil) {
                     _bufferIn = [[NSMutableData alloc] init];
                 }
-                if (position != _attachmentPlaceholder)
+                if (!NSLocationInRange(position, _attachmentTail))
                     [_bufferIn appendBytes: _bytes + _range.location length: 1];
                 _range.location++;
                 _range.length = 0;
@@ -795,7 +838,8 @@ static inline void flushPreviousString(NSRichTextReader *self) {
                 _state = STATE_SKIPLAST;
             }
             if (_state == STATE_CHAR8_XX) {
-                if ([self currentDestination] == DESTINATION_STRING) {
+                if ([self currentDestination] == DESTINATION_STRING &&
+                    !NSLocationInRange(position, _attachmentTail)) {
                     if (_bufferIn == nil) {
                         _bufferIn = [[NSMutableData alloc] init];
                     }

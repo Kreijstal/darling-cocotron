@@ -18,16 +18,18 @@
 */
 
 #import <Foundation/NSObject.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSTouchBarItem.h>
 
 @protocol NSTouchBarDelegate;
 
-@interface NSTouchBar : NSObject
-{
+@class NSMutableDictionary;
+
+@interface NSTouchBar : NSObject {
     id<NSTouchBarDelegate> _delegate;
     NSArray *_defaultItemIdentifiers;
-    NSArray *_itemIdentifiers;
     NSMutableDictionary *_items;
+    NS_LEGACY_IVAR_PAD(_NSTouchBarReserved, 36)
 }
 
 @property(assign) id<NSTouchBarDelegate> delegate;

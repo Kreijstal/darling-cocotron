@@ -20,9 +20,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 // Reviewed for API completeness against 10.6.
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/AppKitExport.h>
 #import <AppKit/NSResponder.h>
 #import <AppKit/NSView.h>
+#import <AppKit/NSApplication.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <CoreGraphics/CGSubWindow.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
@@ -54,7 +56,7 @@ typedef NS_OPTIONS(NSUInteger, NSWindowStyleMask) {
     NSWindowStyleMaskMiniaturizable = 0x04,
     NSWindowStyleMaskResizable = 0x08,
     NSWindowStyleMaskTexturedBackground = 0x100,
-    NSWindiwStyleMaskUnifiedTitleAndToolbar = 0x1000,
+    NSWindowStyleMaskUnifiedTitleAndToolbar = 0x1000,
     NSWindowStyleMaskFullScreen = 0x4000,
     NSWindowStyleMaskFullSizeContentView = 0x8000,
     // NSPanel only:
@@ -62,6 +64,11 @@ typedef NS_OPTIONS(NSUInteger, NSWindowStyleMask) {
     NSWindowStyleMaskDocModalWindow = 0x40,
     NSWindowStyleMaskNonactivatingPanel = 0x80,
     NSWindowStyleMaskHUDWindow = 0x2000,
+};
+
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSWindiwStyleMaskUnifiedTitleAndToolbar = NSWindowStyleMaskUnifiedTitleAndToolbar,
 };
 
 typedef NS_ENUM(NSUInteger, NSBackingStoreType) {
@@ -89,38 +96,17 @@ typedef NS_ENUM(NSUInteger, NSWindowBackingLocation) {
     NSWindowBackingLocationMainMemory = 0x02
 };
 
-typedef NS_ENUM(NSInteger, NSWindowToolbarStyle) {
-    NSWindowToolbarStyleAutomatic,
-    NSWindowToolbarStyleExpanded,
-    NSWindowToolbarStylePreference,
-    NSWindowToolbarStyleUnified,
-    NSWindowToolbarStyleUnifiedCompact,
-};
+typedef NSInteger NSWindowLevel NS_TYPED_EXTENSIBLE_ENUM;
 
-typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
-    NSTitlebarSeparatorStyleAutomatic = 0,
-    NSTitlebarSeparatorStyleNone = 1,
-    NSTitlebarSeparatorStyleLine = 2,
-    NSTitlebarSeparatorStyleShadow = 3
-};
-
-typedef NS_ENUM(NSInteger, NSWindowTitleVisibility) {
-    NSWindowTitleVisible = 0,
-    NSWindowTitleHidden = 1
-};
-
-enum {
-    NSNormalWindowLevel = kCGNormalWindowLevel,
-    NSFloatingWindowLevel = kCGFloatingWindowLevel,
-    NSSubmenuWindowLevel = kCGTornOffMenuWindowLevel,
-    NSTornOffMenuWindowLevel = kCGTornOffMenuWindowLevel,
-    NSMainMenuWindowLevel = kCGMainMenuWindowLevel,
-    NSStatusWindowLevel = kCGStatusWindowLevel,
-    NSModalPanelWindowLevel = kCGModalPanelWindowLevel,
-    NSPopUpMenuWindowLevel = kCGPopUpMenuWindowLevel,
-    NSScreenSaverWindowLevel = kCGScreenSaverWindowLevel,
-};
-typedef NSInteger NSWindowLevel;
+static const NSWindowLevel NSNormalWindowLevel = kCGNormalWindowLevel;
+static const NSWindowLevel NSFloatingWindowLevel = kCGFloatingWindowLevel;
+static const NSWindowLevel NSSubmenuWindowLevel = kCGTornOffMenuWindowLevel;
+static const NSWindowLevel NSTornOffMenuWindowLevel = kCGTornOffMenuWindowLevel;
+static const NSWindowLevel NSMainMenuWindowLevel = kCGMainMenuWindowLevel;
+static const NSWindowLevel NSStatusWindowLevel = kCGStatusWindowLevel;
+static const NSWindowLevel NSModalPanelWindowLevel = kCGModalPanelWindowLevel;
+static const NSWindowLevel NSPopUpMenuWindowLevel = kCGPopUpMenuWindowLevel;
+static const NSWindowLevel NSScreenSaverWindowLevel = kCGScreenSaverWindowLevel;
 
 typedef NS_OPTIONS(NSUInteger, NSWindowCollectionBehavior) {
     NSWindowCollectionBehaviorDefault = 0x00,
@@ -130,7 +116,12 @@ typedef NS_OPTIONS(NSUInteger, NSWindowCollectionBehavior) {
     NSWindowCollectionBehaviorTransient = 0x08,
     NSWindowCollectionBehaviorStationary = 0x10,
     NSWindowCollectionBehaviorParticipatesInCycle = 0x20,
-    NSWindowCollectionBehaviorIgnoresCycle = 0x40
+    NSWindowCollectionBehaviorIgnoresCycle = 0x40,
+    NSWindowCollectionBehaviorFullScreenPrimary = 0x80,
+    NSWindowCollectionBehaviorFullScreenAuxiliary = 0x100,
+    NSWindowCollectionBehaviorFullScreenNone = 0x200,
+    NSWindowCollectionBehaviorFullScreenAllowsTiling = 0x800,
+    NSWindowCollectionBehaviorFullScreenDisallowsTiling = 0x1000
 };
 
 typedef NS_ENUM(NSUInteger, NSWindowSharingType) {
@@ -143,6 +134,35 @@ typedef NS_OPTIONS(NSUInteger, NSWindowOcclusionState) {
     NSWindowOcclusionStateVisible = 1 << 1
 };
 
+typedef NS_ENUM(NSInteger, NSWindowTabbingMode) {
+    NSWindowTabbingModeAutomatic = 0,
+    NSWindowTabbingModePreferred,
+    NSWindowTabbingModeDisallowed,
+};
+
+typedef NS_ENUM(NSInteger, NSWindowTitleVisibility) {
+    NSWindowTitleVisible = 0,
+    NSWindowTitleHidden = 1,
+};
+
+typedef NS_ENUM(NSInteger, NSTitlebarSeparatorStyle) {
+    NSTitlebarSeparatorStyleAutomatic = 0,
+    NSTitlebarSeparatorStyleNone = 1,
+    NSTitlebarSeparatorStyleLine = 2,
+    NSTitlebarSeparatorStyleShadow = 3,
+};
+
+typedef NS_ENUM(NSInteger, NSWindowToolbarStyle) {
+    NSWindowToolbarStyleAutomatic = 0,
+    NSWindowToolbarStyleExpanded = 1,
+    NSWindowToolbarStylePreference = 2,
+    NSWindowToolbarStyleUnified = 3,
+    NSWindowToolbarStyleUnifiedCompact = 4,
+};
+
+typedef NSString *NSWindowTabbingIdentifier NS_SWIFT_BRIDGED_TYPEDEF;
+typedef NSString *NSWindowFrameAutosaveName NS_SWIFT_BRIDGED_TYPEDEF;
+
 typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
     NSWindowAnimationBehaviorDefault = 0,
     NSWindowAnimationBehaviorNone = 2,
@@ -151,7 +171,11 @@ typedef NS_ENUM(NSInteger, NSWindowAnimationBehavior) {
     NSWindowAnimationBehaviorAlertPanel = 5
 };
 
-typedef int NSSelectionDirection;
+typedef NS_ENUM(int, NSSelectionDirection) {
+    NSDirectSelection = 0,
+    NSSelectingNext = 1,
+    NSSelectingPrevious = 2,
+};
 
 APPKIT_EXPORT const NSNotificationName NSWindowDidBecomeKeyNotification
         NS_SWIFT_NAME(NSWindow.didBecomeKeyNotification);
@@ -190,7 +214,7 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidChangeScreenNotification
         NS_SWIFT_NAME(NSWindow.didChangeScreenNotification);
 APPKIT_EXPORT const NSNotificationName NSWindowDidChangeScreenProfileNotification
         NS_SWIFT_NAME(NSWindow.didChangeScreenProfileNotification);
-APPKIT_EXPORT const NSString *NSBackingPropertyOldScaleFactorKey;
+APPKIT_EXPORT NSString *const NSBackingPropertyOldScaleFactorKey;
 APPKIT_EXPORT const NSNotificationName NSWindowDidEndSheetNotification
         NS_SWIFT_NAME(NSWindow.didEndSheetNotification);
 APPKIT_EXPORT const NSNotificationName NSWindowDidEnterFullScreenNotification
@@ -205,128 +229,164 @@ APPKIT_EXPORT const NSNotificationName NSWindowWillExitFullScreenNotification
         NS_SWIFT_NAME(NSWindow.willExitFullScreenNotification);
 APPKIT_EXPORT const NSNotificationName NSWindowDidExposeNotification
         NS_SWIFT_NAME(NSWindow.didExposeNotification);
-APPKIT_EXPORT const NSNotificationName NSWindowWillEnterVersionBrowserNotification;
-APPKIT_EXPORT const NSNotificationName NSWindowDidEnterVersionBrowserNotification;
-APPKIT_EXPORT const NSNotificationName NSWindowWillExitVersionBrowserNotification;
-APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification;
+APPKIT_EXPORT const NSNotificationName NSWindowWillEnterVersionBrowserNotification
+        NS_SWIFT_NAME(NSWindow.willEnterVersionBrowserNotification);
+APPKIT_EXPORT const NSNotificationName NSWindowDidEnterVersionBrowserNotification
+        NS_SWIFT_NAME(NSWindow.didEnterVersionBrowserNotification);
+APPKIT_EXPORT const NSNotificationName NSWindowWillExitVersionBrowserNotification
+        NS_SWIFT_NAME(NSWindow.willExitVersionBrowserNotification);
+APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
+        NS_SWIFT_NAME(NSWindow.didExitVersionBrowserNotification);
 
-@interface NSWindow : NSResponder <NSUserInterfaceItemIdentification, NSAccessibility, NSAppearanceCustomization> {
+typedef NS_ENUM(NSInteger, NSWindowUserTabbingPreference) {
+    NSWindowUserTabbingPreferenceManual,
+    NSWindowUserTabbingPreferenceAlways,
+    NSWindowUserTabbingPreferenceInFullScreen,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x84, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
+@interface NSWindow : NSResponder <NSAnimatablePropertyContainer, NSUserInterfaceItemIdentification, NSAccessibility, NSAppearanceCustomization> {
     NSRect _frame;
-    NSWindowStyleMask _styleMask;
-    NSBackingStoreType _backingType;
-    NSWindowLevel _level;
-
-    NSSize _minSize;
-    NSSize _maxSize;
-    NSSize _contentMinSize;
-    NSSize _contentMaxSize;
-
-    NSWindow *_parentWindow;
-    NSMutableArray<NSWindow *> *_childWindows;
-
-    NSString *_representedFilename;
-    NSURL *_representedURL;
-    NSString *_title;
-    NSString *_miniwindowTitle;
-    NSImage *_miniwindowImage;
-
-    NSThemeFrame *_backgroundView;
-    NSMenu *_menu;
-    NSView *_menuView;
     NSView *_contentView;
-    NSViewController *_contentViewController;
-    NSColor *_backgroundColor;
-
     id<NSWindowDelegate> _delegate;
     NSResponder *_firstResponder;
-
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved1, 8)
+    CGWindow *_platformWindow;  // a slot that Apple's layout leaves unused
     NSTextView *_sharedFieldEditor;
-    NSTextView *_currentFieldEditor;
-    NSArray *_draggedTypes;
-@public
-    NSArray *_dragTypes;
-@protected
-
-    NSMutableArray *_trackingAreas;
-
-    NSSheetContext *_sheetContext;
-
-    NSSize _resizeInfo;
-
-    int _cursorRectsDisabled;
-    int _flushDisabled;
-
-    BOOL _isOpaque;
-    BOOL _isVisible;
-    BOOL _isDocumentEdited;
-    BOOL _makeSureIsOnAScreen;
-
-    BOOL _acceptsMouseMovedEvents;
-    BOOL _excludedFromWindowsMenu;
-    BOOL _isDeferred;
-    BOOL _dynamicDepthLimit;
-    BOOL _canStoreColor;
-    BOOL _isOneShot;
-    BOOL _useOptimizedDrawing;
-    BOOL _releaseWhenClosed;
-    BOOL _isClosed;
-    BOOL _hidesOnDeactivate;
-    BOOL _hiddenForDeactivate;
-    BOOL _isActive;
-    BOOL _viewsNeedDisplay;
-    BOOL _flushNeeded;
-    BOOL _isFlushWindowDisabled;
-    BOOL _isAutodisplay;
-    BOOL _canHide;
-    BOOL _displaysWhenScreenProfileChanges;
-
-    CGFloat _alphaValue;
-    BOOL _hasShadow;
-    BOOL _showsResizeIndicator;
-    BOOL _showsToolbarButton;
-    BOOL _ignoresMouseEvents;
-    BOOL _isMovableByWindowBackground;
-    NSWindowAnimationBehavior _animationBehavior;
-    BOOL _allowsToolTipsWhenApplicationIsInactive;
-    BOOL _defaultButtonCellKeyEquivalentDisabled;
-    BOOL _autorecalculatesKeyViewLoop;
-    BOOL _hasBeenOnScreen;
-
-    BOOL _isInLiveResize;
-    BOOL _preservesContentDuringLiveResize;
-    NSSize _resizeIncrements;
-    NSSize _contentResizeIncrements;
-
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved2, 8)
+    NSWindowLevel _level;
+    NSColor *_backgroundColor;
+    NSThemeFrame *_backgroundView;
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved3, 12)
+    NSImage *_miniwindowImage;
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved4, 8)
+    NSURL *_representedURL;
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved5, 4)
     NSString *_autosaveFrameName;
-
-    CGWindow *_platformWindow;
-    NSMutableDictionary *_threadToContext;
-
-    NSUndoManager *_undoManager;
-    NSView *_initialFirstResponder;
-    NSButtonCell *_defaultButtonCell;
-
-    NSWindowController *_windowController;
-    NSMutableArray *_drawers;
-    BOOL _bottomCornerRounded;
     NSToolbar *_toolbar;
-    NSWindowAnimationContext *_animationContext;
+    NS_LEGACY_IVAR_PAD(_NSWindowReserved6, 8)
+    NSButtonCell *_defaultButtonCell;
+    NSView *_initialFirstResponder;
+    NS_EXTRA_IVARS_BEGIN(NSWindow)
+        NSWindowStyleMask _styleMask;
+        NSBackingStoreType _backingType;
 
-    NSRect _savedFrame;
-    NSPoint _mouseDownLocationInWindow;
+        NSSize _minSize;
+        NSSize _maxSize;
+        NSSize _contentMinSize;
+        NSSize _contentMaxSize;
 
-    NSAppearance *_appearance;
-    NSUserInterfaceItemIdentifier _identifier;
+        NSWindow *_parentWindow;
+        NSMutableArray<NSWindow *> *_childWindows;
 
-    BOOL _isAccessible;
-    Class _restorationClass;
-    BOOL _restorable;
+        NSDictionary *_animations;
 
-    NSMutableArray *_titlebarAccessoryViewControllers;
-    NSWindowToolbarStyle _toolbarStyle;
-    NSTitlebarSeparatorStyle _titlebarSeparatorStyle;
-    BOOL _titlebarAppearsTransparent;
-    NSWindowTitleVisibility _titleVisibility;
+        NSString *_representedFilename;
+        NSString *_title;
+        NSString *_miniwindowTitle;
+
+        NSMenu *_menu;
+        NSView *_menuView;
+        NSViewController *_contentViewController;
+
+
+        NSTextView *_currentFieldEditor;
+        NSArray *_draggedTypes;
+
+        NSMutableArray *_trackingAreas;
+
+        NSSheetContext *_sheetContext;
+
+        NSSize _resizeInfo;
+
+        int _cursorRectsDisabled;
+        int _flushDisabled;
+
+        BOOL _isOpaque;
+        BOOL _isVisible;
+        BOOL _isDocumentEdited;
+        BOOL _makeSureIsOnAScreen;
+
+        BOOL _acceptsMouseMovedEvents;
+        BOOL _excludedFromWindowsMenu;
+        BOOL _isDeferred;
+        BOOL _dynamicDepthLimit;
+        BOOL _canStoreColor;
+        BOOL _isOneShot;
+        BOOL _useOptimizedDrawing;
+        BOOL _releaseWhenClosed;
+        BOOL _isClosed;
+        BOOL _hidesOnDeactivate;
+        BOOL _hiddenForDeactivate;
+        BOOL _isActive;
+        BOOL _viewsNeedDisplay;
+        BOOL _flushNeeded;
+        BOOL _isFlushWindowDisabled;
+        BOOL _isAutodisplay;
+        BOOL _canHide;
+        BOOL _displaysWhenScreenProfileChanges;
+
+        CGFloat _alphaValue;
+        BOOL _hasShadow;
+        BOOL _showsResizeIndicator;
+        BOOL _showsToolbarButton;
+        BOOL _ignoresMouseEvents;
+        BOOL _isMovableByWindowBackground;
+        NSWindowAnimationBehavior _animationBehavior;
+        BOOL _allowsToolTipsWhenApplicationIsInactive;
+        BOOL _defaultButtonCellKeyEquivalentDisabled;
+        BOOL _autorecalculatesKeyViewLoop;
+        BOOL _hasBeenOnScreen;
+
+        BOOL _isInLiveResize;
+        BOOL _preservesContentDuringLiveResize;
+        NSSize _resizeIncrements;
+        NSSize _contentResizeIncrements;
+
+
+        NSMutableDictionary *_threadToContext;
+
+        NSUndoManager *_undoManager;
+
+        NSWindowController *_windowController;
+        NSMutableArray *_drawers;
+        BOOL _bottomCornerRounded;
+        NSWindowAnimationContext *_animationContext;
+
+        NSRect _savedFrame;
+        NSMutableDictionary *_mouseDownViews;
+
+        NSAppearance *_appearance;
+        NSUserInterfaceItemIdentifier _identifier;
+
+        BOOL _isAccessible;
+        BOOL _restorable;
+        Class _restorationClass;
+        NSWindowTabbingMode _tabbingMode;
+        NSWindowCollectionBehavior _collectionBehavior;
+        NSWindowTabbingIdentifier _tabbingIdentifier;
+        NSString *_subtitle;
+        NSWindowTitleVisibility _titleVisibility;
+        NSSize _minFullScreenContentSize;
+        NSSize _maxFullScreenContentSize;
+        NSInteger _fullScreenTransition;
+        NSUInteger _fullScreenTransitionGeneration;
+        NSTitlebarSeparatorStyle _titlebarSeparatorStyle;
+        NSWindowToolbarStyle _toolbarStyle;
+        BOOL _titlebarAppearsTransparent;
+        BOOL _isMovable;
+        NSButton *_standardWindowButtons[3];
+
+        NSMutableArray *_titlebarAccessoryViewControllers;
+        // Inverted so that the zero-filled extras give the documented defaults.
+        BOOL _concurrentViewDrawingDisabled;
+        BOOL _allowsTerminationWhenModal;
+        BOOL _canBecomeVisibleWithoutLogin;
+        // Zeroing weak reference to the appearance source.
+        id _appearanceSource;
+    NS_EXTRA_IVARS_END(NSWindow)
 }
 
 @property(class) BOOL allowsAutomaticWindowTabbing;
@@ -364,82 +424,77 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
 
 - (NSWindow *) initWithWindowRef: (void *) carbonRef NS_RETURNS_NOT_RETAINED;
 
-- (NSGraphicsContext *) graphicsContext;
-- (NSDictionary *) deviceDescription;
+@property(nonatomic, readonly) NSGraphicsContext *graphicsContext;
+@property(nonatomic, readonly) NSDictionary *deviceDescription;
 - (void *) windowRef;
-- (BOOL) allowsConcurrentViewDrawing;
-- (void) setAllowsConcurrentViewDrawing: (BOOL) allows;
+@property(nonatomic) BOOL allowsConcurrentViewDrawing;
 
 @property (retain) NSView *contentView;
+@property (weak) id<NSWindowDelegate> delegate;
 // Setting it makes the controller's view the content view.
 @property (retain) NSViewController *contentViewController;
 // A titled, closable, miniaturizable, resizable window sized to the
 // controller's preferredContentSize, or else its view, and titled after it.
 + (instancetype) windowWithContentViewController: (NSViewController *) contentViewController;
-@property (weak) id<NSWindowDelegate> delegate;
 
-- (NSString *) title;
-- (NSString *) representedFilename;
-- (NSURL *) representedURL;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, copy) NSString *representedFilename;
+@property(nonatomic, copy) NSURL *representedURL;
 
-- (NSWindowLevel) level;
+@property(nonatomic) NSWindowLevel level;
 @property(readonly) NSRect frame;
 - (NSRect) frame;
-- (NSWindowStyleMask) styleMask;
-- (NSBackingStoreType) backingType;
-- (NSWindowBackingLocation) preferredBackingLocation;
-- (void) setPreferredBackingLocation: (NSWindowBackingLocation) location;
-- (NSWindowBackingLocation) backingLocation;
+@property(nonatomic) NSWindowStyleMask styleMask;
+@property(nonatomic) NSBackingStoreType backingType;
+@property(nonatomic) NSWindowBackingLocation preferredBackingLocation;
+@property(nonatomic, readonly) NSWindowBackingLocation backingLocation;
 
-- (NSSize) minSize;
-- (NSSize) maxSize;
+@property(nonatomic) NSSize minSize;
+@property(nonatomic) NSSize maxSize;
 @property NSSize contentMinSize;
 @property NSSize contentMaxSize;
 @property NSSize minFullScreenContentSize;
 @property NSSize maxFullScreenContentSize;
 
-- (BOOL) isOneShot;
+@property(nonatomic, getter=isOneShot) BOOL oneShot;
 @property (getter=isOpaque) BOOL opaque;
 - (BOOL) hasDynamicDepthLimit;
-- (BOOL) isReleasedWhenClosed;
-- (BOOL) preventsApplicationTerminationWhenModal;
-- (void) setPreventsApplicationTerminationWhenModal: (BOOL) prevents;
-- (BOOL) hidesOnDeactivate;
+@property(nonatomic, getter=isReleasedWhenClosed) BOOL releasedWhenClosed;
+@property(nonatomic) BOOL preventsApplicationTerminationWhenModal;
+@property(nonatomic) BOOL hidesOnDeactivate;
 - (BOOL) worksWhenModal;
-- (BOOL) isSheet;
-@property(readonly, copy) NSArray<NSWindow *> *sheets;
-- (NSArray *) sheets;
-- (BOOL) acceptsMouseMovedEvents;
-- (BOOL) isExcludedFromWindowsMenu;
-- (BOOL) isAutodisplay;
+@property(nonatomic, getter=isSheet, readonly) BOOL sheet;
+@property(nonatomic) BOOL acceptsMouseMovedEvents;
+@property(nonatomic, getter=isExcludedFromWindowsMenu) BOOL excludedFromWindowsMenu;
+@property(nonatomic, getter=isAutodisplay) BOOL autodisplay;
 - (BOOL) isFlushWindowDisabled;
-- (NSString *) frameAutosaveName;
-- (BOOL) hasShadow;
-- (BOOL) ignoresMouseEvents;
-- (NSSize) aspectRatio;
-- (NSSize) contentAspectRatio;
-- (BOOL) autorecalculatesKeyViewLoop;
-- (BOOL) canHide;
+- (NSWindowFrameAutosaveName) frameAutosaveName;
+@property(nonatomic) BOOL hasShadow;
+@property(nonatomic) BOOL ignoresMouseEvents;
+@property(nonatomic) NSSize aspectRatio;
+@property(nonatomic) NSSize contentAspectRatio;
+@property(nonatomic) BOOL autorecalculatesKeyViewLoop;
+@property(nonatomic) BOOL canHide;
 - (BOOL) canStoreColor;
-- (BOOL) showsResizeIndicator;
-- (BOOL) showsToolbarButton;
-- (BOOL) displaysWhenScreenProfileChanges;
-- (BOOL) isMovableByWindowBackground;
-- (BOOL) allowsToolTipsWhenApplicationIsInactive;
+@property(nonatomic) BOOL showsResizeIndicator;
+@property(nonatomic) BOOL showsToolbarButton;
+@property(nonatomic) BOOL displaysWhenScreenProfileChanges;
+@property(nonatomic, getter=isMovableByWindowBackground) BOOL movableByWindowBackground;
+@property(nonatomic) BOOL allowsToolTipsWhenApplicationIsInactive;
 
 - (BOOL) autorecalculatesContentBorderThicknessForEdge: (NSRectEdge) edge;
 - (CGFloat) contentBorderThicknessForEdge: (NSRectEdge) edge;
 
-- (NSImage *) miniwindowImage;
-- (NSString *) miniwindowTitle;
-- (NSDockTile *) dockTile;
-- (NSColor *) backgroundColor;
-- (CGFloat) alphaValue;
-- (NSWindowDepth) depthLimit;
-- (NSSize) resizeIncrements;
-- (NSSize) contentResizeIncrements;
-- (BOOL) preservesContentDuringLiveResize;
-- (NSToolbar *) toolbar;
+@property(nonatomic, retain) NSImage *miniwindowImage;
+@property(nonatomic, copy) NSString *miniwindowTitle;
+@property(nonatomic, readonly) NSDockTile *dockTile;
+@property(nonatomic, retain) NSColor *backgroundColor;
+@property(nonatomic) CGFloat alphaValue;
+@property(nonatomic) NSWindowDepth depthLimit;
+@property(nonatomic) NSSize resizeIncrements;
+@property(nonatomic) NSSize contentResizeIncrements;
+@property(nonatomic) BOOL preservesContentDuringLiveResize;
+@property(nonatomic, retain) NSToolbar *toolbar;
 - (NSView *) initialFirstResponder;
 
 - (void) setFrame: (NSRect) frame display: (BOOL) display;
@@ -447,78 +502,37 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
 - (void) setContentSize: (NSSize) contentSize;
 - (void) setFrameOrigin: (NSPoint) point;
 - (void) setFrameTopLeftPoint: (NSPoint) point;
-- (void) setStyleMask: (NSWindowStyleMask) styleMask;
-- (void) setMinSize: (NSSize) size;
-- (void) setMaxSize: (NSSize) size;
 - (void) setContentBorderThickness: (CGFloat) thickness
                            forEdge: (NSRectEdge) edge;
-- (void) setMovable: (BOOL) movable;
 
-- (void) setBackingType: (NSBackingStoreType) value;
 - (void) setDynamicDepthLimit: (BOOL) value;
-- (void) setOneShot: (BOOL) flag;
-- (void) setReleasedWhenClosed: (BOOL) flag;
-- (void) setHidesOnDeactivate: (BOOL) flag;
-- (void) setAcceptsMouseMovedEvents: (BOOL) flag;
-- (void) setExcludedFromWindowsMenu: (BOOL) value;
-- (void) setAutodisplay: (BOOL) value;
 - (void) setAutorecalculatesContentBorderThickness: (BOOL) automatic
                                            forEdge: (NSRectEdge) edge;
-- (void) setTitle: (NSString *) title;
 - (void) setTitleWithRepresentedFilename: (NSString *) filename;
 
 - (void) setInitialFirstResponder: (NSView *) view;
-- (void) setMiniwindowImage: (NSImage *) image;
-- (void) setMiniwindowTitle: (NSString *) title;
-- (void) setBackgroundColor: (NSColor *) color;
-- (void) setAlphaValue: (CGFloat) value;
-- (void) setToolbar: (NSToolbar *) toolbar;
-- (void) setDefaultButtonCell: (NSButtonCell *) cell;
-- (void) setWindowController: (NSWindowController *) value;
-- (void) setDocumentEdited: (BOOL) flag;
-- (void) setContentAspectRatio: (NSSize) value;
-- (void) setHasShadow: (BOOL) value;
-- (void) setIgnoresMouseEvents: (BOOL) value;
-- (void) setAspectRatio: (NSSize) value;
-- (void) setAutorecalculatesKeyViewLoop: (BOOL) value;
-- (void) setCanHide: (BOOL) value;
-- (void) setCanBecomeVisibleWithoutLogin: (BOOL) flag;
-- (void) setCollectionBehavior: (NSWindowCollectionBehavior) behavior;
-- (void) setLevel: (NSInteger) value;
-- (void) setParentWindow: (NSWindow *) value;
-- (void) setPreservesContentDuringLiveResize: (BOOL) value;
-- (void) setRepresentedFilename: (NSString *) value;
-- (void) setRepresentedURL: (NSURL *) newURL;
-- (void) setResizeIncrements: (NSSize) value;
-- (void) setShowsResizeIndicator: (BOOL) value;
-- (void) setShowsToolbarButton: (BOOL) value;
-- (void) setContentResizeIncrements: (NSSize) value;
-- (void) setDepthLimit: (NSWindowDepth) value;
-- (void) setDisplaysWhenScreenProfileChanges: (BOOL) value;
-- (void) setMovableByWindowBackground: (BOOL) value;
-- (void) setAllowsToolTipsWhenApplicationIsInactive: (BOOL) value;
 
 - (BOOL) setFrameUsingName: (NSString *) name;
 - (BOOL) setFrameUsingName: (NSString *) name force: (BOOL) force;
-- (BOOL) setFrameAutosaveName: (NSString *) name;
+- (BOOL) setFrameAutosaveName: (NSWindowFrameAutosaveName) name;
 - (void) saveFrameUsingName: (NSString *) name;
 - (void) setFrameFromString: (NSString *) value;
 - (NSString *) stringWithSavedFrame;
 
 - (NSEventModifierFlags) resizeFlags;
-- (CGFloat) userSpaceScaleFactor;
-- (NSResponder *) firstResponder;
+@property(nonatomic, readonly) CGFloat userSpaceScaleFactor;
+@property(nonatomic, readonly) NSResponder *firstResponder;
 
 - (NSButton *) standardWindowButton: (NSWindowButton) value;
-- (NSButtonCell *) defaultButtonCell;
-- (NSWindow *) attachedSheet;
-- (NSWindow *) sheetParent;
-- (NSArray<NSWindow *> *) tabbedWindows;
+@property(nonatomic, retain) NSButtonCell *defaultButtonCell;
+@property(nonatomic, readonly) NSWindow *attachedSheet;
+@property(nonatomic, readonly) NSWindow *sheetParent;
+@property(nonatomic, readonly) NSArray<NSWindow *> *tabbedWindows;
 
-- (id) windowController;
+@property(nonatomic, retain) id windowController;
 - (NSArray *) drawers;
 
-- (NSInteger) windowNumber;
+@property(nonatomic, readonly) NSInteger windowNumber;
 - (int) gState;
 
 @property(readonly, strong) NSScreen *screen;
@@ -526,41 +540,39 @@ APPKIT_EXPORT const NSNotificationName NSWindowDidExitVersionBrowserNotification
 
 - (NSScreen *) screen;
 - (NSScreen *) deepestScreen;
-- (NSColorSpace *) colorSpace;
-- (void) setColorSpace: (NSColorSpace *) newColorSpace;
-- (BOOL) isOnActiveSpace;
-- (NSWindowSharingType) sharingType;
-- (void) setSharingType: (NSWindowSharingType) type;
-- (NSWindowAnimationBehavior) animationBehavior;
-- (void) setAnimationBehavior: (NSWindowAnimationBehavior) behavior;
+@property(nonatomic, retain) NSColorSpace *colorSpace;
+@property(nonatomic, getter=isOnActiveSpace, readonly) BOOL onActiveSpace;
+@property(nonatomic) NSWindowSharingType sharingType;
+@property(nonatomic) NSWindowAnimationBehavior animationBehavior;
 
-- (BOOL) isDocumentEdited;
-- (BOOL) isZoomed;
+@property(nonatomic, getter=isDocumentEdited) BOOL documentEdited;
+@property(nonatomic, getter=isZoomed, readonly) BOOL zoomed;
 @property(readonly) NSWindowOcclusionState occlusionState;
 
-- (BOOL) isVisible;
+@property(nonatomic, getter=isVisible, readonly) BOOL visible;
 - (void) setIsVisible: (BOOL) flag;
-- (BOOL) isKeyWindow;
-- (BOOL) isMainWindow;
-- (BOOL) isMiniaturized;
-- (BOOL) isMovable;
-- (BOOL) inLiveResize;
-- (BOOL) canBecomeKeyWindow;
-- (BOOL) canBecomeMainWindow;
-- (BOOL) canBecomeVisibleWithoutLogin;
-- (NSWindowCollectionBehavior) collectionBehavior;
+@property(nonatomic, getter=isKeyWindow, readonly) BOOL keyWindow;
+@property(nonatomic, getter=isMainWindow, readonly) BOOL mainWindow;
+@property(nonatomic, getter=isMiniaturized, readonly) BOOL miniaturized;
+@property(nonatomic, getter=isMovable) BOOL movable;
+- (void) performWindowDragWithEvent: (NSEvent *) event;
+@property(nonatomic, readonly) BOOL inLiveResize;
+@property(nonatomic, readonly) BOOL canBecomeKeyWindow;
+@property(nonatomic, readonly) BOOL canBecomeMainWindow;
+@property(nonatomic) BOOL canBecomeVisibleWithoutLogin;
+@property(nonatomic) NSWindowCollectionBehavior collectionBehavior;
 
-/* Window tabbing. Declared because games set it while configuring a window, and an
- * unrecognised selector on NSWindow takes the process down at launch. Window tabbing is
- * not implemented, so the value is stored and ignored. */
-typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
-	NSWindowTabbingModeAutomatic = 0,
-	NSWindowTabbingModePreferred,
-	NSWindowTabbingModeDisallowed,
-};
+/* Window tabbing is not implemented, so the value is stored and ignored. */
+@property(nonatomic) NSWindowTabbingMode tabbingMode;
+@property(copy) NSWindowTabbingIdentifier tabbingIdentifier;
 
-- (NSWindowTabbingMode) tabbingMode;
-- (void) setTabbingMode: (NSWindowTabbingMode)tabbingMode;
+/* Title bar and toolbar appearance. The window manager draws the title bar,
+ * so these are stored for callers to read back. */
+@property(copy) NSString *subtitle;
+@property NSWindowTitleVisibility titleVisibility;
+@property BOOL titlebarAppearsTransparent;
+@property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
+@property NSWindowToolbarStyle toolbarStyle;
 
 - (NSPoint) convertBaseToScreen: (NSPoint) point;
 - (NSPoint) convertScreenToBase: (NSPoint) point;
@@ -568,13 +580,13 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 - (NSPoint) convertPointFromScreen: (NSPoint) point;
 - (NSRect) convertRectToScreen: (NSRect) rect;
 - (NSRect) convertRectFromScreen: (NSRect) rect;
+@property (readonly) CGFloat backingScaleFactor;
 - (NSRect) convertRectToBacking: (NSRect) rect;
 - (NSRect) convertRectFromBacking: (NSRect) rect;
 - (NSPoint) convertPointToBacking: (NSPoint) point;
 - (NSPoint) convertPointFromBacking: (NSPoint) point;
 - (NSSize) convertSizeToBacking: (NSSize) size;
 - (NSSize) convertSizeFromBacking: (NSSize) size;
-@property (readonly) CGFloat backingScaleFactor;
 
 - (void) beginSheet: (NSWindow *) sheet
         completionHandler: (void (^)(NSInteger returnCode)) handler;
@@ -585,10 +597,13 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 
 - (NSRect) frameRectForContentRect: (NSRect) rect;
 - (NSRect) contentRectForFrameRect: (NSRect) rect;
+@property(readonly) NSRect contentLayoutRect;
+- (NSRect) backingAlignedRect: (NSRect) rect options: (NSAlignmentOptions) options;
+- (NSRect) accessibilityFrame;
 - (NSRect) constrainFrameRect: (NSRect) rect toScreen: (NSScreen *) screen;
 
-- (NSWindow *) parentWindow;
-- (NSArray *) childWindows;
+@property(nonatomic, retain) NSWindow *parentWindow;
+@property(nonatomic, readonly) NSArray *childWindows;
 - (void) addChildWindow: (NSWindow *) child
                 ordered: (NSWindowOrderingMode) ordered;
 - (void) removeChildWindow: (NSWindow *) child;
@@ -620,8 +635,7 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 
 - (void) disableScreenUpdatesUntilFlush;
 - (void) useOptimizedDrawing: (BOOL) flag;
-- (BOOL) viewsNeedDisplay;
-- (void) setViewsNeedDisplay: (BOOL) flag;
+@property(nonatomic) BOOL viewsNeedDisplay;
 - (void) disableFlushWindow;
 - (void) enableFlushWindow;
 - (void) flushWindow;
@@ -653,14 +667,14 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 - (NSPoint) mouseLocationOutsideOfEventStream;
 
 - (NSEvent *) currentEvent;
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask;
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask;
 
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask
                           untilDate: (NSDate *) untilDate
                              inMode: (NSRunLoopMode) mode
                             dequeue: (BOOL) dequeue;
 
-- (void) discardEventsMatchingMask: (NSEventMask) mask
+- (void) discardEventsMatchingMask: (NSUInteger) mask
                        beforeEvent: (NSEvent *) event;
 
 - (void) sendEvent: (NSEvent *) event;
@@ -738,27 +752,113 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 - (void) windowDidDeminiaturize: (NSNotification *) note;
 - (void) windowWillMove: (NSNotification *) note;
 - (void) windowDidMove: (NSNotification *) note;
+- (void) windowDidChangeOcclusionState: (NSNotification *) note;
 - (NSSize) windowWillResize: (NSWindow *) sender toSize: (NSSize) size;
 - (void) windowDidResize: (NSNotification *) note;
 - (void) windowDidUpdate: (NSNotification *) note;
 - (BOOL) windowShouldClose: sender;
 - (void) windowWillClose: (NSNotification *) note;
 
+- (void) windowDidChangeBackingProperties: (NSNotification *) note;
+- (void) windowWillStartLiveResize: (NSNotification *) note;
+- (void) windowDidEndLiveResize: (NSNotification *) note;
+- (void) windowWillEnterFullScreen: (NSNotification *) note;
+- (void) windowDidEnterFullScreen: (NSNotification *) note;
+- (void) windowWillExitFullScreen: (NSNotification *) note;
+- (void) windowDidExitFullScreen: (NSNotification *) note;
+- (void) windowWillEnterVersionBrowser: (NSNotification *) note;
+- (void) windowDidEnterVersionBrowser: (NSNotification *) note;
+- (void) windowWillExitVersionBrowser: (NSNotification *) note;
+- (void) windowDidExitVersionBrowser: (NSNotification *) note;
+
+// Declared for source compatibility: this implementation has no title-bar
+// document icon, no custom full-screen animation and no version browser, so
+// these are not sent.
+- (BOOL) window: (NSWindow *) window shouldPopUpDocumentPathMenu: (NSMenu *) menu;
+- (BOOL) window: (NSWindow *) window
+        shouldDragDocumentWithEvent: (NSEvent *) event
+                               from: (NSPoint) dragImageLocation
+                     withPasteboard: (NSPasteboard *) pasteboard;
+- (NSSize) window: (NSWindow *) window willUseFullScreenContentSize: (NSSize) proposedSize;
+- (NSApplicationPresentationOptions) window: (NSWindow *) window
+        willUseFullScreenPresentationOptions: (NSApplicationPresentationOptions) proposedOptions;
+- (NSArray<NSWindow *> *) customWindowsToEnterFullScreenForWindow: (NSWindow *) window;
+- (NSArray<NSWindow *> *) customWindowsToEnterFullScreenForWindow: (NSWindow *) window
+                                                         onScreen: (NSScreen *) screen;
+- (void) window: (NSWindow *) window startCustomAnimationToEnterFullScreenWithDuration: (NSTimeInterval) duration;
+- (void) window: (NSWindow *) window
+        startCustomAnimationToEnterFullScreenOnScreen: (NSScreen *) screen
+                                         withDuration: (NSTimeInterval) duration;
+- (void) windowDidFailToEnterFullScreen: (NSWindow *) window;
+- (NSArray<NSWindow *> *) customWindowsToExitFullScreenForWindow: (NSWindow *) window;
+- (void) window: (NSWindow *) window startCustomAnimationToExitFullScreenWithDuration: (NSTimeInterval) duration;
+- (void) windowDidFailToExitFullScreen: (NSWindow *) window;
+- (NSSize) window: (NSWindow *) window
+        willResizeForVersionBrowserWithMaxPreferredSize: (NSSize) maxPreferredFrameSize
+                                         maxAllowedSize: (NSSize) maxAllowedFrameSize;
+- (void) window: (NSWindow *) window willEncodeRestorableState: (NSCoder *) state;
+- (void) window: (NSWindow *) window didDecodeRestorableState: (NSCoder *) state;
+
 - (CGSubWindow *) _createSubWindowWithFrame: (CGRect) frame;
 
 @end
 
 @interface NSWindow (NSWindowTitlebarAccessories)
-// Stored only: accessories aren't shown and the toolbar style doesn't change
-// drawing.
+// Stored only: accessories aren't shown.
 @property(readonly, copy) NSArray *titlebarAccessoryViewControllers;
 - (void) addTitlebarAccessoryViewController:
         (NSTitlebarAccessoryViewController *) controller;
-@property NSWindowToolbarStyle toolbarStyle;
-@property NSTitlebarSeparatorStyle titlebarSeparatorStyle;
-@property BOOL titlebarAppearsTransparent;
-@property NSWindowTitleVisibility titleVisibility;
-@property(getter=isMovableByWindowBackground) BOOL movableByWindowBackground;
+@end
+
+@interface NSWindow (NSWindowTitlebarAccessoryIndexing)
+// Index 0 is the first accessory. An index past the end raises.
+- (void) insertTitlebarAccessoryViewController:
+                 (NSTitlebarAccessoryViewController *) controller
+                                       atIndex: (NSInteger) index;
+- (void) removeTitlebarAccessoryViewControllerAtIndex: (NSInteger) index;
+@end
+
+@interface NSWindow (NSWindowAdditionalAPI)
+
+// The sheets attached to the window: at most one, as sheets aren't queued.
+@property(readonly, copy) NSArray<NSWindow *> *sheets;
+// A critical sheet is presented like any other sheet; there is no separate
+// queue for it.
+- (void) beginCriticalSheet: (NSWindow *) sheetWindow
+          completionHandler: (void (^_Nullable)(NSModalResponse returnCode)) handler;
+
+// The window's own appearance, else the source's, else the application's.
+// Resetting to nil makes the application the source.
+@property(weak, null_resettable) NSObject<NSAppearanceCustomization> *appearanceSource;
+
+// The windows here only have an sRGB backing store.
+- (BOOL) canRepresentDisplayGamut: (NSDisplayGamut) displayGamut;
+
+// From the AppleWindowTabbingMode default (always, manual, else in full screen).
+@property(class, readonly) NSWindowUserTabbingPreference userTabbingPreference;
+
+// The application's layout direction.
+@property(readonly) NSUserInterfaceLayoutDirection windowTitlebarLayoutDirection;
+
+// The frame cascading starts from: the window's frame.
+@property(readonly) NSRect cascadingReferenceFrame;
+
+// Window tabbing is not implemented, so every window is the only tab of its
+// own tab group and these have no effect.
+- (void) selectNextTab: (nullable id) sender;
+- (void) selectPreviousTab: (nullable id) sender;
+- (void) moveTabToNewWindow: (nullable id) sender;
+- (void) toggleTabBar: (nullable id) sender;
+- (void) toggleTabOverview: (nullable id) sender;
+
+// Takes events matching the mask from the event queue in the given mode and
+// passes them to the handler until it sets *stop. When no event arrives for
+// `timeout` seconds the handler is called with a nil event.
+- (void) trackEventsMatchingMask: (NSEventMask) mask
+                         timeout: (NSTimeInterval) timeout
+                            mode: (NSRunLoopMode) mode
+                         handler: (void (^)(NSEvent *_Nullable event, BOOL *stop)) trackingHandler;
+
 @end
 
 @interface NSWindow (Darling)
@@ -767,8 +867,7 @@ typedef NS_ENUM(NSUInteger, NSWindowTabbingMode) {
 
 // Private AppKit compatibility used by older window subclasses.
 @interface NSWindow (NSPrivateCornerStyle)
-- (BOOL) bottomCornerRounded;
-- (void) setBottomCornerRounded: (BOOL) rounded;
+@property(nonatomic) BOOL bottomCornerRounded;
 @end
 
 // private
@@ -776,8 +875,10 @@ APPKIT_EXPORT const NSNotificationName NSWindowWillAnimateNotification;
 APPKIT_EXPORT const NSNotificationName NSWindowAnimatingNotification;
 APPKIT_EXPORT const NSNotificationName NSWindowDidAnimateNotification;
 
+APPKIT_EXPORT NSNotificationName const NSWindowDidChangeBackingPropertiesNotification;
+APPKIT_EXPORT NSString * const NSBackingPropertyOldColorSpaceKey;
+
 APPKIT_EXPORT void NSCountWindows(NSInteger *count);
 APPKIT_EXPORT void NSWindowList(NSInteger size, NSInteger list[]);
 APPKIT_EXPORT void NSCountWindowsForContext(NSInteger context, NSInteger *count);
 APPKIT_EXPORT void NSWindowListForContext(NSInteger context, NSInteger size, NSInteger list[]);
-

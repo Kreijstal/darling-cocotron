@@ -34,6 +34,28 @@ static NSString *const NSPopUpButtonBindingObservationContext =
     return [NSPopUpButtonCell class];
 }
 
+- initWithCoder: (NSCoder *) coder {
+    self = [super initWithCoder: coder];
+
+    if (![coder allowsKeyedCoding]) {
+        NSInteger version = [coder versionForClassName: @"NSPopUpButton"];
+
+        // Versions up to 24 archive a selector and an object, and 24 one byte more;
+        // from 25 on nothing follows the control. Their meaning is unknown (nothing
+        // observable changes with them).
+        if (version <= 24) {
+            SEL unknownSelector;
+            [coder decodeValuesOfObjCTypes: ":", &unknownSelector];
+            [coder decodeObject];
+        }
+        if (version == 24) {
+            char unknownByte;
+            [coder decodeValuesOfObjCTypes: "c", &unknownByte];
+        }
+    }
+    return self;
+}
+
 - initWithFrame: (NSRect) frame pullsDown: (BOOL) pullsDown {
     [super initWithFrame: frame];
     [self setPullsDown: pullsDown];
@@ -46,6 +68,7 @@ static NSString *const NSPopUpButtonBindingObservationContext =
     NS_HANDLER
     NS_ENDHANDLER
 
+            NS_EXTRA_FREE(NSPopUpButton, self);
             [super dealloc];
 }
 
@@ -141,6 +164,7 @@ static NSString *const NSPopUpButtonBindingObservationContext =
 
 - (void) addItemWithTitle: (NSString *) title {
     [_cell addItemWithTitle: title];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -151,6 +175,7 @@ static NSString *const NSPopUpButtonBindingObservationContext =
 
 - (void) removeAllItems {
     [_cell removeAllItems];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -175,12 +200,22 @@ static NSString *const NSPopUpButtonBindingObservationContext =
 }
 
 - (void) selectItemAtIndex: (NSInteger) index {
+    NSInteger previous = [self indexOfSelectedItem];
+
     [_cell selectItemAtIndex: index];
+    // The title that is shown changes with the selection, and so does the intrinsic size; selecting
+    // what is selected already changes nothing
+    if ([self indexOfSelectedItem] != previous)
+        [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) selectItemWithTitle: (NSString *) title {
+    NSInteger previous = [self indexOfSelectedItem];
+
     [_cell selectItemWithTitle: title];
+    if ([self indexOfSelectedItem] != previous)
+        [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -201,13 +236,14 @@ static NSString *const NSPopUpButtonBindingObservationContext =
     if ([self pullsDown]) {
         // The title gets stored in the zero index item in the menu - it made
         // sense to Apple at some point...
-        // A title may be assigned before the caller has populated the menu.
-        // Create its title item before indexing the otherwise empty menu.
-        if ([_cell numberOfItems] == 0) {
-            [_cell addItemWithTitle: (title != nil) ? title : @""];
-        } else {
-            [[_cell itemAtIndex: 0] setTitle: title];
-        }
+        // QUIRK: assigning a title to a pull-down button whose menu has no
+        // items neither raises nor creates the title item: the item count
+        // stays 0 and the title stays empty. Not documented. Evidence:
+        // black-box observation on macOS 27 (tier 2).
+        // Test: tests/empty-pulldown-runtime.m
+        if ([_cell numberOfItems] == 0)
+            return;
+        [[_cell itemAtIndex: 0] setTitle: title];
         [self synchronizeTitleAndSelectedItem];
     } else {
         [super setTitle: title];
@@ -399,8 +435,8 @@ static NSString *const NSPopUpButtonBindingObservationContext =
 {
     // No need to observe the same thing many times when we have several
     // bindings
-    if (!_observerAdded) {
-        _observerAdded = YES;
+    if (!NS_EXTRA(NSPopUpButton, self)->_observerAdded) {
+        NS_EXTRA(NSPopUpButton, self)->_observerAdded = YES;
         [self addObserver: self
                 forKeyPath: @"cell.menu.itemArray"
                    options: NSKeyValueObservingOptionPrior

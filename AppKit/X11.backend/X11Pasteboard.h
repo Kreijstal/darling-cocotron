@@ -31,12 +31,19 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
     NSMutableDictionary<NSPasteboardType, NSData *> *_typeToData;
     NSMutableDictionary<NSPasteboardType, id<NSPasteboardTypeOwner>>
             *_typeToOwner;
+    // The types in the order they were declared or written: -types answers in it.
+    NSMutableArray<NSPasteboardType> *_typeOrder;
     Time _ownershipTime;
     NSInteger _changeCount;
 
     Atom _receivingProperty;
     Atom _incrAtom;
     Atom _targetsAtom;
+    Atom _textAtom;
+    Atom _utf8StringAtom;
+    // The property type of the last reply read, which for TEXT says what
+    // encoding the owner chose.
+    Atom _receivedType;
     Atom _awaitingTarget;
     NSArray<NSPasteboardType> *_remoteTypes;
     Window _remoteOwner;

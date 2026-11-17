@@ -18,26 +18,35 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/NSObject.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSButton, NSImage, NSArray, NSWindow, NSError, NSView, NSMutableArray;
 
-typedef enum {
+// NSApplication.h imports this header, so the modal response type is declared here.
+typedef NSInteger NSModalResponse NS_TYPED_EXTENSIBLE_ENUM;
+
+static const NSModalResponse NSModalResponseOK = 1;
+static const NSModalResponse NSModalResponseCancel = 0;
+static const NSModalResponse NSModalResponseStop = -1000;
+static const NSModalResponse NSModalResponseAbort = -1001;
+static const NSModalResponse NSModalResponseContinue = -1002;
+
+typedef NS_ENUM(NSUInteger, NSAlertStyle) {
     NSAlertStyleWarning = 0,
     NSAlertStyleInformational = 1,
     NSAlertStyleCritical = 2,
+};
 
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
     NSWarningAlertStyle = NSAlertStyleWarning,
     NSInformationalAlertStyle = NSAlertStyleInformational,
     NSCriticalAlertStyle = NSAlertStyleCritical,
-} NSAlertStyle;
-
-enum {
-    NSAlertFirstButtonReturn = 1000,
-    NSAlertSecondButtonReturn = 1001,
-    NSAlertThirdButtonReturn = 1002,
 };
 
-typedef NSInteger NSModalResponse;
+static const NSModalResponse NSAlertFirstButtonReturn = 1000;
+static const NSModalResponse NSAlertSecondButtonReturn = 1001;
+static const NSModalResponse NSAlertThirdButtonReturn = 1002;
 
 @interface NSAlert : NSObject {
     id _delegate;
@@ -56,6 +65,7 @@ typedef NSInteger NSModalResponse;
     BOOL _needsLayout;
     id _sheetDelegate;
     SEL _sheetDidEnd;
+    NS_LEGACY_IVAR_PAD(_NSAlertReserved, 60)
 }
 
 + (NSAlert *) alertWithError: (NSError *) error;
@@ -66,27 +76,19 @@ typedef NSInteger NSModalResponse;
          informativeTextWithFormat: (NSString *) format, ...;
 
 - delegate;
-- (NSAlertStyle) alertStyle;
-- (NSImage *) icon;
-- (NSString *) messageText;
-- (NSString *) informativeText;
-- (NSView *) accessoryView;
-- (BOOL) showsHelp;
-- (BOOL) showsSuppressionButton;
-- (NSString *) helpAnchor;
-- (NSArray *) buttons;
-- (NSButton *) suppressionButton;
+@property(nonatomic) NSAlertStyle alertStyle;
+@property(nonatomic, retain) NSImage *icon;
+@property(nonatomic, copy) NSString *messageText;
+@property(nonatomic, copy) NSString *informativeText;
+@property(nonatomic, retain) NSView *accessoryView;
+@property(nonatomic) BOOL showsHelp;
+@property(nonatomic) BOOL showsSuppressionButton;
+@property(nonatomic, copy) NSString *helpAnchor;
+@property(nonatomic, readonly) NSArray *buttons;
+@property(nonatomic, readonly) NSButton *suppressionButton;
 - window;
 
 - (void) setDelegate: delegate;
-- (void) setAlertStyle: (NSAlertStyle) value;
-- (void) setIcon: (NSImage *) value;
-- (void) setMessageText: (NSString *) value;
-- (void) setInformativeText: (NSString *) value;
-- (void) setAccessoryView: (NSView *) value;
-- (void) setShowsHelp: (BOOL) value;
-- (void) setShowsSuppressionButton: (BOOL) value;
-- (void) setHelpAnchor: (NSString *) value;
 
 - (NSButton *) addButtonWithTitle: (NSString *) title;
 
@@ -99,7 +101,7 @@ typedef NSInteger NSModalResponse;
 - (void) beginSheetModalForWindow: (NSWindow *) sheetWindow
                 completionHandler:
                         (void (^)(NSModalResponse returnCode)) handler;
-- (NSInteger) runModal;
+- (NSModalResponse) runModal;
 
 @end
 

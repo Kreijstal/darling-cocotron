@@ -75,7 +75,7 @@ static inline CGBlendMode blendModeForCompositeOp(NSCompositingOperation op) {
     return table[op];
 }
 
-void NSRectClipList(const NSRect *rects, int count) {
+void NSRectClipList(const NSRect *rects, NSInteger count) {
     CGContextRef graphicsPort = NSCurrentGraphicsPort();
 
     CGContextClipToRects(graphicsPort, rects, count);
@@ -87,7 +87,9 @@ void NSRectClip(NSRect rect) {
     CGContextClipToRect(graphicsPort, rect);
 }
 
-void NSRectFillListWithColors(const NSRect *rects, NSColor **colors, int count)
+void NSRectFillListWithColors(const NSRect *rects,
+                              NSColor *const _Nonnull *_Nonnull colors,
+                              NSInteger count)
 {
     CGContextRef context = NSCurrentGraphicsPort();
     int i;
@@ -105,10 +107,9 @@ void NSRectFillListWithColors(const NSRect *rects, NSColor **colors, int count)
     CGContextRestoreGState(context);
 }
 
-void NSRectFillListWithColorsUsingOperation(const NSRect *rects,
-                                            NSColor * const *colors,
-                                            NSInteger count,
-                                            NSCompositingOperation op)
+void NSRectFillListWithColorsUsingOperation(
+        const NSRect *rects, NSColor *const _Nonnull *_Nonnull colors,
+        NSInteger count, NSCompositingOperation op)
 {
     CGContextRef context = NSCurrentGraphicsPort();
     NSInteger i;
@@ -124,7 +125,7 @@ void NSRectFillListWithColorsUsingOperation(const NSRect *rects,
 }
 
 void NSRectFillListWithGrays(const NSRect *rects, const CGFloat *grays,
-                             int count)
+                             NSInteger count)
 {
     CGContextRef context = NSCurrentGraphicsPort();
     int i;
@@ -142,7 +143,7 @@ void NSRectFillListWithGrays(const NSRect *rects, const CGFloat *grays,
     CGContextRestoreGState(context);
 }
 
-void NSRectFillList(const NSRect *rects, int count) {
+void NSRectFillList(const NSRect *rects, NSInteger count) {
     NSRectFillListUsingOperation(rects, count, NSCompositeSourceOver);
 }
 
@@ -159,7 +160,7 @@ void NSEraseRect(NSRect rect) {
     CGContextRestoreGState(context);
 }
 
-void NSRectFillListUsingOperation(const NSRect *rects, int count,
+void NSRectFillListUsingOperation(const NSRect *rects, NSInteger count,
                                   NSCompositingOperation operation)
 {
     CGContextRef context = NSCurrentGraphicsPort();
@@ -543,7 +544,72 @@ void NSCopyBits(int gState, NSRect rect, NSPoint point) {
     CGContextCopyBits(NSCurrentGraphicsPort(), rect, point, gState);
 }
 
-void NSBeep() {
+// NSBestDepth and the NSWindowDepth helpers. The depths a window can use are
+// the three RGB depths declared in NSGraphics.h; the helpers describe those.
+// NSBestDepth picks the smallest available depth whose samples are at least
+// the requested size, falling back to the deepest one, and reports an exact
+// match only for an RGB colour space and a non-planar request that names the
+// samples and pixels of that depth.
+static const NSWindowDepth availableDepths[] = {
+    NSWindowDepthTwentyfourBitRGB, NSWindowDepthSixtyfourBitRGB,
+    NSWindowDepthOnehundredtwentyeightBitRGB, 0
+};
+
+const NSWindowDepth *NSAvailableWindowDepths(void) {
+    return availableDepths;
+}
+
+NSInteger NSBitsPerSampleFromDepth(NSWindowDepth depth) {
+    switch (depth) {
+    case NSWindowDepthTwentyfourBitRGB:
+        return 8;
+    case NSWindowDepthSixtyfourBitRGB:
+        return 16;
+    case NSWindowDepthOnehundredtwentyeightBitRGB:
+        return 32;
+    }
+
+    return 0;
+}
+
+BOOL NSPlanarFromDepth(NSWindowDepth depth) {
+    return NO;
+}
+
+NSColorSpaceName NSColorSpaceFromDepth(NSWindowDepth depth) {
+    if (NSBitsPerSampleFromDepth(depth) == 0)
+        return nil;
+
+    return NSCalibratedRGBColorSpace;
+}
+
+NSWindowDepth NSBestDepth(NSColorSpaceName colorSpace, NSInteger bitsPerSample,
+                          NSInteger bitsPerPixel, BOOL planar,
+                          BOOL *exactMatch)
+{
+    NSWindowDepth best = NSWindowDepthOnehundredtwentyeightBitRGB;
+    int i;
+
+    for (i = 0; availableDepths[i] != 0; i++) {
+        if (NSBitsPerSampleFromDepth(availableDepths[i]) >= bitsPerSample) {
+            best = availableDepths[i];
+            break;
+        }
+    }
+
+    if (exactMatch != NULL) {
+        BOOL rgb = [colorSpace isEqualToString: NSCalibratedRGBColorSpace] ||
+                   [colorSpace isEqualToString: NSDeviceRGBColorSpace];
+
+        *exactMatch = rgb && !planar &&
+                      NSBitsPerSampleFromDepth(best) == bitsPerSample &&
+                      NSBitsPerPixelFromDepth(best) == bitsPerPixel;
+    }
+
+    return best;
+}
+
+void NSBeep(void) {
     [[NSDisplay currentDisplay] beep];
 }
 

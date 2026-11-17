@@ -46,98 +46,98 @@ static const CGFloat kImageMargin = 2.;
 
 - (void) encodeWithCoder: (NSCoder *) coder {
     [super encodeWithCoder: coder];
-    [coder encodeObject: _titleOrAttributedTitle forKey: @"NSButtonCell title"];
+    [coder encodeObject: NS_EXTRA(NSCell, self)->_titleOrAttributedTitle forKey: @"NSButtonCell title"];
     [coder encodeObject: _alternateTitle
                  forKey: @"NSButtonCell alternateTitle"];
-    [coder encodeInt: _imagePosition forKey: @"NSButtonCell imagePosition"];
-    [coder encodeInt: _highlightsBy forKey: @"NSButtonCell highlightsBy"];
-    [coder encodeInt: _showsStateBy forKey: @"NSButtonCell showsStateBy"];
-    [coder encodeBool: _isTransparent forKey: @"NSButtonCell transparent"];
-    [coder encodeBool: _imageDimsWhenDisabled
+    [coder encodeInt: NS_EXTRA(NSButtonCell, self)->_imagePosition forKey: @"NSButtonCell imagePosition"];
+    [coder encodeInt: NS_EXTRA(NSButtonCell, self)->_highlightsBy forKey: @"NSButtonCell highlightsBy"];
+    [coder encodeInt: NS_EXTRA(NSButtonCell, self)->_showsStateBy forKey: @"NSButtonCell showsStateBy"];
+    [coder encodeBool: NS_EXTRA(NSButtonCell, self)->_isTransparent forKey: @"NSButtonCell transparent"];
+    [coder encodeBool: NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled
                forKey: @"NSButtonCell imageDimsWhenDisabled"];
-    [coder encodeObject: _alternateImage
+    [coder encodeObject: NS_EXTRA(NSButtonCell, self)->_alternateImage
                  forKey: @"NSButtonCell alternateImage"];
     [coder encodeObject: _keyEquivalent forKey: @"NSButtonCell keyEquivalent"];
-    [coder encodeInt: _keyEquivalentModifierMask
+    [coder encodeInt: NS_EXTRA(NSButtonCell, self)->_keyEquivalentModifierMask
               forKey: @"NSButtonCell keyEquivalentModifierMask"];
 }
 
 - (void) _applyButtonCellAppleFlags: (unsigned) flags flags2: (unsigned) flags2 {
-    _imagePosition = NSNoImage;
+    NS_EXTRA(NSButtonCell, self)->_imagePosition = NSNoImage;
     if ((flags & 0x00480000) == 0x00400000)
-        _imagePosition = NSImageOnly;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageOnly;
     else if ((flags & 0x00480000) == 0x00480000)
-        _imagePosition = NSImageOverlaps;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageOverlaps;
     else if ((flags & 0x00380000) == 0x00380000)
-        _imagePosition = NSImageLeft;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageLeft;
     else if ((flags & 0x00380000) == 0x00280000)
-        _imagePosition = NSImageRight;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageRight;
     else if ((flags & 0x00380000) == 0x00180000)
-        _imagePosition = NSImageBelow;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageBelow;
     else if ((flags & 0x00380000) == 0x00080000)
-        _imagePosition = NSImageAbove;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageAbove;
 
     //  bits 6 and 7 in flags2, but not in order
     switch ((flags2 >> 6) & 0x3) {
 
     case 0:
-        _imageScaling = NSImageScaleNone;
+        NS_EXTRA(NSButtonCell, self)->_imageScaling = NSImageScaleNone;
         break;
 
     case 1:
-        _imageScaling = NSImageScaleProportionallyUpOrDown;
+        NS_EXTRA(NSButtonCell, self)->_imageScaling = NSImageScaleProportionallyUpOrDown;
         break;
 
     case 2:
-        _imageScaling = NSImageScaleProportionallyDown;
+        NS_EXTRA(NSButtonCell, self)->_imageScaling = NSImageScaleProportionallyDown;
         break;
 
     case 3:
-        _imageScaling = NSImageScaleAxesIndependently;
+        NS_EXTRA(NSButtonCell, self)->_imageScaling = NSImageScaleAxesIndependently;
         break;
     }
 
-    _highlightsBy = 0;
-    _showsStateBy = 0;
+    NS_EXTRA(NSButtonCell, self)->_highlightsBy = 0;
+    NS_EXTRA(NSButtonCell, self)->_showsStateBy = 0;
 
     if (flags & 0x80000000)
-        _highlightsBy |= NSPushInCellMask;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy |= NSPushInCellMask;
     if (flags & 0x40000000)
-        _showsStateBy |= NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy |= NSContentsCellMask;
     if (flags & 0x20000000)
-        _showsStateBy |= NSChangeBackgroundCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy |= NSChangeBackgroundCellMask;
     if (flags & 0x10000000)
-        _showsStateBy |= NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy |= NSChangeGrayCellMask;
     if (flags & 0x08000000)
-        _highlightsBy |= NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy |= NSContentsCellMask;
     if (flags & 0x04000000)
-        _highlightsBy |= NSChangeBackgroundCellMask;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy |= NSChangeBackgroundCellMask;
     if (flags & 0x02000000)
-        _highlightsBy |= NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy |= NSChangeGrayCellMask;
 
-    _isBordered =
+    NS_EXTRA(NSCell, self)->_isBordered =
             (flags & 0x00800000) ? YES : NO; // err, this flag is in NSCell too
 
-    _bezelStyle = (flags2 & 0x7) | (flags2 & 0x20 >> 2);
+    NS_EXTRA(NSButtonCell, self)->_bezelStyle = (flags2 & 0x7) | (flags2 & 0x20 >> 2);
 
-    if (_bezelStyle == 0) // this is how textured buttons are encoded by IB
-        _bezelStyle = NSTexturedSquareBezelStyle;
-    if (_bezelStyle == 3)
-        _bezelStyle = NSTexturedRoundedBezelStyle;
-    if (_bezelStyle == 4)
-        _bezelStyle = NSRoundRectBezelStyle;
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == 0) // this is how textured buttons are encoded by IB
+        NS_EXTRA(NSButtonCell, self)->_bezelStyle = NSTexturedSquareBezelStyle;
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == 3)
+        NS_EXTRA(NSButtonCell, self)->_bezelStyle = NSTexturedRoundedBezelStyle;
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == 4)
+        NS_EXTRA(NSButtonCell, self)->_bezelStyle = NSRoundRectBezelStyle;
 
-    _isTransparent = (flags & 0x00008000) ? YES : NO;
-    _imageDimsWhenDisabled = (flags & 0x00002000) ? NO : YES;
+    NS_EXTRA(NSButtonCell, self)->_isTransparent = (flags & 0x00008000) ? YES : NO;
+    NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = (flags & 0x00002000) ? NO : YES;
 
-    _showsBorderOnlyWhileMouseInside = (flags2 & 0x8) ? YES : NO;
+    NS_EXTRA(NSButtonCell, self)->_showsBorderOnlyWhileMouseInside = (flags2 & 0x8) ? YES : NO;
 
     if ((flags & 0x7e800000) != 0x48000000)
         [self setButtonType: NSMomentaryPushInButton];
     else if (flags & 0x100) {
         id altImageSource = nil;
         if (flags & 0x100)
-            altImageSource = self->_alternateImage;
+            altImageSource = NS_EXTRA(NSButtonCell, self)->_alternateImage;
         if ([[altImageSource name] isEqualToString: @"NSSwitch"])
             [self setButtonType: NSSwitchButton];
         if ([[altImageSource name] isEqualToString: @"NSRadioButton"])
@@ -168,7 +168,7 @@ static const CGFloat kImageMargin = 2.;
         flags2 = [keyed decodeIntForKey: @"NSButtonFlags2"];
         id check;
 
-        _titleOrAttributedTitle =
+        NS_EXTRA(NSCell, self)->_titleOrAttributedTitle =
                 [[keyed decodeObjectForKey: @"NSContents"] retain];
         _alternateTitle =
                 [[keyed decodeObjectForKey: @"NSAlternateContents"] retain];
@@ -177,196 +177,197 @@ static const CGFloat kImageMargin = 2.;
 
         check = [keyed decodeObjectForKey: @"NSAlternateImage"];
         if ([check isKindOfClass: [NSImage class]])
-            _alternateImage = [check retain];
+            NS_EXTRA(NSButtonCell, self)->_alternateImage = [check retain];
         else if ([check isKindOfClass: [NSButtonImageSource class]]) {
-            [_image release];
-            _image = [[check normalImage] retain];
-            _alternateImage = [[check alternateImage] retain];
+            [NS_EXTRA(NSCell, self)->_image release];
+            NS_EXTRA(NSCell, self)->_image = [[check normalImage] retain];
+            NS_EXTRA(NSButtonCell, self)->_alternateImage = [[check alternateImage] retain];
         } else
-            _alternateImage = nil;
+            NS_EXTRA(NSButtonCell, self)->_alternateImage = nil;
 
         /* _normalImage is a private ivar in Apple's AppKit. Third party library
            BGHUDAppKit uses it to figure out what kind of standard button is
            being drawn. We emulate it for BGHUDAppKit. */
-        _normalImage = [_image retain];
+        _normalImage = [NS_EXTRA(NSCell, self)->_image retain];
 
         _keyEquivalent =
                 [[keyed decodeObjectForKey: @"NSKeyEquivalent"] retain];
-        _keyEquivalentModifierMask = flags2 >> 8;
-        [self setIntValue: _state]; // make the int value of NSButtonCell to be
+        NS_EXTRA(NSButtonCell, self)->_keyEquivalentModifierMask = flags2 >> 8;
+        [self setIntValue: NS_EXTRA(NSCell, self)->_state]; // make the int value of NSButtonCell to be
                                     // in synch with the bare _state of NSCell
     } else {
         NSInteger version = [coder versionForClassName: @"NSButtonCell"];
-        NSLog(@"NSButtonCell version is %ld\n", (long) version);
-        unichar keyEquivModMask;
-        if (version <= 16) {
-            if ([(NSUnarchiver *) coder systemVersion] > 82) {
-                short periodicDelay, periodicInterval;
-                [coder decodeValuesOfObjCTypes: "ss", &periodicDelay,
-                                                &periodicInterval];
+        unsigned int keyEquivModMask = 0;
+        id altContents = nil, keyEquivalent = nil, keyEquivalentFont = nil, normalImage = nil;
+        id alternateImageOrFont = nil, sound = nil;
 
-                [self setPeriodicDelay: periodicDelay / 1000.0f
-                              interval: periodicInterval / 1000.0f];
+        // Read layout per class version: only the sequence of public decode calls is
+        // dictated by the archive; what the unknown values mean is not known.
+        if (version <= 16) {
+            if ([coder systemVersion] > 82) {
+                short periodicDelay, periodicInterval;
+                [coder decodeValuesOfObjCTypes: "ss", &periodicDelay, &periodicInterval];
+
+                [self setPeriodicDelay: periodicDelay / 1000.0f interval: periodicInterval / 1000.0f];
             }
 
-            char *altContents;
+            char *altContentsString = NULL;
             unsigned short inFlags1, inFlags2;
-            [coder decodeValuesOfObjCTypes: "*@ss", &altContents, &_sound,
-                                            &inFlags1, &inFlags2];
+            [coder decodeValuesOfObjCTypes: "*@ss", &altContentsString, &sound, &inFlags1, &inFlags2];
 
             flags = (((unsigned) inFlags1) << 16) & 0xFEF80000;
             flags |= (((unsigned) inFlags1) & 0x3) << 17;
             flags |= (((unsigned) inFlags2) << 8) & 0x8000;
             flags |= (((unsigned) inFlags2) & 0x6) << 12;
 
-            unichar keyEquivalent = inFlags2 >> 8;
-            if (keyEquivalent != 0) {
-                _keyEquivalent =
-                        [[NSString alloc] initWithCharacters: &keyEquivalent
-                                                      length: 1];
+            unichar keyEquivalentChar = inFlags2 >> 8;
+            if (keyEquivalentChar != 0) {
+                keyEquivalent = [[NSString alloc] initWithCharacters: &keyEquivalentChar length: 1];
             }
 
-            if (altContents) {
-                _alternateTitle = [[NSString alloc]
-                        initWithBytesNoCopy: altContents
-                                     length: strlen(altContents)
-                                   encoding: NSUTF8StringEncoding
-                               freeWhenDone: TRUE];
+            if (altContentsString) {
+                altContents = [[NSString alloc] initWithBytesNoCopy: altContentsString
+                                                             length: strlen(altContentsString)
+                                                           encoding: NSUTF8StringEncoding
+                                                       freeWhenDone: YES];
             }
 
+            // Two objects follow whatever the flags say. The first is the normal image
+            // when bit 17 is set, else the alternate image; the second is only kept
+            // as the alternate image when bit 17 is set.
+            id first = nil, second = nil;
+            [coder decodeValuesOfObjCTypes: "@@", &first, &second];
             if (flags & 0x20000) {
-                [coder decodeValuesOfObjCTypes: "@@", &_normalImage,
-                                                &_alternateImage];
+                normalImage = first;
+                alternateImageOrFont = second;
             } else {
-                float dummy;
-                [coder decodeValuesOfObjCTypes: "@f", &_alternateImage, &dummy];
+                alternateImageOrFont = first;
+                [second release];
             }
 
             if (version >= 2)
                 [coder decodeValuesOfObjCTypes: "I", &keyEquivModMask];
-            else
-                keyEquivModMask = 0;
         } else if (version <= 40) {
             short periodicDelay, periodicInterval;
-            NSUnarchiver *una = (NSUnarchiver *) coder;
-            [coder decodeValuesOfObjCTypes: "ss", &periodicDelay,
-                                            &periodicInterval];
+            [coder decodeValuesOfObjCTypes: "ss", &periodicDelay, &periodicInterval];
 
-            [self setPeriodicDelay: periodicDelay / 1000.0f
-                          interval: periodicInterval / 1000.0f];
+            [self setPeriodicDelay: periodicDelay / 1000.0f interval: periodicInterval / 1000.0f];
 
             [coder decodeValuesOfObjCTypes: "I", &keyEquivModMask];
 
-            unsigned int inFlags = [una decodeByte];
-            flags = inFlags << 31;
+            // Eighteen separate flag bytes. Seventeen are mapped to the flag word; the
+            // eighth (index 7) is read and ignored (its meaning is unknown).
+            static const struct {
+                int shift;
+                unsigned mask;
+            } bytes[18] = {
+                { 31, 1 }, { 30, 1 }, { 29, 1 }, { 28, 1 }, { 27, 1 }, { 26, 1 },
+                { 25, 1 },    { 0, 0 },  { 23, 1 }, { 22, 1 }, { 21, 1 }, { 20, 1 },
+                { 19, 1 },    { 18, 1 }, { 17, 1 }, { 15, 1 }, { 13, 3 }, { 12, 1 },
+            };
+            int i;
+            for (i = 0; i < 18; i++) {
+                char c = 0;
+                [coder decodeValuesOfObjCTypes: "c", &c];
+                if (bytes[i].mask != 0) {
+                    flags |= (((unsigned) (unsigned char) c) & bytes[i].mask) << bytes[i].shift;
+                }
+            }
 
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 30;
+            altContents = [[coder decodeObject] retain];
+            keyEquivalent = [[coder decodeObject] retain];
+            keyEquivalentFont = [[coder decodeObject] retain];
+            normalImage = [[coder decodeObject] retain];
+            alternateImageOrFont = [[coder decodeObject] retain];
+            sound = [[coder decodeObject] retain];
 
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 29;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 28;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 27;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 26;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 25;
-
-            [una decodeByte];
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 23;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 22;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 21;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 20;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 19;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 18;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 17;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 15;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 3) << 13;
-
-            inFlags = [una decodeByte];
-            flags |= (inFlags & 1) << 12;
-
-            id altContents = [coder decodeObject];
-            // TODO: _setAltContents
-
-            [self setKeyEquivalent: [coder decodeObject]];
-            [self setKeyEquivalentFont: [coder decodeObject]];
-            [self setImage: [coder decodeObject]];
-            [self setAlternateImage: [coder decodeObject]];
-            [self setSound: [coder decodeObject]];
-
-            unsigned int var50;
-            if (version >= 19)
-                [coder decodeValuesOfObjCTypes: "I", &var50];
-            if (version > 20)
-                [coder decodeValuesOfObjCTypes: "I", &var50];
-            if (version > 26)
-                [una decodeByte];
+            // Values of unknown meaning, kept in the archive layout and dropped:
+            // two words from version 19 (the second from 21) up to 26, a byte at 26 and
+            // a further byte from 26 on; versions 27 and later have two bytes only.
+            unsigned int unknownWord;
+            char unknownByte;
+            if (version >= 19 && version <= 26)
+                [coder decodeValuesOfObjCTypes: "I", &unknownWord];
+            if (version >= 21 && version <= 26)
+                [coder decodeValuesOfObjCTypes: "I", &unknownWord];
             if (version >= 26)
-                [una decodeByte];
+                [coder decodeValuesOfObjCTypes: "c", &unknownByte];
+            if (version >= 27)
+                [coder decodeValuesOfObjCTypes: "c", &unknownByte];
         } else if (version <= 57) {
             short periodicDelay, periodicInterval;
-            [coder decodeValuesOfObjCTypes: "ssIi@@@@@", &periodicDelay,
-                                            &periodicInterval, &flags,
-                                            &keyEquivModMask, &_alternateTitle,
-                                            &_keyEquivalent, &_normalImage,
-                                            &_alternateImage, &_sound];
+            [coder decodeValuesOfObjCTypes: "ssIi@@@@@", &periodicDelay, &periodicInterval, &keyEquivModMask, &flags,
+                                            &altContents, &keyEquivalent, &normalImage, &alternateImageOrFont, &sound];
 
-            [self setPeriodicDelay: periodicDelay / 1000.0f
-                          interval: periodicInterval / 1000.0f];
+            [self setPeriodicDelay: periodicDelay / 1000.0f interval: periodicInterval / 1000.0f];
 
             flags &= 0xfeffffff;
             flags2 &= 0xFFFFFFD8;
         } else {
             short periodicDelay, periodicInterval;
-            id alternateImageOrFont;
-            [coder decodeValuesOfObjCTypes: "ssii@@@@@", &periodicDelay,
-                                            &periodicInterval, &flags2, &flags,
-                                            &_alternateTitle, &_keyEquivalent,
-                                            &_normalImage, &alternateImageOrFont,
-                                            &_sound];
+            [coder decodeValuesOfObjCTypes: "ssii@@@@@", &periodicDelay, &periodicInterval, &flags2, &flags, &altContents,
+                                            &keyEquivalent, &normalImage, &alternateImageOrFont, &sound];
 
-            if ([alternateImageOrFont isKindOfClass:[NSButtonImageSource class]]) {
-                _alternateImage = alternateImageOrFont;
-            } else if ([alternateImageOrFont isKindOfClass:[NSFont class]]) {
-                _keyEquivalentFont = alternateImageOrFont;
-            } else {
-                [alternateImageOrFont release];
-            }
+            [self setPeriodicDelay: periodicDelay / 1000.0f interval: periodicInterval / 1000.0f];
 
-            // Title is in the _objectValue decoded in NSCell
-            NSString* stringValue = [self stringValue];
-            if ([stringValue length] > 0) {
-                [self setTitle: stringValue];
-            }
-
-            [self setPeriodicDelay: periodicDelay / 1000.0f
-                          interval: periodicInterval / 1000.0f];
-
+            // As in the keyed form, the key equivalent's modifier mask sits above the
+            // low byte of the second flag word.
+            keyEquivModMask = flags2 >> 8;
             flags &= 0xfeffffff;
+        }
+
+        [_alternateTitle release];
+        _alternateTitle = [altContents isKindOfClass: [NSString class]] ? altContents : nil;
+        if (_alternateTitle == nil)
+            [altContents release];
+
+        [_keyEquivalent release];
+        _keyEquivalent = [keyEquivalent isKindOfClass: [NSString class]] ? keyEquivalent : nil;
+        if (_keyEquivalent == nil) {
+            [keyEquivalent release];
+            _keyEquivalent = [@"" retain];
+        }
+
+        [NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont release];
+        NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont = [keyEquivalentFont isKindOfClass: [NSFont class]] ? keyEquivalentFont : nil;
+        if (NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont == nil)
+            [keyEquivalentFont release];
+
+        [_sound release];
+        _sound = sound;
+
+        // The normal image is also the cell's own image, as in the keyed form.
+        if (normalImage != nil) {
+            if ([normalImage isKindOfClass: [NSImage class]]) {
+                [NS_EXTRA(NSCell, self)->_image release];
+                NS_EXTRA(NSCell, self)->_image = normalImage;
+            } else {
+                [normalImage release];
+            }
+        }
+        _normalImage = [NS_EXTRA(NSCell, self)->_image retain];
+
+        // The slot after the key equivalent and image holds the alternate image, a
+        // button image source standing for both images, or the key equivalent font.
+        [NS_EXTRA(NSButtonCell, self)->_alternateImage release];
+        NS_EXTRA(NSButtonCell, self)->_alternateImage = nil;
+        if ([alternateImageOrFont isKindOfClass: [NSButtonImageSource class]]) {
+            [NS_EXTRA(NSCell, self)->_image release];
+            NS_EXTRA(NSCell, self)->_image = [[alternateImageOrFont normalImage] retain];
+            [_normalImage release];
+            _normalImage = [NS_EXTRA(NSCell, self)->_image retain];
+            NS_EXTRA(NSButtonCell, self)->_alternateImage = [[alternateImageOrFont alternateImage] retain];
+        } else if ([alternateImageOrFont isKindOfClass: [NSImage class]]) {
+            NS_EXTRA(NSButtonCell, self)->_alternateImage = [alternateImageOrFont retain];
+        } else if ([alternateImageOrFont isKindOfClass: [NSFont class]] && NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont == nil) {
+            NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont = [alternateImageOrFont retain];
+        }
+        [alternateImageOrFont release];
+
+        // The title is the object value decoded by NSCell.
+        NSString *stringValue = [self stringValue];
+        if ([stringValue length] > 0) {
+            [self setTitle: stringValue];
         }
 
         if (version <= 36) {
@@ -406,35 +407,31 @@ static const CGFloat kImageMargin = 2.;
                     flags &= 0xB70000;
                 }
             }
-
-            [self _applyButtonCellAppleFlags: flags flags2: flags2];
-
-            [self setKeyEquivalentModifierMask: keyEquivModMask];
-        } else {
-            [self _applyButtonCellAppleFlags: flags flags2: flags2];
         }
 
-        if (version < 58) {
-            [self setKeyEquivalentModifierMask: keyEquivModMask];
-        }
-        // TODO: set alternate image based on buttonType
+        [self _applyButtonCellAppleFlags: flags flags2: flags2];
+        [self setKeyEquivalentModifierMask: keyEquivModMask];
+
+        // The object value holds the state (NSCell decoded the title there), as after
+        // keyed decoding.
+        [self setIntValue: NS_EXTRA(NSCell, self)->_state];
     }
     return self;
 }
 
 - initTextCell: (NSString *) string {
     [super initTextCell: string];
-    _titleOrAttributedTitle = [string copy];
+    NS_EXTRA(NSCell, self)->_titleOrAttributedTitle = [string copy];
     _alternateTitle = @"";
-    _imagePosition = NSNoImage;
-    _highlightsBy = NSPushInCellMask;
-    _showsStateBy = 0;
-    _isTransparent = NO;
-    _imageDimsWhenDisabled = NO;
-    _alternateImage = nil;
+    NS_EXTRA(NSButtonCell, self)->_imagePosition = NSNoImage;
+    NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSPushInCellMask;
+    NS_EXTRA(NSButtonCell, self)->_showsStateBy = 0;
+    NS_EXTRA(NSButtonCell, self)->_isTransparent = NO;
+    NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = NO;
+    NS_EXTRA(NSButtonCell, self)->_alternateImage = nil;
     _keyEquivalent = @"";
-    _keyEquivalentModifierMask = 0;
-    _showsBorderOnlyWhileMouseInside = NO;
+    NS_EXTRA(NSButtonCell, self)->_keyEquivalentModifierMask = 0;
+    NS_EXTRA(NSButtonCell, self)->_showsBorderOnlyWhileMouseInside = NO;
 
     [self setBordered: YES];
     [self setBezeled: YES];
@@ -446,8 +443,8 @@ static const CGFloat kImageMargin = 2.;
 
 - initImageCell: (NSImage *) image {
     [super initImageCell: image];
-    _titleOrAttributedTitle = @""; // empty string, not nil
-    _imagePosition = NSImageOnly;
+    NS_EXTRA(NSCell, self)->_titleOrAttributedTitle = @""; // empty string, not nil
+    NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageOnly;
     [self setObjectValue: [NSNumber numberWithBool: NO]];
 
     return self;
@@ -458,34 +455,37 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) dealloc {
-    [_buttonImageSource release];
-    [_titleOrAttributedTitle release];
+    if (NS_EXTRA_ALLOCATED(NSButtonCell, self))
+        [NS_EXTRA(NSButtonCell, self)->_buttonImageSource release];
+    [NS_EXTRA(NSCell, self)->_titleOrAttributedTitle release];
     [_normalImage release];
     [_alternateTitle release];
-    [_alternateImage release];
+    [NS_EXTRA(NSButtonCell, self)->_alternateImage release];
     [_keyEquivalent release];
     [_sound release];
-    [_keyEquivalentFont release];
-    [_backgroundColor release];
+    [NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont release];
+    [NS_EXTRA(NSButtonCell, self)->_backgroundColor release];
+    NS_EXTRA_FREE(NSButtonCell, self);
     [super dealloc];
 }
 
 - copyWithZone: (NSZone *) zone {
     NSButtonCell *result = [super copyWithZone: zone];
+    NS_EXTRA_COPY(NSButtonCell, result, self);
 
-    result->_titleOrAttributedTitle = [_titleOrAttributedTitle copy];
+    NS_EXTRA(NSCell, result)->_titleOrAttributedTitle = [NS_EXTRA(NSCell, self)->_titleOrAttributedTitle copy];
     result->_alternateTitle = [_alternateTitle copy];
-    result->_alternateImage = [_alternateImage retain];
+    NS_EXTRA(NSButtonCell, result)->_alternateImage = [NS_EXTRA(NSButtonCell, self)->_alternateImage retain];
     result->_keyEquivalent = [_keyEquivalent copy];
     result->_sound = [_sound retain];
-    result->_keyEquivalentFont = [_keyEquivalentFont retain];
-    result->_backgroundColor = [_backgroundColor retain];
+    NS_EXTRA(NSButtonCell, result)->_keyEquivalentFont = [NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont retain];
+    NS_EXTRA(NSButtonCell, result)->_backgroundColor = [NS_EXTRA(NSButtonCell, self)->_backgroundColor retain];
 
     return result;
 }
 
 - (BOOL) isTransparent {
-    return _isTransparent;
+    return NS_EXTRA(NSButtonCell, self)->_isTransparent;
 }
 
 - (NSString *) keyEquivalent {
@@ -493,14 +493,14 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (NSCellImagePosition) imagePosition {
-    return _imagePosition;
+    return NS_EXTRA(NSButtonCell, self)->_imagePosition;
 }
 
 - (NSString *) title {
-    if ([_titleOrAttributedTitle isKindOfClass: [NSAttributedString class]])
-        return [_titleOrAttributedTitle string];
+    if ([NS_EXTRA(NSCell, self)->_titleOrAttributedTitle isKindOfClass: [NSAttributedString class]])
+        return [NS_EXTRA(NSCell, self)->_titleOrAttributedTitle string];
     else
-        return _titleOrAttributedTitle;
+        return NS_EXTRA(NSCell, self)->_titleOrAttributedTitle;
 }
 
 - (NSString *) alternateTitle {
@@ -508,17 +508,17 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (NSImage *) alternateImage {
-    return _alternateImage;
+    return NS_EXTRA(NSButtonCell, self)->_alternateImage;
 }
 
 - (NSAttributedString *) attributedTitle {
-    if (_titleOrAttributedTitle == nil) {
+    if (NS_EXTRA(NSCell, self)->_titleOrAttributedTitle == nil) {
         // attributedTitle is explicitly documented to return an empty
         // attributed string when title is nil
         return [[NSAttributedString alloc] initWithString: @""];
-    } else if ([_titleOrAttributedTitle
+    } else if ([NS_EXTRA(NSCell, self)->_titleOrAttributedTitle
                        isKindOfClass: [NSAttributedString class]])
-        return _titleOrAttributedTitle;
+        return NS_EXTRA(NSCell, self)->_titleOrAttributedTitle;
     else {
         NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
         NSMutableParagraphStyle *paraStyle =
@@ -529,8 +529,8 @@ static const CGFloat kImageMargin = 2.;
         if (font != nil)
             [attributes setObject: font forKey: NSFontAttributeName];
 
-        [paraStyle setLineBreakMode: _lineBreakMode];
-        [paraStyle setAlignment: _textAlignment];
+        [paraStyle setLineBreakMode: NS_EXTRA(NSCell, self)->_lineBreakMode];
+        [paraStyle setAlignment: NS_EXTRA(NSCell, self)->_textAlignment];
         [attributes setObject: paraStyle forKey: NSParagraphStyleAttributeName];
 
         if ([self isEnabled])
@@ -556,8 +556,8 @@ static const CGFloat kImageMargin = 2.;
     if (font != nil)
         [attributes setObject: font forKey: NSFontAttributeName];
 
-    [paraStyle setLineBreakMode: _lineBreakMode];
-    [paraStyle setAlignment: _textAlignment];
+    [paraStyle setLineBreakMode: NS_EXTRA(NSCell, self)->_lineBreakMode];
+    [paraStyle setAlignment: NS_EXTRA(NSCell, self)->_textAlignment];
     [attributes setObject: paraStyle forKey: NSParagraphStyleAttributeName];
 
     if ([self isEnabled])
@@ -573,27 +573,27 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (int) highlightsBy {
-    return _highlightsBy;
+    return NS_EXTRA(NSButtonCell, self)->_highlightsBy;
 }
 
 - (int) showsStateBy {
-    return _showsStateBy;
+    return NS_EXTRA(NSButtonCell, self)->_showsStateBy;
 }
 
 - (BOOL) imageDimsWhenDisabled {
-    return _imageDimsWhenDisabled;
+    return NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled;
 }
 
 - (unsigned) keyEquivalentModifierMask {
-    return _keyEquivalentModifierMask;
+    return NS_EXTRA(NSButtonCell, self)->_keyEquivalentModifierMask;
 }
 
 - (NSBezelStyle) bezelStyle {
-    return _bezelStyle;
+    return NS_EXTRA(NSButtonCell, self)->_bezelStyle;
 }
 
 - (BOOL) showsBorderOnlyWhileMouseInside {
-    return _showsBorderOnlyWhileMouseInside;
+    return NS_EXTRA(NSButtonCell, self)->_showsBorderOnlyWhileMouseInside;
 }
 
 - (NSSound *) sound {
@@ -601,39 +601,39 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (NSGradientType) gradientType {
-    return _gradientType;
+    return NS_EXTRA(NSButtonCell, self)->_gradientType;
 }
 
 - (NSImageScaling) imageScaling {
-    return _imageScaling;
+    return NS_EXTRA(NSButtonCell, self)->_imageScaling;
 }
 
 - (BOOL) isOpaque {
-    if (_bezelStyle == NSDisclosureBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSDisclosureBezelStyle)
         return NO;
-    if (_bezelStyle == NSTexturedSquareBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSTexturedSquareBezelStyle)
         return NO;
-    if (_bezelStyle == NSTexturedRoundedBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSTexturedRoundedBezelStyle)
         return NO;
-    if (_bezelStyle == NSShadowlessSquareBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSShadowlessSquareBezelStyle)
         return NO;
-    if (_bezelStyle == NSRecessedBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSRecessedBezelStyle)
         return NO;
 
     return ![self isTransparent] && [self isBordered];
 }
 
 - (NSFont *) keyEquivalentFont {
-    return _keyEquivalentFont;
+    return NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont;
 }
 
 - (NSColor *) backgroundColor {
-    return _backgroundColor;
+    return NS_EXTRA(NSButtonCell, self)->_backgroundColor;
 }
 
 - (void) getPeriodicDelay: (float *) delay interval: (float *) interval {
-    *delay = _periodicDelay;
-    *interval = _periodicInterval;
+    *delay = NS_EXTRA(NSButtonCell, self)->_periodicDelay;
+    *interval = NS_EXTRA(NSButtonCell, self)->_periodicInterval;
 }
 
 - (NSControlStateValue) state {
@@ -641,7 +641,7 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setTransparent: (BOOL) flag {
-    _isTransparent = flag;
+    NS_EXTRA(NSButtonCell, self)->_isTransparent = flag;
 }
 
 - (void) setKeyEquivalent: (NSString *) keyEquivalent {
@@ -651,13 +651,13 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setImagePosition: (NSCellImagePosition) position {
-    _imagePosition = position;
+    NS_EXTRA(NSButtonCell, self)->_imagePosition = position;
 }
 
 - (void) setTitle: (NSString *) title {
     title = [title copy];
-    [_titleOrAttributedTitle release];
-    _titleOrAttributedTitle = title;
+    [NS_EXTRA(NSCell, self)->_titleOrAttributedTitle release];
+    NS_EXTRA(NSCell, self)->_titleOrAttributedTitle = title;
 }
 
 - (void) setAlternateTitle: (NSString *) title {
@@ -668,18 +668,18 @@ static const CGFloat kImageMargin = 2.;
 
 - (void) setAlternateImage: (NSImage *) image {
     image = [image retain];
-    [_alternateImage release];
-    _alternateImage = image;
+    [NS_EXTRA(NSButtonCell, self)->_alternateImage release];
+    NS_EXTRA(NSButtonCell, self)->_alternateImage = image;
 }
 
 - (id) _buttonImageSource {
-    return _buttonImageSource;
+    return NS_EXTRA(NSButtonCell, self)->_buttonImageSource;
 }
 
 - (void) _setButtonImageSource: (id) source {
-    if (_buttonImageSource != source) {
-        [_buttonImageSource release];
-        _buttonImageSource = [source retain];
+    if (NS_EXTRA(NSButtonCell, self)->_buttonImageSource != source) {
+        [NS_EXTRA(NSButtonCell, self)->_buttonImageSource release];
+        NS_EXTRA(NSButtonCell, self)->_buttonImageSource = [source retain];
 
         if ([source respondsToSelector: @selector(normalImage)]) {
             [self setImage: [source normalImage]];
@@ -692,8 +692,8 @@ static const CGFloat kImageMargin = 2.;
 
 - (void) setAttributedTitle: (NSAttributedString *) title {
     title = [title copy];
-    [_titleOrAttributedTitle release];
-    _titleOrAttributedTitle = title;
+    [NS_EXTRA(NSCell, self)->_titleOrAttributedTitle release];
+    NS_EXTRA(NSCell, self)->_titleOrAttributedTitle = title;
 }
 
 - (void) setAttributedAlternateTitle: (NSAttributedString *) title {
@@ -701,19 +701,19 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setHighlightsBy: (int) type {
-    _highlightsBy = type;
+    NS_EXTRA(NSButtonCell, self)->_highlightsBy = type;
 }
 
 - (void) setShowsStateBy: (int) type {
-    _showsStateBy = type;
+    NS_EXTRA(NSButtonCell, self)->_showsStateBy = type;
 }
 
 - (void) setImageDimsWhenDisabled: (BOOL) flag {
-    _imageDimsWhenDisabled = flag;
+    NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = flag;
 }
 
 - (void) setKeyEquivalentModifierMask: (unsigned) mask {
-    _keyEquivalentModifierMask = mask;
+    NS_EXTRA(NSButtonCell, self)->_keyEquivalentModifierMask = mask;
 }
 
 - (void) setState: (NSControlStateValue) value {
@@ -731,8 +731,8 @@ static const CGFloat kImageMargin = 2.;
         [super setState: 0];
 
     [[self controlView] willChangeValueForKey: @"objectValue"];
-    [_objectValue release];
-    _objectValue = [[NSNumber numberWithInt: [super state]] retain];
+    [NS_EXTRA(NSCell, self)->_objectValue release];
+    NS_EXTRA(NSCell, self)->_objectValue = [[NSNumber numberWithInt: [super state]] retain];
     [[self controlView] didChangeValueForKey: @"objectValue"];
 
     if ([[self controlView] respondsToSelector: @selector(updateCell:)])
@@ -740,52 +740,52 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setBezelStyle: (NSBezelStyle) bezelStyle {
-    _bezelStyle = bezelStyle;
+    NS_EXTRA(NSButtonCell, self)->_bezelStyle = bezelStyle;
 }
 
 - (void) setButtonType: (NSButtonType) buttonType {
     switch (buttonType) {
     case NSMomentaryLightButton:
-        _highlightsBy = NSChangeBackgroundCellMask;
-        _showsStateBy = NSNoCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSChangeBackgroundCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSNoCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSMomentaryPushInButton:
-        _highlightsBy = NSPushInCellMask | NSChangeGrayCellMask;
-        _showsStateBy = NSNoCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSPushInCellMask | NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSNoCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSMomentaryChangeButton:
-        _highlightsBy = NSContentsCellMask;
-        _showsStateBy = NSNoCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSNoCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSPushOnPushOffButton:
-        _highlightsBy = NSPushInCellMask | NSChangeGrayCellMask;
-        _showsStateBy = NSChangeBackgroundCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSPushInCellMask | NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSChangeBackgroundCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSOnOffButton:
-        _highlightsBy = NSChangeBackgroundCellMask | NSChangeGrayCellMask;
-        _showsStateBy = NSChangeBackgroundCellMask | NSChangeGrayCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSChangeBackgroundCellMask | NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSChangeBackgroundCellMask | NSChangeGrayCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSToggleButton:
-        _highlightsBy = NSPushInCellMask | NSContentsCellMask;
-        _showsStateBy = NSContentsCellMask;
-        _imageDimsWhenDisabled = YES;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSPushInCellMask | NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = YES;
         break;
 
     case NSSwitchButton:
-        _highlightsBy = NSContentsCellMask;
-        _showsStateBy = NSContentsCellMask;
-        _imagePosition = NSImageLeft;
-        _imageDimsWhenDisabled = NO;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageLeft;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = NO;
         [self setImage: [NSImage imageNamed: @"NSSwitch"]];
         [self setAlternateImage: [NSImage imageNamed: @"NSHighlightedSwitch"]];
         [self setAlignment: NSLeftTextAlignment];
@@ -794,10 +794,10 @@ static const CGFloat kImageMargin = 2.;
         break;
 
     case NSRadioButton:
-        _highlightsBy = NSContentsCellMask;
-        _showsStateBy = NSContentsCellMask;
-        _imagePosition = NSImageLeft;
-        _imageDimsWhenDisabled = NO;
+        NS_EXTRA(NSButtonCell, self)->_highlightsBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_showsStateBy = NSContentsCellMask;
+        NS_EXTRA(NSButtonCell, self)->_imagePosition = NSImageLeft;
+        NS_EXTRA(NSButtonCell, self)->_imageDimsWhenDisabled = NO;
         [self setImage: [NSImage imageNamed: @"NSRadioButton"]];
         [self setAlternateImage:
                         [NSImage imageNamed: @"NSHighlightedRadioButton"]];
@@ -811,7 +811,7 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setShowsBorderOnlyWhileMouseInside: (BOOL) show {
-    _showsBorderOnlyWhileMouseInside = show;
+    NS_EXTRA(NSButtonCell, self)->_showsBorderOnlyWhileMouseInside = show;
 }
 
 - (void) setSound: (NSSound *) sound {
@@ -821,23 +821,23 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setGradientType: (NSGradientType) value {
-    _gradientType = value;
+    NS_EXTRA(NSButtonCell, self)->_gradientType = value;
 }
 
 - (void) setBackgroundColor: (NSColor *) value {
     value = [value copy];
-    [_backgroundColor release];
-    _backgroundColor = value;
+    [NS_EXTRA(NSButtonCell, self)->_backgroundColor release];
+    NS_EXTRA(NSButtonCell, self)->_backgroundColor = value;
 }
 
 - (void) setImageScaling: (NSImageScaling) value {
-    _imageScaling = value;
+    NS_EXTRA(NSButtonCell, self)->_imageScaling = value;
 }
 
 - (void) setKeyEquivalentFont: (NSFont *) value {
     value = [value retain];
-    [_keyEquivalentFont release];
-    _keyEquivalentFont = value;
+    [NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont release];
+    NS_EXTRA(NSButtonCell, self)->_keyEquivalentFont = value;
 }
 
 - (void) setKeyEquivalentFont: (NSString *) value size: (CGFloat) size {
@@ -846,8 +846,8 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (void) setPeriodicDelay: (float) delay interval: (float) interval {
-    _periodicDelay = delay;
-    _periodicInterval = interval;
+    NS_EXTRA(NSButtonCell, self)->_periodicDelay = delay;
+    NS_EXTRA(NSButtonCell, self)->_periodicInterval = interval;
 }
 
 - (NSAttributedString *) titleForHighlight {
@@ -863,7 +863,7 @@ static const CGFloat kImageMargin = 2.;
 }
 
 - (NSImage *) imageForHighlight {
-    if (_bezelStyle == NSDisclosureBezelStyle) {
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSDisclosureBezelStyle) {
 
         if ((([self highlightsBy] & NSContentsCellMask) &&
              [self isHighlighted]))
@@ -918,7 +918,7 @@ static const CGFloat kImageMargin = 2.;
     NSRect frame = {{0, 0}, {0, 0}};
 
     if ([self isKindOfClass: [NSComboBoxCell class]]) {
-        switch (_controlSize) {
+        switch (NS_EXTRA(NSCell, self)->_controlSize) {
         case NSRegularControlSize:
         case NSControlSizeLarge:
             frame.size.width = 2;
@@ -941,7 +941,7 @@ static const CGFloat kImageMargin = 2.;
             break;
         }
     } else if ([self isKindOfClass: [NSPopUpButtonCell class]]) {
-        switch (_controlSize) {
+        switch (NS_EXTRA(NSCell, self)->_controlSize) {
         case NSRegularControlSize:
         case NSControlSizeLarge:
             frame.size.width = 2;
@@ -960,14 +960,14 @@ static const CGFloat kImageMargin = 2.;
             // Mini controls don't need adjusting they're small enough already.
             break;
         }
-    } else if ((_bezelStyle == NSRoundedBezelStyle) &&
-               (_highlightsBy & NSPushInCellMask) &&
-               (_highlightsBy & NSChangeGrayCellMask) &&
-               (_showsStateBy == NSNoCellMask)) {
-        switch (_controlSize) {
+    } else if ((NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSRoundedBezelStyle) &&
+               (NS_EXTRA(NSButtonCell, self)->_highlightsBy & NSPushInCellMask) &&
+               (NS_EXTRA(NSButtonCell, self)->_highlightsBy & NSChangeGrayCellMask) &&
+               (NS_EXTRA(NSButtonCell, self)->_showsStateBy == NSNoCellMask)) {
+        switch (NS_EXTRA(NSCell, self)->_controlSize) {
         default: {
             // Signed, so the flipped offset doesn't wrap; the large sizes keep the regular inset.
-            CGFloat step = (_controlSize == NSSmallControlSize) ? 1 : 0;
+            CGFloat step = (NS_EXTRA(NSCell, self)->_controlSize == NSSmallControlSize) ? 1 : 0;
             frame.size.width = 10 - step * 2;
             frame.size.height = 10 - step * 2;
             frame.origin.x = 5 - step;
@@ -978,7 +978,7 @@ static const CGFloat kImageMargin = 2.;
         case NSMiniControlSize:
             break;
         }
-    } else if (_bezelStyle == NSRegularSquareBezelStyle) {
+    } else if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSRegularSquareBezelStyle) {
     }
 
     return frame;
@@ -1107,7 +1107,7 @@ static void drawRoundedBezel(CGContextRef context, CGRect frame) {
     frame.origin.x += adjustment.origin.x;
     frame.origin.y += adjustment.origin.y;
 
-    switch (_bezelStyle) {
+    switch (NS_EXTRA(NSButtonCell, self)->_bezelStyle) {
 
     case NSDisclosureBezelStyle:
         break;
@@ -1290,7 +1290,7 @@ static NSSize scaledImageSizeInFrameSize(NSSize imageSize, NSSize frameSize,
     frame.origin.x += adjustment.origin.x;
     frame.origin.y += adjustment.origin.y;
 
-    if (_bezelStyle == NSDisclosureBezelStyle)
+    if (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSDisclosureBezelStyle)
         ;
     else if (![self isBordered]) {
         if (defaulted)
@@ -1379,8 +1379,8 @@ static NSSize scaledImageSizeInFrameSize(NSSize imageSize, NSSize frameSize,
         }
     }
 
-    const BOOL isTextured = (_bezelStyle == NSTexturedSquareBezelStyle ||
-                             _bezelStyle == NSTexturedRoundedBezelStyle);
+    const BOOL isTextured = (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSTexturedSquareBezelStyle ||
+                             NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSTexturedRoundedBezelStyle);
 
     if ([self isBordered] && !isTextured) {
         if (([self highlightsBy] & NSPushInCellMask) && [self isHighlighted]) {
@@ -1458,7 +1458,7 @@ static NSSize scaledImageSizeInFrameSize(NSSize imageSize, NSSize frameSize,
     NSAttributedString *title = [self attributedTitle];
     // Disclosure buttons draw a built-in glyph even when image is nil.
     // Measure that glyph, keeping the size independent of the current state.
-    NSImage *image = _bezelStyle == NSDisclosureBezelStyle
+    NSImage *image = NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSDisclosureBezelStyle
             ? [NSImage imageNamed: @"NSButtonCell_disclosure_normal"]
             : [self image];
     BOOL enabled = [self isEnabled] ? YES : ![self imageDimsWhenDisabled];
@@ -1479,7 +1479,7 @@ static NSSize scaledImageSizeInFrameSize(NSSize imageSize, NSSize frameSize,
     } else {
         titleSize = [title size];
     }
-    switch (_bezelStyle == NSDisclosureBezelStyle ? NSImageOnly : [self imagePosition]) {
+    switch (NS_EXTRA(NSButtonCell, self)->_bezelStyle == NSDisclosureBezelStyle ? NSImageOnly : [self imagePosition]) {
 
     case NSNoImage:
         result = titleSize;

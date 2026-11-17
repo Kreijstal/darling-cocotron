@@ -45,6 +45,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
  *    i.e. replace everything using the cache.
  */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 #import <AppKit/NSDragging.h>
 
@@ -57,18 +58,18 @@ APPKIT_EXPORT NSString *const NSTableViewColumnDidResizeNotification;
 
 APPKIT_EXPORT NSString *const NSTableViewRowViewKey;
 
-enum {
-    NSTableViewGridNone,
-    NSTableViewSolidVerticalGridLineMask,
-    NSTableViewSolidHorizontalGridLineMask
+typedef NS_OPTIONS(NSUInteger, NSTableViewGridLineStyle) {
+    NSTableViewGridNone = 0,
+    NSTableViewSolidVerticalGridLineMask = 1 << 0,
+    NSTableViewSolidHorizontalGridLineMask = 1 << 1,
+    NSTableViewDashedHorizontalGridLineMask = 1 << 3,
 };
 
-enum {
+typedef NS_ENUM(NSInteger, NSTableViewSelectionHighlightStyle) {
     NSTableViewSelectionHighlightStyleNone = -1,
     NSTableViewSelectionHighlightStyleRegular = 0,
     NSTableViewSelectionHighlightStyleSourceList = 1,
 };
-typedef NSInteger NSTableViewSelectionHighlightStyle;
 
 typedef NS_ENUM(NSInteger, NSTableViewRowSizeStyle) {
     NSTableViewRowSizeStyleDefault = -1,
@@ -86,116 +87,173 @@ typedef NS_ENUM(NSInteger, NSTableViewStyle) {
     NSTableViewStylePlain = 4,
 };
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSTableViewDropOperation) {
     NSTableViewDropOn,
     NSTableViewDropAbove
-} NSTableViewDropOperation;
+};
 
+typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
+    NSTableViewAnimationEffectNone = 0x0,
+    NSTableViewAnimationEffectFade = 0x1,
+    NSTableViewAnimationEffectGap = 0x2,
+    NSTableViewAnimationSlideUp = 0x10,
+    NSTableViewAnimationSlideDown = 0x20,
+    NSTableViewAnimationSlideLeft = 0x30,
+    NSTableViewAnimationSlideRight = 0x40,
+};
+
+typedef NS_ENUM(NSUInteger, NSTableViewColumnAutoresizingStyle) {
+    NSTableViewNoColumnAutoresizing = 0,
+    NSTableViewUniformColumnAutoresizingStyle,
+    NSTableViewSequentialColumnAutoresizingStyle,
+    NSTableViewReverseSequentialColumnAutoresizingStyle,
+    NSTableViewLastColumnOnlyAutoresizingStyle,
+    NSTableViewFirstColumnOnlyAutoresizingStyle,
+};
+
+typedef NS_ENUM(NSInteger, NSTableViewDraggingDestinationFeedbackStyle) {
+    NSTableViewDraggingDestinationFeedbackStyleNone = -1,
+    NSTableViewDraggingDestinationFeedbackStyleRegular = 0,
+    NSTableViewDraggingDestinationFeedbackStyleSourceList = 1,
+    NSTableViewDraggingDestinationFeedbackStyleGap = 2,
+};
+
+typedef NS_ENUM(NSInteger, NSTableRowActionEdge) {
+    NSTableRowActionEdgeLeading,
+    NSTableRowActionEdgeTrailing,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0xe4, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSTableView : NSControl {
-    id _target;
-    SEL _action;
-    SEL _doubleAction;
-
-    id _delegate;
-    id _dataSource;
-
     NSTableHeaderView *_headerView;
     NSView *_cornerView;
     NSMutableArray *_tableColumns;
-
-    NSInteger _rowHeightsCount;
-    CGFloat *_rowHeights;
+    id _editingCell;
+    id _delegate;
+    id _dataSource;
+    NSSize _intercellSpacing;
     CGFloat _standardRowHeight;
+    NS_LEGACY_IVAR_PAD(_NSTableViewReserved1, 8)
+    NSInteger _editedRow;
+    NSInteger _editedColumn;
+    NS_LEGACY_IVAR_PAD(_NSTableViewReserved2, 12)
     NSColor *_backgroundColor;
     NSColor *_gridColor;
-    BOOL _allowsColumnReordering;
-    BOOL _allowsColumnResizing;
-    BOOL _autoresizesAllColumnsToFit;
-    BOOL _allowsMultipleSelection;
-    BOOL _allowsEmptySelection;
-    BOOL _allowsColumnSelection;
-    BOOL _allowsTypeSelect;
-    NSSize _intercellSpacing;
+    NS_LEGACY_IVAR_PAD(_NSTableViewReserved3, 12)
+    SEL _doubleAction;
+    NS_LEGACY_IVAR_PAD(_NSTableViewReserved4, 44)
+    NS_EXTRA_IVARS_BEGIN(NSTableView)
+        id _target;
+        SEL _action;
 
-    BOOL _alternatingRowBackground;
-    unsigned int _gridStyleMask;
-    NSTableViewSelectionHighlightStyle _selectionHighlightStyle;
-    BOOL _floatsGroupRows;
-    BOOL _usesAutomaticRowHeights;
-    NSTableViewRowSizeStyle _rowSizeStyle;
-    CGFloat _styledRowHeight;
-    NSTableViewStyle _style;
 
-    // temp ivars
-    NSMutableArray *_selectedColumns;
-    NSIndexSet *_selectedRowIndexes;
-    NSInteger _clickedColumn, _clickedRow;
-    NSInteger _editedColumn, _editedRow;
-    NSInteger _numberOfRows;
-    NSInteger _updatesNestingCount;
-    id _editingCell;
-    NSRect _editingFrame, _editingBorder;
-    NSArray *_sortDescriptors;
 
-    NSInteger _draggingRow;
-    NSDragOperation _draggingSourceMaskLocal;
-    NSDragOperation _draggingSourceMaskNonLocal;
+        NSInteger _rowHeightsCount;
+        CGFloat *_rowHeights;
+        BOOL _allowsColumnReordering;
+        BOOL _allowsColumnResizing;
+        NSTableViewColumnAutoresizingStyle _columnAutoresizingStyle;
+        BOOL _allowsMultipleSelection;
+        BOOL _allowsEmptySelection;
+        BOOL _allowsColumnSelection;
+        BOOL _allowsTypeSelect;
 
-    NSMutableDictionary *_prototypeViews;
-    NSMutableDictionary *_reusableViews;
-    NSMutableArray *_activeRowViews;
-    BOOL _verticalMotionCanBeginDrag;
+        BOOL _alternatingRowBackground;
+        unsigned int _gridStyleMask;
+        NSTableViewSelectionHighlightStyle _selectionHighlightStyle;
+        BOOL _usesAutomaticRowHeights;
+        BOOL _floatsGroupRows;
+        NSTableViewRowSizeStyle _rowSizeStyle;
+        CGFloat _styledRowHeight;
+        NSTableViewStyle _style;
+
+        // temp ivars
+        NSMutableArray *_selectedColumns;
+        NSIndexSet *_selectedRowIndexes;
+        NSInteger _clickedColumn, _clickedRow;
+        NSInteger _numberOfRows;
+        NSInteger _updatesNestingCount;
+        NSRect _editingFrame, _editingBorder;
+        NSArray *_sortDescriptors;
+
+        NSInteger _draggingRow;
+        NSDragOperation _draggingSourceMaskLocal;
+        NSDragOperation _draggingSourceMaskNonLocal;
+
+        NSMutableDictionary *_registeredNibs;
+        NSMutableDictionary *_cellViews;    // views in the table, keyed by cell position
+        NSMutableDictionary *_reuseQueues;  // identifier -> views waiting for reuse
+        NSString *_typeSelectString;
+        NSString *_toolTipSignature;
+        NSTimeInterval _typeSelectTime;
+
+        NSTableColumn *_highlightedTableColumn; // not retained
+        NSMutableDictionary *_indicatorImages;
+        BOOL _verticalMotionCannotBeginDrag;
+        BOOL _rowActionsVisible;
+        BOOL _usesStaticContents;
+        NSTableViewDraggingDestinationFeedbackStyle _draggingDestinationFeedbackStyle;
+    NS_EXTRA_IVARS_END(NSTableView)
 }
 
-- (NSView *) makeViewWithIdentifier: (NSString *) identifier owner: (id) owner;
+- (__kindof NSView *) makeViewWithIdentifier: (NSString *) identifier owner: (id) owner;
 - (void) registerNib: (NSNib *) nib forIdentifier: (NSString *) identifier;
+- (void) setIndicatorImage: (NSImage *) image inTableColumn: (NSTableColumn *) tableColumn;
+- (NSImage *) indicatorImageInTableColumn: (NSTableColumn *) tableColumn;
+- (NSInteger) rowForView: (NSView *) view;
+- (NSInteger) columnForView: (NSView *) view;
 - (NSView *) viewAtColumn: (NSInteger) column row: (NSInteger) row makeIfNecessary: (BOOL) makeIfNecessary;
 
-- (SEL) doubleAction;
+@property(nonatomic) SEL doubleAction;
 - (id) doubleClickTarget;
 - (void) setDoubleClickTarget: (id) target;
 - (SEL) doubleClickAction;
 - (void) setDoubleClickAction: (SEL) action;
-- (id) doubleClickTarget;
-- (void) setDoubleClickTarget: (id) target;
-- (SEL) doubleClickAction;
-- (void) setDoubleClickAction: (SEL) action;
 
-- (id) dataSource;
-- (id) delegate;
+@property(nonatomic, assign) id dataSource;
+@property(nonatomic, assign) id delegate;
 
-- (NSView *) headerView;
-- (NSView *) cornerView;
+@property(nonatomic, retain) NSView *headerView;
+@property(nonatomic, retain) NSView *cornerView;
 
-- (CGFloat) rowHeight;
-- (NSSize) intercellSpacing;
-- (NSColor *) backgroundColor;
-- (NSColor *) gridColor;
-- (NSString *) autosaveName;
+@property(nonatomic) CGFloat rowHeight;
+@property(nonatomic) NSSize intercellSpacing;
+@property(nonatomic, retain) NSColor *backgroundColor;
+@property(nonatomic, retain) NSColor *gridColor;
+@property(nonatomic, copy) NSString *autosaveName;
 
-- (BOOL) drawsGrid;
-- (BOOL) allowsColumnReordering;
-- (BOOL) allowsColumnResizing;
-- (BOOL) autoresizesAllColumnsToFit;
-- (BOOL) allowsMultipleSelection;
-- (BOOL) allowsEmptySelection;
-- (BOOL) allowsColumnSelection;
-- (BOOL) allowsTypeSelect;
-- (BOOL) autosaveTableColumns;
+@property(nonatomic) BOOL drawsGrid;
+@property(nonatomic) BOOL allowsColumnReordering;
+@property(nonatomic) BOOL allowsColumnResizing;
+@property(nonatomic) BOOL autoresizesAllColumnsToFit;
+@property(nonatomic) NSTableViewColumnAutoresizingStyle columnAutoresizingStyle;
+@property(nonatomic, assign) NSTableColumn *highlightedTableColumn;
+@property(nonatomic) BOOL verticalMotionCanBeginDrag;
+@property(nonatomic) BOOL rowActionsVisible;
+@property(nonatomic) BOOL usesStaticContents;
+@property(nonatomic) NSTableViewDraggingDestinationFeedbackStyle draggingDestinationFeedbackStyle;
+@property(readonly) NSTableViewStyle effectiveStyle;
+@property(nonatomic) BOOL allowsMultipleSelection;
+@property(nonatomic) BOOL allowsEmptySelection;
+@property(nonatomic) BOOL allowsColumnSelection;
+@property(nonatomic) BOOL allowsTypeSelect;
+@property(nonatomic) BOOL autosaveTableColumns;
 
-- (BOOL) usesAlternatingRowBackgroundColors;
-- (unsigned int) gridStyleMask;
-- (NSTableViewSelectionHighlightStyle) selectionHighlightStyle;
+@property(nonatomic) BOOL usesAlternatingRowBackgroundColors;
+@property(nonatomic) NSTableViewGridLineStyle gridStyleMask;
+@property(nonatomic) NSTableViewSelectionHighlightStyle selectionHighlightStyle;
+@property(nonatomic) BOOL usesAutomaticRowHeights;
 // Floating applies to view-based tables only; Cocotron's tables are cell-based.
-- (BOOL) floatsGroupRows;
-- (BOOL) usesAutomaticRowHeights;
-- (void) setUsesAutomaticRowHeights: (BOOL) value;
-- (NSTableViewRowSizeStyle) rowSizeStyle;
-- (NSTableViewRowSizeStyle) effectiveRowSizeStyle;
+@property(nonatomic) BOOL floatsGroupRows;
+@property(nonatomic) NSTableViewRowSizeStyle rowSizeStyle;
+@property(nonatomic, readonly) NSTableViewRowSizeStyle effectiveRowSizeStyle;
+@property(nonatomic) NSTableViewStyle style;
 
-- (NSInteger) numberOfRows;
-- (NSUInteger) numberOfColumns;
-- (NSArray *) tableColumns;
+@property(nonatomic, readonly) NSInteger numberOfRows;
+@property(nonatomic, readonly) NSUInteger numberOfColumns;
+@property(nonatomic, readonly) NSArray *tableColumns;
 - (NSInteger) columnWithIdentifier: (id) identifier;
 - (NSTableColumn *) tableColumnWithIdentifier: identifier;
 
@@ -207,65 +265,37 @@ typedef enum {
 - (NSInteger) columnAtPoint: (NSPoint) point;
 - (NSRect) frameOfCellAtColumn: (NSInteger) column row: (NSInteger) row;
 
-- (void) setDoubleAction: (SEL) action;
 
-- (void) setDataSource: dataSource;
-- (void) setDelegate: delegate;
 
-- (void) setHeaderView: (NSTableHeaderView *) headerView;
-- (void) setCornerView: (NSView *) view;
 
-- (void) setRowHeight: (CGFloat) height;
-- (void) setIntercellSpacing: (NSSize) size;
-- (void) setBackgroundColor: (NSColor *) color;
-- (void) setGridColor: (NSColor *) color;
-- (void) setAutosaveName: (NSString *) name;
 
-- (void) setDrawsGrid: (BOOL) flag;
-- (void) setAllowsColumnReordering: (BOOL) flag;
-- (void) setAllowsColumnResizing: (BOOL) flag;
-- (void) setAutoresizesAllColumnsToFit: (BOOL) flag;
-- (void) setAllowsMultipleSelection: (BOOL) flag;
-- (void) setAllowsEmptySelection: (BOOL) flag;
-- (void) setAllowsColumnSelection: (BOOL) flag;
-- (void) setAllowsTypeSelect: (BOOL) flag;
 - (void) setDraggingSourceOperationMask: (NSDragOperation) mask
                                forLocal: (BOOL) isLocal;
 - (NSDragOperation) draggingSourceOperationMaskForLocal: (BOOL) isLocal;
-- (BOOL) verticalMotionCanBeginDrag;
-- (void) setVerticalMotionCanBeginDrag: (BOOL) flag;
-- (void) setAutosaveTableColumns: (BOOL) flag;
 
-- (void) setUsesAlternatingRowBackgroundColors: (BOOL) flag;
-- (void) setGridStyleMask: (unsigned int) gridStyle;
-- (void) setSelectionHighlightStyle: (NSTableViewSelectionHighlightStyle) value;
-- (void) setFloatsGroupRows: (BOOL) flag;
-- (void) setRowSizeStyle: (NSTableViewRowSizeStyle) style;
-- (NSTableViewStyle) style;
-- (void) setStyle: (NSTableViewStyle) style;
 
 - (void) addTableColumn: (NSTableColumn *) column;
 - (void) removeTableColumn: (NSTableColumn *) column;
 - (void) moveColumn: (NSInteger) columnIndex toColumn: (NSInteger) newIndex;
 
-- (NSInteger) editedRow;
-- (NSInteger) editedColumn;
+@property(nonatomic, readonly) NSInteger editedRow;
+@property(nonatomic, readonly) NSInteger editedColumn;
 - (void) editColumn: (NSInteger) column
                 row: (NSInteger) row
           withEvent: (NSEvent *) event
              select: (BOOL) select;
 
-- (NSInteger) clickedRow;
-- (NSInteger) clickedColumn;
-- (NSInteger) selectedRow;
-- (NSInteger) selectedColumn;
-- (NSInteger) numberOfSelectedRows;
-- (NSInteger) numberOfSelectedColumns;
+@property(nonatomic, readonly) NSInteger clickedRow;
+@property(nonatomic, readonly) NSInteger clickedColumn;
+@property(nonatomic, readonly) NSInteger selectedRow;
+@property(nonatomic, readonly) NSInteger selectedColumn;
+@property(nonatomic, readonly) NSInteger numberOfSelectedRows;
+@property(nonatomic, readonly) NSInteger numberOfSelectedColumns;
 - (BOOL) isColumnSelected: (NSInteger) row;
 - (BOOL) isRowSelected: (NSInteger) row;
 - (NSEnumerator *) selectedRowEnumerator;
 - (NSEnumerator *) selectedColumnEnumerator;
-- (NSIndexSet *) selectedColumnIndexes;
+@property(nonatomic, readonly) NSIndexSet *selectedColumnIndexes;
 
 - (void) selectRow: (NSInteger) row byExtendingSelection: (BOOL) extend;
 - (void) selectColumn: (NSInteger) column byExtendingSelection: (BOOL) extend;
@@ -314,15 +344,15 @@ typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
 - (NSCell *) preparedCellAtColumn: (NSInteger) columnNumber
                               row: (NSInteger) row;
 
-- (NSIndexSet *) selectedRowIndexes;
+@property(nonatomic, readonly) NSIndexSet *selectedRowIndexes;
 - (void) selectRowIndexes: (NSIndexSet *) indexes
         byExtendingSelection: (BOOL) extend;
 
-- (NSArray *) sortDescriptors;
-- (void) setSortDescriptors: (NSArray *) value;
+@property(nonatomic, copy) NSArray *sortDescriptors;
 @end
 
 @protocol NSTableViewDataSource <NSObject>
+@optional
 - (NSInteger) numberOfRowsInTableView: (NSTableView *) tableView;
 - (id) tableView: (NSTableView *) tableView
         objectValueForTableColumn: (NSTableColumn *) tableColumn
@@ -342,15 +372,19 @@ typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
            acceptDrop: (id<NSDraggingInfo>) draggingInfo
                   row: (NSInteger) row
         dropOperation: (NSTableViewDropOperation) dropOperation;
+- (void) tableView: (NSTableView *) tableView
+        sortDescriptorsDidChange: (NSArray<NSSortDescriptor *> *) oldDescriptors;
 @end
 
 @protocol NSTableViewDelegate <NSObject>
+@optional
 - (BOOL) tableView: (NSTableView *) tableView
         shouldEditTableColumn: (NSTableColumn *) tableColumn
                           row: (NSInteger) row;
 - (BOOL) selectionShouldChangeInTableView: (NSTableView *) tableView;
 - (CGFloat) tableView: (NSTableView *) tableView heightOfRow: (NSInteger) row;
 - (BOOL) tableView: (NSTableView *) tableView shouldSelectRow: (NSInteger) row;
+- (BOOL) tableView: (NSTableView *) tableView isGroupRow: (NSInteger) row;
 - (BOOL) tableView: (NSTableView *) tableView
         shouldSelectTableColumn: (NSTableColumn *) tableColumn;
 - (void) tableView: (NSTableView *) tableView
@@ -362,6 +396,30 @@ typedef NS_OPTIONS(NSUInteger, NSTableViewAnimationOptions) {
 - (NSView *) tableView: (NSTableView *) tableView
     viewForTableColumn: (NSTableColumn *) tableColumn
                    row: (NSInteger) row;
+- (NSIndexSet *) tableView: (NSTableView *) tableView
+        selectionIndexesForProposedSelection: (NSIndexSet *) proposedSelectionIndexes;
+- (void) tableView: (NSTableView *) tableView didClickTableColumn: (NSTableColumn *) tableColumn;
+- (BOOL) tableView: (NSTableView *) tableView shouldReorderColumn: (NSInteger) columnIndex toColumn: (NSInteger) newColumnIndex;
+- (CGFloat) tableView: (NSTableView *) tableView sizeToFitWidthOfColumn: (NSInteger) column;
+- (NSString *) tableView: (NSTableView *) tableView
+          toolTipForCell: (NSCell *) cell
+                    rect: (NSRectPointer) rect
+             tableColumn: (NSTableColumn *) tableColumn
+                     row: (NSInteger) row
+           mouseLocation: (NSPoint) mouseLocation;
+- (BOOL) tableView: (NSTableView *) tableView shouldShowCellExpansionForTableColumn: (NSTableColumn *) tableColumn row: (NSInteger) row;
+- (BOOL) tableView: (NSTableView *) tableView
+        shouldTrackCell: (NSCell *) cell
+         forTableColumn: (NSTableColumn *) tableColumn
+                    row: (NSInteger) row;
+- (NSString *) tableView: (NSTableView *) tableView typeSelectStringForTableColumn: (NSTableColumn *) tableColumn row: (NSInteger) row;
+- (NSInteger) tableView: (NSTableView *) tableView
+        nextTypeSelectMatchFromRow: (NSInteger) startRow
+                             toRow: (NSInteger) endRow
+                         forString: (NSString *) searchString;
+- (BOOL) tableView: (NSTableView *) tableView
+        shouldTypeSelectForEvent: (NSEvent *) event
+         withCurrentSearchString: (NSString *) searchString;
 @end
 
 @interface NSObject (NSTableView_notifications)

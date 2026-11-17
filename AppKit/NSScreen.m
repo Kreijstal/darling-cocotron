@@ -19,23 +19,27 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 // Original - Christopher Lloyd <cjwl@objc.net>
 #import <AppKit/NSApplication.h>
+#import <AppKit/NSColorSpace.h>
 #import <AppKit/NSDisplay.h>
+#import <AppKit/NSGraphics.h>
 #import <AppKit/NSScreen.h>
 #import <AppKit/NSWindow.h>
+#include <math.h>
 
 NSNotificationName const NSScreenColorSpaceDidChangeNotification = @"NSScreenColorSpaceDidChangeNotification";
 
 @implementation NSScreen
 
 - initWithFrame: (NSRect) frame visibleFrame: (NSRect) visibleFrame {
-    _frame = frame;
-    _visibleFrame = visibleFrame;
+    NS_EXTRA(NSScreen, self)->_frame = frame;
+    NS_EXTRA(NSScreen, self)->_visibleFrame = visibleFrame;
     return self;
 }
 
 - (void) dealloc {
-    if (_edid)
-        [_edid release];
+    if (NS_EXTRA(NSScreen, self)->_edid)
+        [NS_EXTRA(NSScreen, self)->_edid release];
+    NS_EXTRA_FREE(NSScreen, self);
     [super dealloc];
 }
 
@@ -53,67 +57,149 @@ NSNotificationName const NSScreenColorSpaceDidChangeNotification = @"NSScreenCol
 }
 
 - (NSWindowDepth) depth {
-    return _depth;
+    return NS_EXTRA(NSScreen, self)->_depth;
 }
 
 - (NSRect) frame {
-    return _frame;
+    return NS_EXTRA(NSScreen, self)->_frame;
 }
 
 - (NSRect) visibleFrame {
-    return _visibleFrame;
+    return NS_EXTRA(NSScreen, self)->_visibleFrame;
 }
 
 - (CGFloat) userSpaceScaleFactor {
     return 1.0;
 }
 
-// Backends with high-resolution displays override this (WaylandScreen,
-// X11Screen). A backend that has no way to know its scale stays at 1.
+// Backends whose displays have more than one device pixel per point (the X11
+// backend, with a configured scale) override this.
 - (CGFloat) backingScaleFactor {
     return 1.0;
 }
 
-// Backends whose screens have a notch override this (PocketScreen).
+// No ICC profile is read from the display, so the screen is described as sRGB.
+- (NSColorSpace *) colorSpace {
+    return [NSColorSpace sRGBColorSpace];
+}
+
+- (NSString *) localizedName {
+    return [NSString stringWithFormat: @"Display %u",
+                                       (unsigned) [self cgDirectDisplayID]];
+}
+
+// Screens are driven as standard dynamic range: no component value above 1.0
+// is displayable, and reference rendering is not supported.
+- (CGFloat) maximumExtendedDynamicRangeColorComponentValue {
+    return 1.0;
+}
+
+- (CGFloat) maximumPotentialExtendedDynamicRangeColorComponentValue {
+    return 1.0;
+}
+
+- (CGFloat) maximumReferenceExtendedDynamicRangeColorComponentValue {
+    return 0.0;
+}
+
+// No screen here has a camera housing or any other region the system reserves
+// along an edge, so no part of the frame is unsafe and there are no usable
+// areas beside a cut-out.
 - (NSEdgeInsets) safeAreaInsets {
     return NSEdgeInsetsMake(0, 0, 0, 0);
+}
+
+- (NSRect) auxiliaryTopLeftArea {
+    return NSZeroRect;
+}
+
+- (NSRect) auxiliaryTopRightArea {
+    return NSZeroRect;
+}
+
+// The refresh rate of the screen's current mode, as the backend reports it, or
+// 60 Hz when it reports none. Displays have a fixed rate here, so the minimum
+// and maximum intervals are the same.
+- (NSTimeInterval) _refreshInterval {
+    NSDisplay *display = [NSDisplay currentDisplay];
+    double rate = 0;
+
+    if ([display respondsToSelector: @selector(currentModeForScreen:)]) {
+        NSDictionary *mode = [display
+                currentModeForScreen: (int) [self cgDirectDisplayID] - 1];
+        rate = [[mode objectForKey: @"RefreshRate"] doubleValue];
+    }
+    if (!(rate > 0))
+        rate = 60.0;
+    return 1.0 / rate;
+}
+
+- (NSTimeInterval) minimumRefreshInterval {
+    return [self _refreshInterval];
+}
+
+- (NSTimeInterval) maximumRefreshInterval {
+    return [self _refreshInterval];
+}
+
+// The highest frame rate the screen supports, rounded to a whole number of
+// frames; it is the reciprocal of the shortest refresh interval.
+- (NSInteger) maximumFramesPerSecond {
+    return (NSInteger) lround(1.0 / [self minimumRefreshInterval]);
+}
+
+// Screens here refresh at a fixed rate, so an update can only take effect on a
+// frame boundary and the granularity is one refresh interval.
+- (NSTimeInterval) displayUpdateGranularity {
+    return [self minimumRefreshInterval];
 }
 
 - (id) description {
     return [NSString stringWithFormat: @"< %@ - frame %@, visible %@ >",
                                        [super description],
-                                       NSStringFromRect(_frame),
-                                       NSStringFromRect(_visibleFrame)];
+                                       NSStringFromRect(NS_EXTRA(NSScreen, self)->_frame),
+                                       NSStringFromRect(NS_EXTRA(NSScreen, self)->_visibleFrame)];
 }
 
 - (NSDictionary<NSDeviceDescriptionKey, id> *) deviceDescription {
     // AppKit clients use this documented string key to obtain the same display
     // ID used by CoreGraphics and assigned by the window-system backend.
-    return @{ @"NSScreenNumber":
-            [NSNumber numberWithUnsignedInt: [self cgDirectDisplayID]] };
+    // The other keys describe the screen as a drawing device: its size in
+    // points, 72 dpi per backing scale unit, and 8-bit RGB.
+    CGFloat dpi = 72.0 * [self backingScaleFactor];
+    return @{
+        @"NSScreenNumber" :
+                [NSNumber numberWithUnsignedInt: [self cgDirectDisplayID]],
+        NSDeviceSize : [NSValue valueWithSize: NS_EXTRA(NSScreen, self)->_frame.size],
+        NSDeviceResolution : [NSValue valueWithSize: NSMakeSize(dpi, dpi)],
+        NSDeviceIsScreen : @"YES",
+        NSDeviceColorSpaceName : NSCalibratedRGBColorSpace,
+        NSDeviceBitsPerSample : @8,
+    };
 }
 
 @end
 
 @implementation NSScreen (Darling)
 - (NSData *) edid {
-    return self->_edid;
+    return NS_EXTRA(NSScreen, self)->_edid;
 }
 
 - (void) setEdid: (NSData *) data {
-    NSData *old = self->_edid;
-    self->_edid = [data retain];
+    NSData *old = NS_EXTRA(NSScreen, self)->_edid;
+    NS_EXTRA(NSScreen, self)->_edid = [data retain];
     [old release];
 }
 
 - (CGDirectDisplayID) cgDirectDisplayID {
-    if (self->_directDisplayID == 0)
+    // The backend may not have assigned an ID; 0 is not a valid display.
+    if (NS_EXTRA(NSScreen, self)->_directDisplayID == 0)
         return 1;
-    return self->_directDisplayID;
+    return NS_EXTRA(NSScreen, self)->_directDisplayID;
 }
 
 - (void) setCgDirectDisplayID: (CGDirectDisplayID) displayID {
-    self->_directDisplayID = displayID;
+    NS_EXTRA(NSScreen, self)->_directDisplayID = displayID;
 }
 
 @end

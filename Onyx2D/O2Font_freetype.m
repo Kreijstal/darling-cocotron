@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <dispatch/dispatch.h>
 #import FT_TRUETYPE_TABLES_H
 
 @implementation O2Font_freetype
@@ -33,22 +34,64 @@ FT_Library O2FontSharedFreeTypeLibrary() {
     return library;
 }
 
-int __darling_vchroot_expand(const char *path, char *out);
+#ifdef DARLING
+// FreeType and fontconfig are host libraries: they take and report host
+// paths, while guest code sees the host file system under the vchroot's exit
+// directory and its own root at the prefix. libsystem_kernel resolves guest
+// paths to host paths; the reverse mapping follows from where the guest root
+// resolves to.
+extern int __darling_vchroot_expand(const char *path, char *out)
+        __attribute__((weak_import));
 
-// fontconfig and FreeType are native libraries: they open files by host path, while the app's
-// files have guest paths inside the prefix.
-static NSString *hostPath(NSString *path) {
-    char expanded[4096];
-    if ([path length] >= sizeof(expanded) || __darling_vchroot_expand([path fileSystemRepresentation], expanded) != 0)
+static const char hostRootInGuest[] = "/Volumes/SystemRoot";
+
+static NSString *hostPathFromGuestPath(NSString *path) {
+    char host[PATH_MAX];
+
+    if (path == nil || __darling_vchroot_expand == NULL)
         return path;
-    return [NSString stringWithUTF8String: expanded];
+    if (__darling_vchroot_expand([path fileSystemRepresentation], host) != 0)
+        return path;
+    return [NSString stringWithUTF8String: host];
 }
+
+static NSString *guestPathFromHostPath(const char *path) {
+    static char prefix[PATH_MAX];
+    static size_t prefixLength;
+    static dispatch_once_t once;
+
+    dispatch_once(&once, ^{
+        if (__darling_vchroot_expand != NULL &&
+            __darling_vchroot_expand("/", prefix) == 0) {
+            prefixLength = strlen(prefix);
+            while (prefixLength > 0 && prefix[prefixLength - 1] == '/')
+                prefix[--prefixLength] = '\0';
+        }
+    });
+
+    if (prefixLength == 0 || path[0] != '/')
+        return [NSString stringWithUTF8String: path];
+    if (strncmp(path, prefix, prefixLength) == 0 &&
+        (path[prefixLength] == '/' || path[prefixLength] == '\0'))
+        return [NSString stringWithUTF8String:
+                path[prefixLength] ? path + prefixLength : "/"];
+    return [NSString stringWithFormat: @"%s%s", hostRootInGuest, path];
+}
+#else
+static NSString *hostPathFromGuestPath(NSString *path) {
+    return path;
+}
+
+static NSString *guestPathFromHostPath(const char *path) {
+    return [NSString stringWithUTF8String: path];
+}
+#endif
 
 static BOOL addFontFile(FcConfig *config, NSString *path) {
     BOOL isDirectory = NO;
     if (![[NSFileManager defaultManager] fileExistsAtPath: path isDirectory: &isDirectory])
         return NO;
-    const FcChar8 *host = (const FcChar8 *) [hostPath(path) UTF8String];
+    const FcChar8 *host = (const FcChar8 *) [hostPathFromGuestPath(path) UTF8String];
     return isDirectory ? FcConfigAppFontAddDir(config, host) : FcConfigAppFontAddFile(config, host);
 }
 
@@ -71,11 +114,57 @@ static void addAppFonts(FcConfig *config, id paths) {
     }
 }
 
+#ifdef DARLING
+// fontconfig runs on the host: it expands "~" and the XDG cache directory
+// from a HOME that names the guest's home directory, which does not exist on
+// the host, and the system cache directory is not writable by a user. With no
+// writable cache directory it reports an error on every use and rescans the
+// fonts each time. Give it a cache directory in the user's Caches folder,
+// which lives inside the prefix, as an additional <cachedir> (fonts.conf(5)):
+// fontconfig writes to the first one that is writable.
+static void addPrefixCacheDirectory(FcConfig *config) {
+    NSArray *caches = NSSearchPathForDirectoriesInDomains(
+            NSCachesDirectory, NSUserDomainMask, YES);
+    if ([caches count] == 0)
+        return;
+
+    NSString *guestDirectory =
+            [[caches objectAtIndex: 0] stringByAppendingPathComponent: @"fontconfig"];
+    NSMutableString *hostDirectory =
+            [hostPathFromGuestPath(guestDirectory) mutableCopy];
+    // the directory goes into XML text
+    [hostDirectory replaceOccurrencesOfString: @"&" withString: @"&amp;"
+                                      options: 0
+                                        range: NSMakeRange(0, [hostDirectory length])];
+    [hostDirectory replaceOccurrencesOfString: @"<" withString: @"&lt;"
+                                      options: 0
+                                        range: NSMakeRange(0, [hostDirectory length])];
+    [hostDirectory replaceOccurrencesOfString: @">" withString: @"&gt;"
+                                      options: 0
+                                        range: NSMakeRange(0, [hostDirectory length])];
+
+    NSString *xml = [NSString stringWithFormat:
+            @"<?xml version=\"1.0\"?><fontconfig><cachedir>%@</cachedir></fontconfig>",
+            hostDirectory];
+    [hostDirectory release];
+    FcConfigParseAndLoadFromMemory(
+            config, (const FcChar8 *) [xml UTF8String], FcTrue);
+}
+#endif
+
 FcConfig *O2FontSharedFontConfig() {
     static FcConfig *fontConfig = NULL;
 
     if (fontConfig == NULL) {
+#ifdef DARLING
+        fontConfig = FcInitLoadConfig();
+        if (fontConfig != NULL) {
+            addPrefixCacheDirectory(fontConfig);
+            FcConfigBuildFonts(fontConfig);
+        }
+#else
         fontConfig = FcInitLoadConfigAndFonts();
+#endif
 
         // A Mac app's fonts (ATSApplicationFontsPath) and an iOS app's (UIAppFonts).
         NSBundle *bundle = [NSBundle mainBundle];
@@ -249,6 +338,61 @@ static NSString *filenameOfFirstScalableFace(FcFontSet *set) {
     return fallback;
 }
 
+NSArray *O2FontCopyInstalledFaces(NSString *family, NSString *postScriptName,
+                                  NSString *style, NSString *fullName)
+{
+    const char *properties[] = { FC_FAMILY, FC_POSTSCRIPT_NAME, FC_STYLE,
+                                 FC_FULLNAME, FC_FILE };
+    NSString *keys[] = { @"family", @"postScriptName", @"style", @"fullName",
+                         @"path" };
+    NSString *values[] = { family, postScriptName, style, fullName };
+    const int count = sizeof(properties) / sizeof(properties[0]);
+
+    NSMutableArray *result = [[NSMutableArray alloc] init];
+    FcPattern *pattern = FcPatternCreate();
+    // Not the variadic FcObjectSetBuild(): fontconfig is a native library,
+    // and Darwin and Linux pass variadic arguments differently on arm64.
+    FcObjectSet *objects = FcObjectSetCreate();
+    if (pattern == NULL || objects == NULL)
+        goto out;
+    for (int i = 0; i < count; i++)
+        FcObjectSetAdd(objects, properties[i]);
+
+    for (int i = 0; i < count - 1; i++) {
+        if (values[i] != nil)
+            FcPatternAddString(pattern, properties[i],
+                               (const FcChar8 *) [values[i] UTF8String]);
+    }
+
+    FcFontSet *fonts = FcFontList(O2FontSharedFontConfig(), pattern, objects);
+    for (int i = 0; fonts != NULL && i < fonts->nfont; i++) {
+        NSMutableDictionary *face = [[NSMutableDictionary alloc] init];
+        for (int j = 0; j < count; j++) {
+            FcChar8 *text = NULL;
+            if (FcPatternGetString(fonts->fonts[i], properties[j], 0, &text) !=
+                FcResultMatch)
+                continue;
+            NSString *value =
+                    (strcmp(properties[j], FC_FILE) == 0)
+                            ? guestPathFromHostPath((const char *) text)
+                            : [NSString stringWithUTF8String: (const char *) text];
+            if (value != nil)
+                [face setObject: value forKey: keys[j]];
+        }
+        [result addObject: face];
+        [face release];
+    }
+    if (fonts != NULL)
+        FcFontSetDestroy(fonts);
+
+out:
+    if (objects != NULL)
+        FcObjectSetDestroy(objects);
+    if (pattern != NULL)
+        FcPatternDestroy(pattern);
+    return result;
+}
+
 + (NSString *) filenameForPattern: (NSString *) pattern {
     FcConfig *config = O2FontSharedFontConfig();
 
@@ -358,14 +502,16 @@ static NSString *filenameOfFirstScalableFace(FcFontSet *set) {
         _ftEncoding = FT_ENCODING_UNICODE;
     } else if (hasMacRoman) {
         _ftEncoding = FT_ENCODING_APPLE_ROMAN;
-    } else {
-        NSLog(@"encoding = %c %c %c %c", face->charmaps[0]->encoding >> 24,
-              face->charmaps[0]->encoding >> 16,
-              face->charmaps[0]->encoding >> 8, face->charmaps[0]->encoding);
+    } else if (numberOfCharMaps > 0) {
         _ftEncoding = face->charmaps[0]->encoding;
+    } else {
+        // No cmap at all: common in the TrueType subsets PDFs embed for
+        // CIDFontType2 fonts, which address glyphs by index, not by character.
+        _ftEncoding = FT_ENCODING_NONE;
     }
 
-    if (FT_Select_Charmap(face, _ftEncoding) != 0) {
+    if (_ftEncoding != FT_ENCODING_NONE &&
+        FT_Select_Charmap(face, _ftEncoding) != 0) {
         NSLog(@"FT_Select_Charmap(%d) failed", _ftEncoding);
     }
 
@@ -373,7 +519,9 @@ static NSString *filenameOfFirstScalableFace(FcFontSet *set) {
         NSLog(@"FreeType font face is not scalable for family: %s", face->family_name ? face->family_name : "unknown");
     }
 
-    _unitsPerEm = (O2Float) face->units_per_EM;
+    // Bitmap-only faces have no design units; keep derived metrics finite.
+    _unitsPerEm = face->units_per_EM != 0 ? (O2Float) face->units_per_EM
+                                          : 1000.0f;
     _ascent = face->ascender;
     _descent = face->descender;
     _leading = 0;
@@ -401,6 +549,39 @@ static NSString *filenameOfFirstScalableFace(FcFontSet *set) {
 
 - (FT_Face) face {
     return _face;
+}
+
+- (NSString *) copyPostScriptName {
+    const char *name = FT_Get_Postscript_Name(_face);
+    if (name == NULL)
+        return [super copyPostScriptName];
+    return [[NSString alloc] initWithUTF8String: name];
+}
+
+- (NSString *) copyFamilyName {
+    if (_face->family_name == NULL)
+        return [super copyFamilyName];
+    return [[NSString alloc] initWithUTF8String: _face->family_name];
+}
+
+- (NSString *) copyStyleName {
+    if (_face->style_name == NULL)
+        return [super copyStyleName];
+    return [[NSString alloc] initWithUTF8String: _face->style_name];
+}
+
+// The face has a single glyph slot, so every FT_Load_Glyph on it is
+// serialized on the font object (see O2Context_builtin_FT and KTFont_FT).
+- (O2Rect) boundingRectForGlyph: (O2Glyph) glyph {
+    @synchronized(self) {
+        if (FT_Load_Glyph(_face, glyph,
+                          FT_LOAD_NO_SCALE | FT_LOAD_IGNORE_TRANSFORM) != 0)
+            return O2RectMake(0, 0, 0, 0);
+        FT_Glyph_Metrics metrics = _face->glyph->metrics;
+        return O2RectMake(metrics.horiBearingX,
+                          metrics.horiBearingY - metrics.height,
+                          metrics.width, metrics.height);
+    }
 }
 
 - (CFArrayRef) copyTableTags {
@@ -497,14 +678,16 @@ FT_Face O2FontFreeTypeFace(O2Font_freetype *self) {
 }
 
 - (void) fetchAdvances {
-    FT_Set_Char_Size(_face, 0, _unitsPerEm * 64, 72, 72);
+    @synchronized(self) {
+        FT_Set_Char_Size(_face, 0, _unitsPerEm * 64, 72, 72);
 
-    _advances = NSZoneMalloc(NULL, sizeof(NSInteger) * _numberOfGlyphs);
+        _advances = NSZoneMalloc(NULL, sizeof(NSInteger) * _numberOfGlyphs);
 
-    for (O2Glyph glyph = 0; glyph < _numberOfGlyphs; glyph++) {
-        FT_Load_Glyph(_face, glyph, FT_LOAD_DEFAULT);
+        for (O2Glyph glyph = 0; glyph < _numberOfGlyphs; glyph++) {
+            FT_Load_Glyph(_face, glyph, FT_LOAD_DEFAULT);
 
-        _advances[glyph] = _face->glyph->advance.x / (O2Float)(2 << 5);
+            _advances[glyph] = _face->glyph->advance.x / (O2Float)(2 << 5);
+        }
     }
 }
 
@@ -628,44 +811,89 @@ FT_Face O2FontFreeTypeFace(O2Font_freetype *self) {
     return [self unicode_createEncodingForTextEncoding: encoding];
 }
 
+/* Cache entries are keyed by everything that determines the rendered bitmap:
+ * the glyph, the 26.6 pixel size handed to FT_Set_Char_Size and the FreeType
+ * load flags and render mode. The text rendering matrix only reaches this
+ * point as its scale (folded into the pixel size by the caller; shear and
+ * rotation are not applied to FreeType bitmaps), and the context's
+ * antialiasing flag is not consulted by the FreeType backend (coverage is
+ * always the 8-bit gray bitmap). If the backend starts honouring either, the
+ * extra input has to become part of this key. */
+#define O2FONT_GLYPH_LOAD_FLAGS FT_LOAD_DEFAULT
+#define O2FONT_GLYPH_RENDER_MODE FT_RENDER_MODE_NORMAL
+#define O2FONT_GLYPH_SIZE_KEY_BITS 24
+
 - (O2FreeTypeCachedGlyph *) rasterizeGlyph: (O2Glyph) glyph
                                   pointSize: (O2Float) pointSize
 {
-    if (_face == NULL) {
+    if (_face == NULL || !(pointSize > 0)) {
         return nil;
     }
 
-    @synchronized(self) {
-        uint64_t keyValue = ((uint64_t)(uint32_t)((long)(pointSize * 64)) << 32) |
-                            glyph;
-        NSNumber *key = [NSNumber numberWithUnsignedLongLong: keyValue];
+    /* The size is set here, under the font lock, so a hit or a miss never
+     * depends on what size the face was left at by metric queries. */
+    O2Float size64 = pointSize * 64;
+    BOOL cacheable = size64 < (O2Float)(1 << O2FONT_GLYPH_SIZE_KEY_BITS);
 
-        O2FreeTypeCachedGlyph *cached = [_glyphCache objectForKey: key];
-        if (cached != nil) {
-            return [[cached retain] autorelease];
+    @synchronized(self) {
+        NSNumber *key = nil;
+
+        if (cacheable) {
+            uint64_t keyValue =
+                    ((uint64_t)(uint32_t)(long) size64
+                     << (64 - O2FONT_GLYPH_SIZE_KEY_BITS)) |
+                    ((uint64_t)O2FONT_GLYPH_RENDER_MODE << 32) | glyph;
+            key = [NSNumber numberWithUnsignedLongLong: keyValue];
+
+            O2FreeTypeCachedGlyph *hit = [_glyphCache objectForKey: key];
+            if (hit != nil) {
+                return [[hit retain] autorelease];
+            }
         }
 
-        if (FT_Load_Glyph(_face, glyph, FT_LOAD_DEFAULT) != 0) {
+        if (FT_Set_Char_Size(_face, 0, (long) size64, 72.0, 72.0) != 0) {
             return nil;
         }
 
-        if (FT_Render_Glyph(_face->glyph, FT_RENDER_MODE_NORMAL) != 0) {
+        if (FT_Load_Glyph(_face, glyph, O2FONT_GLYPH_LOAD_FLAGS) != 0) {
+            return nil;
+        }
+
+        if (FT_Render_Glyph(_face->glyph, O2FONT_GLYPH_RENDER_MODE) != 0) {
             return nil;
         }
 
         FT_GlyphSlot slot = _face->glyph;
-        cached = [[O2FreeTypeCachedGlyph alloc]
+        O2FreeTypeCachedGlyph *cached = [[O2FreeTypeCachedGlyph alloc]
                 initWithBitmap: &slot->bitmap
                           left: slot->bitmap_left
                            top: slot->bitmap_top
                        advance: slot->advance.x];
+        [cached autorelease];
 
-        if ([_glyphCache count] >= O2FONT_GLYPH_CACHE_LIMIT) {
+        if (!cacheable) {
+            return cached;
+        }
+
+        NSUInteger bytes = (NSUInteger) cached->bitmap.rows *
+                           (NSUInteger) cached->bitmap.width;
+
+        if (bytes > O2FONT_GLYPH_CACHE_BYTES_LIMIT) {
+            return cached; /* too large to be worth keeping */
+        }
+
+        /* Bounded by entry count and by bytes; the whole cache is dropped
+         * when either limit would be exceeded. Entries handed out earlier
+         * stay valid because they are retained by their callers. */
+        if ([_glyphCache count] >= O2FONT_GLYPH_CACHE_LIMIT ||
+            _glyphCacheBytes + bytes > O2FONT_GLYPH_CACHE_BYTES_LIMIT) {
             [_glyphCache removeAllObjects];
+            _glyphCacheBytes = 0;
         }
 
         [_glyphCache setObject: cached forKey: key];
-        return [cached autorelease];
+        _glyphCacheBytes += bytes;
+        return cached;
     }
 }
 

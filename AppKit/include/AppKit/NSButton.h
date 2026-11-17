@@ -17,57 +17,46 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSButtonCell.h>
 #import <AppKit/NSControl.h>
 
+#define _NS_SIDE_NSButton 0, 1,
+// Legacy ObjC ABI (i386): instance size must stay 0x5c, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSButton : NSControl {
-    BOOL _hasDestructiveAction;
-    NSColor *_contentTintColor;
+    NS_EXTRA_IVARS_BEGIN(NSButton)
+        NSColor *_contentTintColor;
+        BOOL _hasDestructiveAction;
+    NS_SIDE_IVARS_END(NSButton)
 }
 
-+ (instancetype) buttonWithImage: (NSImage *) image target: (id) target action: (SEL) action;
-+ (instancetype) buttonWithTitle: (NSString *) title target: (id) target action: (SEL) action;
 + (instancetype) buttonWithTitle: (NSString *) title image: (NSImage *) image target: (id) target action: (SEL) action;
 + (instancetype) checkboxWithTitle: (NSString *) title target: (id) target action: (SEL) action;
 + (instancetype) radioButtonWithTitle: (NSString *) title target: (id) target action: (SEL) action;
 
-- (BOOL) isTransparent;
-- (NSString *) keyEquivalent;
-- (NSEventModifierFlags) keyEquivalentModifierMask;
-- (NSImage *) image;
-- (NSCellImagePosition) imagePosition;
-- (NSString *) title;
-- (NSControlStateValue) state;
-- (BOOL) allowsMixedState;
-- (NSSound *) sound;
+@property(nonatomic, getter=isTransparent) BOOL transparent;
+@property(nonatomic, copy) NSString *keyEquivalent;
+@property(nonatomic) NSEventModifierFlags keyEquivalentModifierMask;
+@property(nonatomic, retain) NSImage *image;
+@property(nonatomic) NSCellImagePosition imagePosition;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic) NSControlStateValue state;
+@property(nonatomic) BOOL allowsMixedState;
+@property(nonatomic, retain) NSSound *sound;
 
-- (NSBezelStyle) bezelStyle;
-- (NSString *) alternateTitle;
-- (NSImage *) alternateImage;
-- (NSAttributedString *) attributedTitle;
-- (NSAttributedString *) attributedAlternateTitle;
-- (BOOL) showsBorderOnlyWhileMouseInside;
+@property(nonatomic) NSBezelStyle bezelStyle;
+@property(nonatomic, copy) NSString *alternateTitle;
+@property(nonatomic, retain) NSImage *alternateImage;
+@property(nonatomic, copy) NSAttributedString *attributedTitle;
+@property(nonatomic, copy) NSAttributedString *attributedAlternateTitle;
+@property(nonatomic) BOOL showsBorderOnlyWhileMouseInside;
 - (void) getPeriodicDelay: (float *) delay interval: (float *) interval;
 
-- (void) setTransparent: (BOOL) value;
-- (void) setKeyEquivalent: (NSString *) value;
-- (void) setKeyEquivalentModifierMask: (NSEventModifierFlags) value;
-- (void) setImage: (NSImage *) value;
-- (void) setImagePosition: (NSCellImagePosition) value;
-- (NSImageScaling) imageScaling;
-- (void) setImageScaling: (NSImageScaling) value;
-- (void) setTitle: (NSString *) value;
-- (void) setState: (NSControlStateValue) value;
+@property(nonatomic) NSImageScaling imageScaling;
 - (void) setNextState;
-- (void) setAllowsMixedState: (BOOL) value;
-- (void) setSound: (NSSound *) value;
 
-- (void) setBezelStyle: (NSBezelStyle) value;
-- (void) setAlternateTitle: (NSString *) value;
-- (void) setAlternateImage: (NSImage *) value;
-- (void) setAttributedTitle: (NSAttributedString *) value;
-- (void) setAttributedAlternateTitle: (NSAttributedString *) value;
-- (void) setShowsBorderOnlyWhileMouseInside: (BOOL) value;
 - (void) setPeriodicDelay: (float) delay interval: (float) interval;
 
 - (void) setButtonType: (NSButtonType) value;
@@ -77,15 +66,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (BOOL) performKeyEquivalent: (NSEvent *) event;
 - (void) performClick: sender;
 
-@end
+// Convenience constructors (10.12)
++ (instancetype) buttonWithTitle: (NSString *) title
+                          target: (id) target
+                          action: (SEL) action;
++ (instancetype) buttonWithImage: (NSImage *) image
+                          target: (id) target
+                          action: (SEL) action;
 
-@interface NSButton (NSDestructiveAction)
-// macOS 11: marks a button whose action is destructive (stored; not drawn differently).
-- (BOOL) hasDestructiveAction;
-- (void) setHasDestructiveAction: (BOOL) value;
 @end
 
 @interface NSButton (NSButtonContentTint)
 // Stored only: the image and title aren't tinted.
 @property(copy) NSColor *contentTintColor;
 @end
+
+@interface NSButton (NSDestructiveAction)
+// macOS 11: marks a button whose action is destructive (stored; not drawn differently).
+@property(nonatomic) BOOL hasDestructiveAction;
+@end
+

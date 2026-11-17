@@ -17,10 +17,37 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSCollectionViewItem.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSView.h>
 
 @class NSCollectionViewLayout, NSCollectionView;
 @protocol NSCollectionViewDelegate;
+typedef NS_ENUM(NSInteger, NSCollectionViewDropOperation) {
+    NSCollectionViewDropOn = 0,
+    NSCollectionViewDropBefore = 1,
+};
+
+typedef NS_ENUM(NSInteger, NSCollectionViewItemHighlightState) {
+    NSCollectionViewItemHighlightNone = 0,
+    NSCollectionViewItemHighlightForSelection = 1,
+    NSCollectionViewItemHighlightForDeselection = 2,
+    NSCollectionViewItemHighlightAsDropTarget = 3,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSCollectionViewScrollPosition) {
+    NSCollectionViewScrollPositionNone = 0,
+    NSCollectionViewScrollPositionTop = 1 << 0,
+    NSCollectionViewScrollPositionCenteredVertically = 1 << 1,
+    NSCollectionViewScrollPositionBottom = 1 << 2,
+    NSCollectionViewScrollPositionNearestHorizontalEdge = 1 << 9,
+    NSCollectionViewScrollPositionLeft = 1 << 3,
+    NSCollectionViewScrollPositionCenteredHorizontally = 1 << 4,
+    NSCollectionViewScrollPositionRight = 1 << 5,
+    NSCollectionViewScrollPositionLeadingEdge = 1 << 6,
+    NSCollectionViewScrollPositionTrailingEdge = 1 << 7,
+    NSCollectionViewScrollPositionNearestVerticalEdge = 1 << 8,
+};
+
 @protocol NSCollectionViewDataSource <NSObject>
 - (NSInteger)collectionView:(NSCollectionView *)view numberOfItemsInSection:(NSInteger)section;
 - (NSCollectionViewItem *)collectionView:(NSCollectionView *)view itemForRepresentedObjectAtIndexPath:(NSIndexPath *)path;
@@ -28,7 +55,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSInteger)numberOfSectionsInCollectionView:(NSCollectionView *)view;
 @end
 
-typedef NSString *NSCollectionViewSupplementaryElementKind;
+typedef NSString *NSCollectionViewSupplementaryElementKind NS_SWIFT_BRIDGED_TYPEDEF;
 
 @interface NSCollectionView : NSView {
     NSArray *_content;
@@ -48,6 +75,7 @@ typedef NSString *NSCollectionViewSupplementaryElementKind;
     id<NSCollectionViewDelegate> _delegate;
     NSMutableDictionary *_loadedItems;
     NSArray *_loadedPaths;
+    NS_LEGACY_IVAR_PAD(_NSCollectionViewReserved, 116)
 }
 
 - (NSArray *) content;

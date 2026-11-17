@@ -17,31 +17,32 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSScrollerPart) {
     NSScrollerNoPart = 0,
-    NSScrollerIncrementLine,
-    NSScrollerDecrementLine,
-    NSScrollerIncrementPage,
-    NSScrollerDecrementPage,
-    NSScrollerKnob,
-    NSScrollerKnobSlot
-} NSScrollerPart;
+    NSScrollerDecrementPage = 1,
+    NSScrollerKnob = 2,
+    NSScrollerIncrementPage = 3,
+    NSScrollerDecrementLine = 4,
+    NSScrollerIncrementLine = 5,
+    NSScrollerKnobSlot = 6,
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSScrollerArrow) {
     NSScrollerIncrementArrow,
     NSScrollerDecrementArrow
-} NSScrollerArrow;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSScrollArrowPosition) {
     NSScrollerArrowsMaxEnd = 0,
     NSScrollerArrowsMinEnd = 1,
     NSScrollerArrowsNone = 2,
     NSScrollerArrowsDefaultSetting = NSScrollerArrowsMaxEnd,
-} NSScrollArrowPosition;
+};
 
-enum {
+typedef NS_ENUM(NSUInteger, NSUsableScrollerParts) {
     NSNoScrollerParts = 0,
     NSOnlyScrollerArrows = 1,
     NSAllScrollerParts = 2,
@@ -58,28 +59,32 @@ typedef NS_ENUM(NSInteger, NSScrollerKnobStyle) {
     NSScrollerKnobStyleLight = 2,
 };
 
-typedef NSUInteger NSUsableScrollerParts;
-
+// Legacy ObjC ABI (i386): instance size must stay 0x78, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSScroller : NSControl {
-    id _target;
-    SEL _action;
-    struct {
-        unsigned isHoriz : 1;
-        NSUsableScrollerParts partsUsable : 2;
-    } sFlags;
-
     float _floatValue;
     CGFloat _knobProportion;
-    NSScrollArrowPosition _arrowsPosition;
-    NSControlSize _controlSize;
+    NS_LEGACY_IVAR_PAD(_NSScrollerReserved1, 16)
+    NS_EXTRA_IVARS_BEGIN(NSScroller)
+        id _target;
+        SEL _action;
+        struct {
+            unsigned isHoriz : 1;
+            NSUsableScrollerParts partsUsable : 2;
+        } sFlags;
 
-    NSScrollerPart _hitPart;
-    BOOL _isEnabled;
-    BOOL _isHighlighted;
+        NSScrollArrowPosition _arrowsPosition;
+        NSControlSize _controlSize;
 
-    NSScrollerStyle _scrollerStyle;
-    NSScrollerKnobStyle _knobStyle;
-    NSControlTint _controlTint;
+        NSScrollerPart _hitPart;
+        BOOL _isEnabled;
+        BOOL _isHighlighted;
+
+        NSScrollerStyle _scrollerStyle;
+        NSScrollerKnobStyle _knobStyle;
+        NSControlTint _controlTint;
+    NS_EXTRA_IVARS_END(NSScroller)
 }
 
 + (CGFloat) scrollerWidth;
@@ -120,3 +125,5 @@ typedef NSUInteger NSUsableScrollerParts;
 - (void) trackScrollButtons: (NSEvent *) event;
 
 @end
+
+APPKIT_EXPORT NSNotificationName const NSPreferredScrollerStyleDidChangeNotification;

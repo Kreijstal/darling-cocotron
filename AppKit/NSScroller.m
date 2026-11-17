@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSScroller.h>
 #import <AppKit/NSWindow.h>
 #import <Foundation/NSKeyedArchiver.h>
+#import <Foundation/NSUserDefaults.h>
 
 // Private: coordinates a scroll view's two scrollers. Apps create one, set its
 // delegate and ask for the scroller layout direction.
@@ -95,8 +96,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) contentAreaScrolled {
-    // Terminal reports each scroll through this, with no argument, so the
-    // imp pair redraws its painters.
+    // Clients report each scroll through this, with no argument, so the imp
+    // pair redraws its painters.
     [self contentAreaDidResize];
 }
 
@@ -104,12 +105,21 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @implementation NSScroller
 
+NS_EXTRA_DEALLOC(NSScroller)
+
 + (CGFloat) scrollerWidth {
     return [[NSDisplay currentDisplay] scrollerWidth];
 }
 
-// Cocotron draws legacy scrollers, which take up space next to the content.
 + (NSScrollerStyle) preferredScrollerStyle {
+    // The "Show scroll bars" setting. Its automatic choice depends on
+    // whether a trackpad is in use, which is not known here, so it gives
+    // the scrollers a mouse gets.
+    NSString *setting = [[NSUserDefaults standardUserDefaults]
+            stringForKey: @"AppleShowScrollBars"];
+
+    if ([setting isEqualToString: @"WhenScrolling"])
+        return NSScrollerStyleOverlay;
     return NSScrollerStyleLegacy;
 }
 
@@ -143,36 +153,40 @@ static NSAppleScrollBarVariant appleScrollBarVariant(NSScroller *self) {
     [super initWithCoder: coder];
 
     if ([coder allowsKeyedCoding]) {
-        sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
+        NS_EXTRA(NSScroller, self)->sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
         _floatValue = 0;
         _knobProportion = 0;
         [self checkSpaceForParts];
     } else {
-        // GUESS (rung 6): NeXT/OpenStep typedstream layout for NSScroller
-        sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
+        // Layout per class version as recorded from Mac archives: the target, the value,
+        // the knob proportion and the action, then up to version 16 a short and from 17
+        // two separate bytes. The first byte and the short have an unknown meaning. In
+        // the second byte, bits 5-6 hold the control size and the low two bits the arrows
+        // position (only the values for the default and for none were observed).
+        NSInteger version = [coder versionForClassName: @"NSScroller"];
+        NS_EXTRA(NSScroller, self)->sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
         _floatValue = 0;
         _knobProportion = 0;
 
-        id target = nil;
+        id target = [coder decodeObject];
         float floatVal = 0, knobProp = 0;
         SEL action = NULL;
-        char arrows = 0, size = 0;
+        char unknownByte = 0, flagsByte = 0;
 
-        @try {
-            [coder decodeValueOfObjCType: "@" at: &target];
+        if (version >= 17) {
             [coder decodeValuesOfObjCTypes: "ff:", &floatVal, &knobProp, &action];
-            [coder decodeValueOfObjCType: "c" at: &arrows];
-            [coder decodeValueOfObjCType: "c" at: &size];
-            _floatValue = floatVal;
-            _knobProportion = knobProp;
-            _arrowsPosition = (NSScrollArrowPosition)arrows;
-            _controlSize = (NSControlSize)size;
-            [self setTarget: target];
-            [target release];
-            [self setAction: action];
-        } @catch (id ex) {
-            // Ignore decoding mismatch
+            [coder decodeValuesOfObjCTypes: "c", &unknownByte];
+            [coder decodeValuesOfObjCTypes: "c", &flagsByte];
+        } else {
+            short unknownShort = 0;
+            [coder decodeValuesOfObjCTypes: "ff:s", &floatVal, &knobProp, &action, &unknownShort];
         }
+        _floatValue = floatVal;
+        _knobProportion = knobProp;
+        NS_EXTRA(NSScroller, self)->_controlSize = (NSControlSize) ((flagsByte >> 5) & 3);
+        NS_EXTRA(NSScroller, self)->_arrowsPosition = (flagsByte & 3) == 2 ? NSScrollerArrowsNone : NSScrollerArrowsMaxEnd;
+        [self setTarget: target];
+        [self setAction: action];
         [self checkSpaceForParts];
     }
     return self;
@@ -180,7 +194,7 @@ static NSAppleScrollBarVariant appleScrollBarVariant(NSScroller *self) {
 
 - initWithFrame: (NSRect) frame {
     [super initWithFrame: frame];
-    sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
+    NS_EXTRA(NSScroller, self)->sFlags.isHoriz = (_bounds.size.width < _bounds.size.height) ? NO : YES;
     _floatValue = 0;
     _knobProportion = 0;
     [self checkSpaceForParts];
@@ -199,38 +213,39 @@ static NSAppleScrollBarVariant appleScrollBarVariant(NSScroller *self) {
     return NO;
 }
 
-- (void) setFrame: (NSRect) frame {
-    [super setFrame: frame];
+// -setFrame: goes through -setFrameSize: as well.
+- (void) setFrameSize: (NSSize) size {
+    [super setFrameSize: size];
     [self checkSpaceForParts];
 }
 
 - (id) target {
-    return _target;
+    return NS_EXTRA(NSScroller, self)->_target;
 }
 
 - (void) setTarget: (id) target {
-    _target = target;
+    NS_EXTRA(NSScroller, self)->_target = target;
 }
 
 - (SEL) action {
-    return _action;
+    return NS_EXTRA(NSScroller, self)->_action;
 }
 
 - (void) setAction: (SEL) action {
-    _action = action;
+    NS_EXTRA(NSScroller, self)->_action = action;
 }
 
 - (BOOL) isEnabled {
-    return _isEnabled;
+    return NS_EXTRA(NSScroller, self)->_isEnabled;
 }
 
 - (void) setEnabled: (BOOL) flag {
-    _isEnabled = flag;
+    NS_EXTRA(NSScroller, self)->_isEnabled = flag;
     [self setNeedsDisplay: YES];
 }
 
 - (BOOL) isVertical {
-    return sFlags.isHoriz ? NO : YES;
+    return NS_EXTRA(NSScroller, self)->sFlags.isHoriz ? NO : YES;
 }
 
 - (float) floatValue {
@@ -247,28 +262,28 @@ static NSAppleScrollBarVariant appleScrollBarVariant(NSScroller *self) {
 }
 
 - (NSScrollArrowPosition) arrowsPosition {
-    return _arrowsPosition;
+    return NS_EXTRA(NSScroller, self)->_arrowsPosition;
 }
 
 - (NSControlTint) controlTint {
-    return _controlTint;
+    return NS_EXTRA(NSScroller, self)->_controlTint;
 }
 
 - (void) setControlTint: (NSControlTint) tint {
-    _controlTint = tint;
+    NS_EXTRA(NSScroller, self)->_controlTint = tint;
     [self setNeedsDisplay: YES];
 }
 
 - (NSControlSize) controlSize {
-    return _controlSize;
+    return NS_EXTRA(NSScroller, self)->_controlSize;
 }
 
 - (NSScrollerStyle) scrollerStyle {
-    return _scrollerStyle;
+    return NS_EXTRA(NSScroller, self)->_scrollerStyle;
 }
 
 - (NSScrollerKnobStyle) knobStyle {
-    return _knobStyle;
+    return NS_EXTRA(NSScroller, self)->_knobStyle;
 }
 
 - (id) scrollerImp {
@@ -314,20 +329,20 @@ static NSAppleScrollBarVariant appleScrollBarVariant(NSScroller *self) {
 }
 
 - (void) setArrowsPosition: (NSScrollArrowPosition) position {
-    _arrowsPosition = position;
+    NS_EXTRA(NSScroller, self)->_arrowsPosition = position;
 }
 
 - (void) setControlSize: (NSControlSize) value {
-    _controlSize = value;
+    NS_EXTRA(NSScroller, self)->_controlSize = value;
     [self setNeedsDisplay: YES];
 }
 
 - (void) setScrollerStyle: (NSScrollerStyle) style {
-    _scrollerStyle = style;
+    NS_EXTRA(NSScroller, self)->_scrollerStyle = style;
 }
 
 - (void) setKnobStyle: (NSScrollerKnobStyle) style {
-    _knobStyle = style;
+    NS_EXTRA(NSScroller, self)->_knobStyle = style;
     [self setNeedsDisplay: YES];
 }
 
@@ -392,7 +407,7 @@ static inline CGFloat roundFloat(CGFloat value) {
     NSRect result = NSZeroRect;
 
     if ([self isVertical]) {
-        if (_arrowsPosition == NSScrollerArrowsNone) {
+        if (NS_EXTRA(NSScroller, self)->_arrowsPosition == NSScrollerArrowsNone) {
             decLine = NSZeroRect;
             incLine = NSZeroRect;
         } else {
@@ -411,10 +426,10 @@ static inline CGFloat roundFloat(CGFloat value) {
                 knobSlot.size.height -=
                         decLine.size.height + incLine.size.height;
 
-                if (_arrowsPosition == NSScrollerArrowsMaxEnd) {
+                if (NS_EXTRA(NSScroller, self)->_arrowsPosition == NSScrollerArrowsMaxEnd) {
                     incLine.origin.y = bounds.size.height - incLine.size.height;
                     decLine.origin.y = incLine.origin.y - decLine.size.height;
-                } else if (_arrowsPosition == NSScrollerArrowsMinEnd) {
+                } else if (NS_EXTRA(NSScroller, self)->_arrowsPosition == NSScrollerArrowsMinEnd) {
                     incLine.origin.y = NSMaxY(decLine);
                     knobSlot.origin.y = NSMaxY(incLine);
                 }
@@ -431,7 +446,7 @@ static inline CGFloat roundFloat(CGFloat value) {
         if (floor(knob.size.height) >= floor(knobSlot.size.height))
             knob = NSZeroRect;
     } else {
-        if (_arrowsPosition == NSScrollerArrowsNone) {
+        if (NS_EXTRA(NSScroller, self)->_arrowsPosition == NSScrollerArrowsNone) {
             decLine = NSZeroRect;
             incLine = NSZeroRect;
         } else {
@@ -492,16 +507,16 @@ static inline CGFloat roundFloat(CGFloat value) {
 }
 
 - (void) checkSpaceForParts {
-    sFlags.partsUsable = NSAllScrollerParts;
+    NS_EXTRA(NSScroller, self)->sFlags.partsUsable = NSAllScrollerParts;
 }
 
 - (NSUsableScrollerParts) usableParts {
-    return sFlags.partsUsable;
+    return NS_EXTRA(NSScroller, self)->sFlags.partsUsable;
 }
 
 - (void) highlight: (BOOL) flag {
-    if (_isHighlighted != flag) {
-        _isHighlighted = flag;
+    if (NS_EXTRA(NSScroller, self)->_isHighlighted != flag) {
+        NS_EXTRA(NSScroller, self)->_isHighlighted = flag;
         [self setNeedsDisplay: YES];
     }
 }
@@ -519,7 +534,7 @@ static inline CGFloat roundFloat(CGFloat value) {
     if (!NSIsEmptyRect(knob))
         [[self graphicsStyle] drawScrollerKnobInRect: knob
                                             vertical: [self isVertical]
-                                           highlight: _isHighlighted];
+                                           highlight: NS_EXTRA(NSScroller, self)->_isHighlighted];
 }
 
 - (void) drawArrow: (NSScrollerArrow) arrow highlight: (BOOL) highlight {
@@ -542,9 +557,9 @@ static inline CGFloat roundFloat(CGFloat value) {
     NSRect knob = [self rectForPart: NSScrollerKnob];
     BOOL high;
 
-    high = (_hitPart == NSScrollerIncrementLine) && _isHighlighted;
+    high = (NS_EXTRA(NSScroller, self)->_hitPart == NSScrollerIncrementLine) && NS_EXTRA(NSScroller, self)->_isHighlighted;
     [self drawArrow: NSScrollerIncrementArrow highlight: high];
-    high = (_hitPart == NSScrollerDecrementLine) && _isHighlighted;
+    high = (NS_EXTRA(NSScroller, self)->_hitPart == NSScrollerDecrementLine) && NS_EXTRA(NSScroller, self)->_isHighlighted;
     [self drawArrow: NSScrollerDecrementArrow highlight: high];
 
     if (!NSIsEmptyRect(decPage))
@@ -565,24 +580,24 @@ static inline CGFloat roundFloat(CGFloat value) {
 }
 
 - (NSScrollerPart) hitPart {
-    return _hitPart;
+    return NS_EXTRA(NSScroller, self)->_hitPart;
 }
 
 - (NSScrollerPart) testPart: (NSPoint) point {
     int part;
 
-    _hitPart = NSScrollerNoPart;
+    NS_EXTRA(NSScroller, self)->_hitPart = NSScrollerNoPart;
 
     for (part = NSScrollerIncrementLine; part <= NSScrollerKnobSlot; part++) {
         NSRect rect = [self rectForPart: part];
 
         if (NSMouseInRect(point, rect, [self isFlipped])) {
-            _hitPart = part;
+            NS_EXTRA(NSScroller, self)->_hitPart = part;
             break;
         }
     }
 
-    return _hitPart;
+    return NS_EXTRA(NSScroller, self)->_hitPart;
 }
 
 - (void) trackKnob: (NSEvent *) event {
@@ -623,7 +638,7 @@ static inline CGFloat roundFloat(CGFloat value) {
 
         [self setNeedsDisplay: YES];
 
-        [self sendAction: _action to: _target];
+        [self sendAction: NS_EXTRA(NSScroller, self)->_action to: NS_EXTRA(NSScroller, self)->_target];
 
     } while ([event type] != NSLeftMouseUp);
 }
@@ -634,11 +649,11 @@ static inline CGFloat roundFloat(CGFloat value) {
 
     // fixup to make paging behavior available via the Alt key, like NEXTSTEP
     if (([event modifierFlags] & NSAlternateKeyMask) &&
-        (_hitPart == NSScrollerIncrementLine))
-        _hitPart = NSScrollerIncrementPage;
+        (NS_EXTRA(NSScroller, self)->_hitPart == NSScrollerIncrementLine))
+        NS_EXTRA(NSScroller, self)->_hitPart = NSScrollerIncrementPage;
     else if (([event modifierFlags] & NSAlternateKeyMask) &&
-             (_hitPart == NSScrollerDecrementLine))
-        _hitPart = NSScrollerDecrementPage;
+             (NS_EXTRA(NSScroller, self)->_hitPart == NSScrollerDecrementLine))
+        NS_EXTRA(NSScroller, self)->_hitPart = NSScrollerDecrementPage;
 
     // scroll every 1/2 second...
     [NSEvent startPeriodicEventsAfterDelay: 0.0 withPeriod: 0.05];
@@ -649,7 +664,7 @@ static inline CGFloat roundFloat(CGFloat value) {
 
         [self highlight: NSMouseInRect(point, rect, [self isFlipped])];
         if (NSMouseInRect(point, rect, [self isFlipped]))
-            [self sendAction: _action to: _target];
+            [self sendAction: NS_EXTRA(NSScroller, self)->_action to: NS_EXTRA(NSScroller, self)->_target];
 
         event = [[self window] nextEventMatchingMask: NSPeriodicMask |
                                                       NSLeftMouseUpMask |
@@ -693,10 +708,10 @@ static inline CGFloat roundFloat(CGFloat value) {
 
             // knobRect may now be different
             knobRect = [self rectForPart: NSScrollerKnob];
-            _hitPart = NSScrollerKnobSlot; // for scroll-to-click
+            NS_EXTRA(NSScroller, self)->_hitPart = NSScrollerKnobSlot; // for scroll-to-click
 
             [self highlight: YES];
-            [self sendAction: _action to: _target];
+            [self sendAction: NS_EXTRA(NSScroller, self)->_action to: NS_EXTRA(NSScroller, self)->_target];
         }
 
         event = [[self window] nextEventMatchingMask: NSLeftMouseUpMask |
@@ -756,8 +771,10 @@ static inline CGFloat roundFloat(CGFloat value) {
             _floatValue = 1.0;
 
         [self setNeedsDisplay: YES];
-        [self sendAction: _action to: _target];
+        [self sendAction: NS_EXTRA(NSScroller, self)->_action to: NS_EXTRA(NSScroller, self)->_target];
     }
 }
 
 @end
+
+NSNotificationName const NSPreferredScrollerStyleDidChangeNotification = @"NSPreferredScrollerStyleDidChangeNotification";

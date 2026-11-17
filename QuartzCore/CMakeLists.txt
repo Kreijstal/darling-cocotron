@@ -28,10 +28,13 @@ set(QuartzCore_sources
 	CABase.m
 	CABasicAnimation.m
 	CAContext.m
+	CAEDRMetadata.m
 	CAEmitterCell.m
 	CAEmitterLayer.m
+	CAFrameRateRange.m
 	CALayerContext.m
 	CACoding.m
+	CAKeyedCoding.m
 	CALayer.m
 	CALayerHost.m
 	CATextLayer.m
@@ -61,6 +64,7 @@ set(QuartzCore_sources
 	CAFilter.m
 	CAGradientLayer.m
 	CAShapeLayer.m
+	CATiledLayer.m
 	CAMediaTiming.m
 	CAReplicatorLayer.m
 	CAScrollLayer.m
@@ -104,7 +108,9 @@ add_framework(QuartzCore
 		Onyx2D
 		OpenGL
 		CoreGraphics
+		IOSurface
 		CoreText
+		ImageIO
 		Metal_private
 		${QUARTZCORE_LINK_INDIUM_PRIVATE}
 		cxx
@@ -121,7 +127,7 @@ set_target_properties(QuartzCore
 		CXX_STANDARD_REQUIRED ON
 )
 
-add_dependencies(QuartzCore CoreImage CoreVideo)
+add_dependencies(QuartzCore CoreImage CoreVideo IOSurface)
 
 target_include_directories(QuartzCore PUBLIC
 	include

@@ -18,10 +18,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSDisplay.h>
+#import <AppKit/NSGlobalMenu+Private.h>
 #import <AppKit/NSErrors.h>
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSColorList.h>
 #import <dispatch/dispatch.h>
+
+// Handling this source is what makes -[NSRunLoop runMode:beforeDate:] return
+// for a posted event; timers alone never end it.
+static void eventPosted(void *info) {}
 
 // Handling this source is what makes -[NSRunLoop runMode:beforeDate:] return
 // for a posted event; timers alone never end it.
@@ -44,21 +49,26 @@ static void eventPosted(void *info) {}
     }
 }
 
+// There is one window-server connection per process, shared by every thread.
+// The instance is published only after the backend has initialized, so a
+// backend that fails to start (or raises) leaves nothing behind and a later
+// call tries again.
+static NSDisplay *processDisplay = nil;
+
 + (NSDisplay *) currentDisplay {
-    // One display per process: a backend's sources run on the main thread's run loop, so a
-    // display made for another thread would share them and be torn down with that thread.
-    static NSDisplay *display;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        display = [[[NSThread mainThread] sharedObjectForClassName: @"NSDisplay"] retain];
-    });
-    return display;
+    @synchronized([NSDisplay class]) {
+        if (processDisplay == nil) {
+            processDisplay = [[NSDisplay alloc] init];
+        }
+        return processDisplay;
+    }
 }
 
 - (instancetype) init {
     if ([self class] != [NSDisplay class]) {
         // Initializing a concrete subclass.
         _eventQueue = [NSMutableArray new];
+        _eventQueueLock = [NSRecursiveLock new];
         CFRunLoopSourceContext context = {.version = 0, .perform = eventPosted};
         _eventSource = CFRunLoopSourceCreate(NULL, 0, &context);
         CFRunLoopAddSource(CFRunLoopGetMain(), _eventSource,
@@ -104,12 +114,12 @@ static void eventPosted(void *info) {}
     }
 
     // None of the backends can be used.
+    NSArray *available = [[backends copy] autorelease];
+    [backends release];
     [NSException raise: NSWindowServerCommunicationException
                 format: @"Failed to connect to a window server. Available "
                         @"backends are: %@",
-                        backends];
-
-    [backends release];
+                        available];
     return nil;
 }
 
@@ -118,7 +128,12 @@ static void eventPosted(void *info) {}
         CFRunLoopSourceInvalidate(_eventSource);
         CFRelease(_eventSource);
     }
+    [_eventQueueLock release];
+    [_eventQueue release];
     [super dealloc];
+}
+
+- (void) _mainMenuDidChange: (NSMenu *) menu {
 }
 
 - (NSArray<NSScreen *> *) screens {
@@ -153,6 +168,12 @@ static void eventPosted(void *info) {}
 - (NSTimeInterval) textCaretBlinkInterval {
     NSInvalidAbstractInvocation();
     return 1;
+}
+
+// Brings the windows of the given process to the front. Backends that can
+// do so override this; the default reports that nothing was activated.
+- (BOOL) activateProcessIdentifier: (pid_t) processIdentifier {
+    return NO;
 }
 
 - (void) hideCursor {
@@ -206,14 +227,26 @@ static void eventPosted(void *info) {}
     NSInvalidAbstractInvocation();
 }
 
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask
                           untilDate: (NSDate *) untilDate
                              inMode: (NSString *) mode
                             dequeue: (BOOL) dequeue
 {
     NSEvent *result = nil;
 
-    if ([_eventQueue count] || [untilDate timeIntervalSinceNow] <= 0.0)
+    // Only an event the caller asked for lets it return at once: waiting for
+    // an event of another type must still block until the date.
+    BOOL queued = NO;
+
+    [_eventQueueLock lock];
+    for (NSEvent *candidate in _eventQueue) {
+        if (NSEventMaskFromType([candidate type]) & mask) {
+            queued = YES;
+            break;
+        }
+    }
+    [_eventQueueLock unlock];
+    if (queued)
         untilDate = [NSDate date];
 
     [[NSRunLoop currentRunLoop] runMode: mode beforeDate: untilDate];
@@ -224,17 +257,22 @@ static void eventPosted(void *info) {}
     // them here destroyed every other pending event whenever a caller asked
     // for a narrow mask - a tracking loop asking for NSLeftMouseUpMask would
     // silently discard queued key events.
-    NSUInteger i, count = [_eventQueue count];
-    for (i = 0; i < count; i++) {
-        NSEvent *event = _eventQueue[i];
+    [_eventQueueLock lock];
+    @try {
+        NSUInteger i, count = [_eventQueue count];
+        for (i = 0; i < count; i++) {
+            NSEvent *event = _eventQueue[i];
 
-        if (NSEventMaskFromType([event type]) & mask) {
-            result = [[event retain] autorelease];
+            if (NSEventMaskFromType([event type]) & mask) {
+                result = [[event retain] autorelease];
 
-            if (dequeue)
-                [_eventQueue removeObjectAtIndex: i];
-            break;
+                if (dequeue)
+                    [_eventQueue removeObjectAtIndex: i];
+                break;
+            }
         }
+    } @finally {
+        [_eventQueueLock unlock];
     }
 
     if (result == nil) {
@@ -247,49 +285,88 @@ static void eventPosted(void *info) {}
     return result;
 }
 
-- (void) discardEventsMatchingMask: (NSEventMask) mask
+- (void) discardEventsMatchingMask: (NSUInteger) mask
                        beforeEvent: (NSEvent *) event
 {
-    NSInteger count = [_eventQueue count];
+    [_eventQueueLock lock];
+    @try {
+        NSInteger count = [_eventQueue count];
 
-    while (--count >= 0) {
-        if (_eventQueue[count] == event) {
-            break;
+        while (--count >= 0) {
+            if (_eventQueue[count] == event) {
+                break;
+            }
         }
-    }
 
-    // The mask selects which events to drop, so it has to be tested against
-    // each candidate. Testing it against the stop marker makes the test
-    // constant for the whole scan, so a coalescing call drops every earlier
-    // event whatever its type - and the periodic-event coalescer wipes queued
-    // key and mouse events on every tick.
-    while (--count >= 0) {
-        if (NSEventMaskFromType([_eventQueue[count] type]) & mask) {
-            [_eventQueue removeObjectAtIndex: count];
+        // The mask selects which events to drop, so it has to be tested against
+        // each candidate. Testing it against the stop marker makes the test
+        // constant for the whole scan, so a coalescing call drops every earlier
+        // event whatever its type - and the periodic-event coalescer wipes queued
+        // key and mouse events on every tick.
+        while (--count >= 0) {
+            if (NSEventMaskFromType([_eventQueue[count] type]) & mask) {
+                [_eventQueue removeObjectAtIndex: count];
+            }
         }
+    } @finally {
+        [_eventQueueLock unlock];
     }
 }
 
+- (void) accumulateMouseDeltaX: (CGFloat) dx y: (CGFloat) dy {
+    [_eventQueueLock lock];
+    _mouseDeltaX += dx;
+    _mouseDeltaY += dy;
+    [_eventQueueLock unlock];
+}
+
+// Whole units are taken; the fraction stays for the next call, so a slow
+// motion in a fractional scale is not lost.
+- (void) takeMouseDeltaX: (int32_t *) dx y: (int32_t *) dy {
+    [_eventQueueLock lock];
+    double wholeX = _mouseDeltaX < 0 ? ceil(_mouseDeltaX) : floor(_mouseDeltaX);
+    double wholeY = _mouseDeltaY < 0 ? ceil(_mouseDeltaY) : floor(_mouseDeltaY);
+    _mouseDeltaX -= wholeX;
+    _mouseDeltaY -= wholeY;
+    [_eventQueueLock unlock];
+    if (dx != NULL)
+        *dx = (int32_t) wholeX;
+    if (dy != NULL)
+        *dy = (int32_t) wholeY;
+}
+
 - (void) postEvent: (NSEvent *) event atStart: (BOOL) atStart {
-    if (!atStart && [NSEvent isMouseCoalescingEnabled]) {
-        NSEventType type = [event type];
-        if (type == NSMouseMoved || type == NSLeftMouseDragged ||
-            type == NSRightMouseDragged || type == NSOtherMouseDragged) {
-            NSInteger count = [_eventQueue count];
-            if (count > 0) {
-                NSEvent *last = [_eventQueue objectAtIndex: count - 1];
-                if ([last type] == type && [last window] == [event window]) {
-                    [_eventQueue replaceObjectAtIndex: count - 1 withObject: event];
-                    return;
+    // Callable from any thread
+    [_eventQueueLock lock];
+    @try {
+        BOOL coalesced = NO;
+
+        // A moved or dragged event replaces the one still queued last for the
+        // same window and type.
+        if (!atStart && [NSEvent isMouseCoalescingEnabled]) {
+            NSEventType type = [event type];
+            if (type == NSMouseMoved || type == NSLeftMouseDragged ||
+                type == NSRightMouseDragged || type == NSOtherMouseDragged) {
+                NSInteger count = [_eventQueue count];
+                if (count > 0) {
+                    NSEvent *last = [_eventQueue objectAtIndex: count - 1];
+                    if ([last type] == type && [last window] == [event window]) {
+                        [_eventQueue replaceObjectAtIndex: count - 1 withObject: event];
+                        coalesced = YES;
+                    }
                 }
             }
         }
-    }
 
-    if (atStart) {
-        [_eventQueue insertObject: event atIndex: 0];
-    } else {
-        [_eventQueue addObject: event];
+        if (coalesced) {
+            // nothing more to queue
+        } else if (atStart) {
+            [_eventQueue insertObject: event atIndex: 0];
+        } else {
+            [_eventQueue addObject: event];
+        }
+    } @finally {
+        [_eventQueueLock unlock];
     }
     CFRunLoopSourceSignal(_eventSource);
     CFRunLoopWakeUp(CFRunLoopGetMain());
@@ -297,14 +374,20 @@ static void eventPosted(void *info) {}
 
 - (BOOL) containsAndRemovePeriodicEvents {
     BOOL result = NO;
-    NSUInteger count = [_eventQueue count];
+    [_eventQueueLock lock];
+    @try {
+        // signed: with an unsigned index "--count >= 0" never ends
+        NSInteger count = [_eventQueue count];
 
-    while (--count >= 0) {
-        NSEvent *event = _eventQueue[count];
-        if ([event type] == NSPeriodic) {
-            result = YES;
-            [_eventQueue removeObjectAtIndex: count];
+        while (--count >= 0) {
+            NSEvent *event = _eventQueue[count];
+            if ([event type] == NSPeriodic) {
+                result = YES;
+                [_eventQueue removeObjectAtIndex: count];
+            }
         }
+    } @finally {
+        [_eventQueueLock unlock];
     }
 
     return result;
@@ -338,6 +421,10 @@ static void eventPosted(void *info) {}
 
 - (NSArray *) fontTypefacesForFamilyName: (NSString *) name {
     NSInvalidAbstractInvocation();
+    return nil;
+}
+
+- (NSString *) substituteFamilyName: (NSString *) familyName {
     return nil;
 }
 
@@ -400,6 +487,10 @@ static void eventPosted(void *info) {}
 
 - (NSUInteger) currentModifierFlags {
     NSInvalidAbstractInvocation();
+    return 0;
+}
+
+- (NSUInteger) pressedMouseButtons {
     return 0;
 }
 

@@ -39,56 +39,67 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @implementation NSCustomImageRep
 
+// After the image rep part an NSArchiver archive holds the delegate and the draw selector.
+- (instancetype) initWithCoder: (NSCoder *) coder {
+    if ((self = [super initWithCoder: coder]) == nil)
+        return nil;
+    NS_EXTRA(NSCustomImageRep, self)->_delegate = [coder decodeObject];
+    [coder decodeValuesOfObjCTypes: ":", &NS_EXTRA(NSCustomImageRep, self)->_drawSelector];
+    return self;
+}
+
 - (instancetype) initWithSize: (NSSize) size
                      flipped: (BOOL) flipped
               drawingHandler: (BOOL (^)(NSRect)) handler {
     if ((self = [super init])) {
         [self setSize: size];
-        _drawingHandler = [handler copy];
-        _drawingHandlerFlipped = flipped;
+        NS_EXTRA(NSCustomImageRep, self)->_drawingHandler = [handler copy];
+        NS_EXTRA(NSCustomImageRep, self)->_drawingHandlerFlipped = flipped;
     }
     return self;
 }
 
 - (BOOL (^)(NSRect)) drawingHandler {
-    return _drawingHandler;
+    return NS_EXTRA(NSCustomImageRep, self)->_drawingHandler;
 }
 
 - (id) copyWithZone: (NSZone *) zone {
     NSCustomImageRep *result = [super copyWithZone: zone];
+    NS_EXTRA_COPY(NSCustomImageRep, result, self);
     // NSImageRep uses NSCopyObject; balance this subclass's copied pointer.
-    result->_drawingHandler = [_drawingHandler copy];
+    NS_EXTRA(NSCustomImageRep, result)->_drawingHandler = [NS_EXTRA(NSCustomImageRep, self)->_drawingHandler copy];
     return result;
 }
 
 - (void) dealloc {
-    [_drawingHandler release];
+    [NS_EXTRA(NSCustomImageRep, self)->_drawingHandler release];
+    NS_EXTRA_FREE(NSCustomImageRep, self);
     [super dealloc];
 }
 
 - initWithDrawSelector: (SEL) selector delegate: delegate {
-    _drawSelector = selector;
-    _delegate = delegate;
+    NS_EXTRA(NSCustomImageRep, self)->_drawSelector = selector;
+    NS_EXTRA(NSCustomImageRep, self)->_delegate = delegate;
     return self;
 }
 
 - (SEL) drawSelector {
-    return _drawSelector;
+    return NS_EXTRA(NSCustomImageRep, self)->_drawSelector;
 }
 
 - delegate {
-    return _delegate;
+    return NS_EXTRA(NSCustomImageRep, self)->_delegate;
 }
 
 - (BOOL) draw {
-    if (_drawingHandler != nil) {
+    if (NS_EXTRA(NSCustomImageRep, self)->_drawingHandler != nil) {
         NSGraphicsContext *context = [NSGraphicsContext currentContext];
         if (context == nil)
             return NO;
         NSSize size = [self size];
-        BOOL flip = [context isFlipped] != _drawingHandlerFlipped;
+        BOOL flip = [context isFlipped] != NS_EXTRA(NSCustomImageRep, self)->_drawingHandlerFlipped;
         NSCustomImageRepFocusView *focus = [[[NSCustomImageRepFocusView alloc]
-                initWithFlipped: _drawingHandlerFlipped] autorelease];
+                initWithFlipped: NS_EXTRA(NSCustomImageRep, self)->_drawingHandlerFlipped] autorelease];
         [NSGraphicsContext saveGraphicsState];
         [[context focusStack] addObject: focus];
         @try {
@@ -96,13 +107,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                 CGContextTranslateCTM([context graphicsPort], 0, size.height);
                 CGContextScaleCTM([context graphicsPort], 1, -1);
             }
-            return _drawingHandler(NSMakeRect(0, 0, size.width, size.height));
+            return NS_EXTRA(NSCustomImageRep, self)->_drawingHandler(NSMakeRect(0, 0, size.width, size.height));
         } @finally {
             [[context focusStack] removeLastObject];
             [NSGraphicsContext restoreGraphicsState];
         }
     }
-    [_delegate performSelector: _drawSelector withObject: self];
+    [NS_EXTRA(NSCustomImageRep, self)->_delegate performSelector: NS_EXTRA(NSCustomImageRep, self)->_drawSelector withObject: self];
     return YES;
 }
 

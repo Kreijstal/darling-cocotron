@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSFont.h>
 #import <AppKit/NSFontManager.h>
 #import <AppKit/NSRaise.h>
+#import <AppKit/NSKeyEquivalentMatching.h>
 #import <AppKit/NSWindow.h>
 
 @implementation NSButton
@@ -96,7 +97,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) dealloc {
-    [_contentTintColor release];
+    if (NS_EXTRA_ALLOCATED(NSButton, self)) {
+        [NS_EXTRA(NSButton, self)->_contentTintColor release];
+    }
     [super dealloc];
 }
 
@@ -203,16 +206,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setImage: (NSImage *) value {
     [_cell setImage: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setImagePosition: (NSCellImagePosition) value {
     [_cell setImagePosition: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setTitle: (NSString *) value {
+    NSString *before = [[_cell title] retain];
+
     [_cell setTitle: value];
+    if (!(before == [_cell title] || [before isEqual: [_cell title]]))
+        [self invalidateIntrinsicContentSize];
+    [before release];
     [self setNeedsDisplay: YES];
 }
 
@@ -236,26 +246,31 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setBezelStyle: (NSBezelStyle) value {
     [_cell setBezelStyle: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAlternateTitle: (NSString *) value {
     [_cell setAlternateTitle: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAlternateImage: (NSImage *) value {
     [_cell setAlternateImage: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAttributedTitle: (NSAttributedString *) value {
     [_cell setAttributedTitle: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAttributedAlternateTitle: (NSAttributedString *) value {
     [_cell setAttributedAlternateTitle: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -266,6 +281,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setButtonType: (NSButtonType) value {
     [_cell setButtonType: value];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -299,17 +315,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         return YES;
     }
 
-    NSString *characters = [event charactersIgnoringModifiers];
-    unsigned modifiers = [event modifierFlags];
-
-    const unsigned keyModifiers = NSCommandKeyMask | NSAlternateKeyMask |
-                                  NSShiftKeyMask | NSControlKeyMask;
-    if ((modifiers & keyModifiers) ==
-        ([self keyEquivalentModifierMask] & keyModifiers)) {
-        if ([key isEqualToString: characters]) {
-            [self performClick: nil];
-            return YES;
-        }
+    if (NSKeyEquivalentMatchesEvent(key, [self keyEquivalentModifierMask], event)) {
+        [self performClick: nil];
+        return YES;
     }
 
     return NO;
@@ -365,28 +373,28 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @end
 
-@implementation NSButton (NSDestructiveAction)
-
-- (BOOL) hasDestructiveAction {
-    return _hasDestructiveAction;
-}
-
-- (void) setHasDestructiveAction: (BOOL) value {
-    _hasDestructiveAction = value;
-}
-
-@end
-
 @implementation NSButton (NSButtonContentTint)
 
 - (NSColor *) contentTintColor {
-    return _contentTintColor;
+    return NS_EXTRA(NSButton, self)->_contentTintColor;
 }
 
 - (void) setContentTintColor: (NSColor *) color {
     color = [color copy];
-    [_contentTintColor release];
-    _contentTintColor = color;
+    [NS_EXTRA(NSButton, self)->_contentTintColor release];
+    NS_EXTRA(NSButton, self)->_contentTintColor = color;
+}
+
+@end
+
+@implementation NSButton (NSDestructiveAction)
+
+- (BOOL) hasDestructiveAction {
+    return NS_EXTRA(NSButton, self)->_hasDestructiveAction;
+}
+
+- (void) setHasDestructiveAction: (BOOL) value {
+    NS_EXTRA(NSButton, self)->_hasDestructiveAction = value;
 }
 
 @end

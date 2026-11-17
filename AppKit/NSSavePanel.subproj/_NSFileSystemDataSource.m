@@ -34,12 +34,29 @@
     [_cachedPaths release];
     [_fileManager release];
     [_rootItems release];
+    [_rootURL release];
     [super dealloc];
 }
 
+- (void) setRootURL: (NSURL *) url {
+    url = [url retain];
+    [_rootURL release];
+    _rootURL = url;
+}
+
+- (NSURL *) rootURL {
+    if (_rootURL != nil)
+        return _rootURL;
+    return [NSURL fileURLWithPath: @"/" isDirectory: YES];
+}
+
+// Top level: the explicit root directory when one is set, else the default
+// list of well-known places.
 - (NSArray *) _contentsOfDirectory: (NSURL *) url {
     if (url == nil) {
-        return _rootItems;
+        if (_rootURL == nil)
+            return _rootItems;
+        url = _rootURL;
     }
     NSArray *items = [_fileManager contentsOfDirectoryAtURL: url
                                  includingPropertiesForKeys: nil

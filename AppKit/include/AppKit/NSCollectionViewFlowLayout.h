@@ -18,11 +18,17 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSString.h>
 #import <AppKit/NSCollectionViewLayout.h>
 
 APPKIT_EXPORT NSString *const NSCollectionElementKindSectionHeader;
 APPKIT_EXPORT NSString *const NSCollectionElementKindSectionFooter;
+
+typedef NS_ENUM(NSInteger, NSCollectionViewScrollDirection) {
+    NSCollectionViewScrollDirectionVertical,
+    NSCollectionViewScrollDirectionHorizontal,
+};
 
 @interface NSCollectionViewFlowLayout : NSCollectionViewLayout
 {
@@ -30,6 +36,7 @@ APPKIT_EXPORT NSString *const NSCollectionElementKindSectionFooter;
     NSEdgeInsets _sectionInset;
     CGFloat _minimumLineSpacing;
     CGFloat _minimumInteritemSpacing;
+    NS_LEGACY_IVAR_PAD(_NSCollectionViewFlowLayoutReserved, 92)
 }
 
 @property NSSize itemSize;

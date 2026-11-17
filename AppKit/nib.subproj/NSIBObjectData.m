@@ -43,7 +43,21 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
 
 @interface NSNib (private)
 - (NSDictionary *) externalNameTable;
+- (void) _replaceDecodedObject: (id) object withObject: (id) replacement;
 @end
+
+// -replaceObject:withObject: does not always tell the delegate, and the system
+// NSKeyedUnarchiver does not change what later decodes of the object return
+// either. So tell the nib directly, and remember the replacement so that the
+// loop over the object table reuses it instead of instantiating the
+// placeholder a second time.
+static void replaceDecodedObject(NSKeyedUnarchiver *keyed, NSMapTable *replacements, id object, id replacement) {
+    [keyed replaceObject: object withObject: replacement];
+    [replacements setObject: replacement forKey: object];
+    id nib = [keyed delegate];
+    if ([nib respondsToSelector: @selector(_replaceDecodedObject:withObject:)])
+        [nib _replaceDecodedObject: object withObject: replacement];
+}
 
 @interface NSMenu (private)
 - (NSString *) _name;
@@ -83,6 +97,10 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
                                            valueOptions: NSPointerFunctionsObjectPersonality | NSPointerFunctionsStrongMemory
                                                capacity: 0];
 
+    _instantiatedObjectTable = [[NSMapTable alloc] initWithKeyOptions: NSPointerFunctionsObjectPointerPersonality | NSPointerFunctionsStrongMemory
+                                                         valueOptions: NSPointerFunctionsObjectPointerPersonality | NSPointerFunctionsStrongMemory
+                                                             capacity: 0];
+
     _classTable = [[NSMapTable alloc] initWithKeyOptions: NSPointerFunctionsObjectPointerPersonality | NSPointerFunctionsStrongMemory
                                             valueOptions: NSPointerFunctionsObjectPersonality | NSPointerFunctionsStrongMemory
                                                 capacity: 0];
@@ -112,6 +130,8 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
         NSKeyedUnarchiver *keyed = (NSKeyedUnarchiver *) coder;
         NSMutableDictionary *nameTable = [NSMutableDictionary
                 dictionaryWithDictionary: [[keyed delegate] externalNameTable]];
+        NSMapTable *replacements = [NSMapTable mapTableWithKeyOptions: NSPointerFunctionsObjectPointerPersonality | NSPointerFunctionsStrongMemory
+                                                         valueOptions: NSPointerFunctionsObjectPointerPersonality | NSPointerFunctionsStrongMemory];
         int i, count;
         id owner;
 
@@ -130,7 +150,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
             id nibObject = [namedObjects objectAtIndex: i];
 
             if (external != nil) {
-                [keyed replaceObject: nibObject withObject: external];
+                replaceDecodedObject(keyed, replacements, nibObject, external);
                 [_nameTable setObject: check forKey: external];
             } else if ([nibObject isKindOfClass: [NSCustomObject class]]) {
                 id replacement = [nibObject createCustomInstance];
@@ -138,7 +158,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
                 if (replacement == nil) {
                     [_nameTable setObject: check forKey: nibObject];
                 } else {
-                    [keyed replaceObject: nibObject withObject: replacement];
+                    replaceDecodedObject(keyed, replacements, nibObject, replacement);
                     [_nameTable setObject: check forKey: replacement];
                     [replacement release];
                 }
@@ -154,7 +174,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
                 // Already-decoded arrays and connectors can still reference
                 // the placeholder after the decoder accepts replacement.
                 // Preserve it until buildConnectionsWithNameTable: repairs them.
-                [keyed replaceObject: _fileOwner withObject: owner];
+                replaceDecodedObject(keyed, replacements, _fileOwner, owner);
             }
         }
 
@@ -187,9 +207,15 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
             id replacement = nil;
 
             if ([aKey isKindOfClass: [NSCustomObject class]]) {
-                if ((aKey == _fileOwner || aKey == owner) && owner != nil) {
+                id known = [replacements objectForKey: aKey];
+
+                if (known != nil) {
+                    // Already replaced above; an unarchiver that ignores
+                    // replaceObject:withObject: still hands out the placeholder.
+                    replacement = [known retain];
+                } else if ((aKey == _fileOwner || aKey == owner) && owner != nil) {
                     replacement = [owner retain];
-                } else {
+                } else if (aValue == _fileOwner || (owner != nil && aValue == owner)) {
                     replacement = [aKey createCustomInstance];
                 }
             }
@@ -197,7 +223,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
             if (replacement != nil) {
                 // Tell the decoder we are now using that - that will notify
                 // the Nib object
-                [keyed replaceObject: aKey withObject: replacement];
+                replaceDecodedObject(keyed, replacements, aKey, replacement);
                 // Update the connections
                 [self replaceObject: aKey withObject: replacement];
 
@@ -239,7 +265,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
         // Decode objectTable key/value pairs
         [coder decodeValueOfObjCType: @encode(int) at: &count];
 
-        if (version < 16) {
+        if (version <= 16) {
             // Super legacy support
             // read version 0
 
@@ -357,9 +383,13 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
             [coder decodeValueOfObjCType: @encode(id) at: &connections];
             [coder decodeValueOfObjCType: @encode(id) at: &_fontManager];
 
-            [_visibleWindows setSet: visibleWindows];
+            if (visibleWindows != nil) {
+                [_visibleWindows setSet: visibleWindows];
+            }
             [visibleWindows release];
-            [_connections setArray: connections];
+            if (connections != nil) {
+                [_connections setArray: connections];
+            }
             [connections release];
 
             // Oid table since version 19
@@ -371,7 +401,9 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
                     int value;
 
                     [coder decodeValuesOfObjCTypes: "@i", &key, &value];
-                    NSMapInsert(_oidTable, key, (const void *)(NSInteger)value);
+                    if (key != nil) {
+                        NSMapInsert(_oidTable, key, (const void *)(NSInteger)value);
+                    }
                     [key release];
                 }
 
@@ -387,18 +419,24 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
                     NSObject *key, *value;
 
                     [coder decodeValuesOfObjCTypes: "@@", &key, &value];
-                    NSMapInsert(_instantiatedObjectTable, key, value);
+                    if (key != nil) {
+                        NSMapInsert(_instantiatedObjectTable, key, value);
+                    }
+                    [key release];
+                    [value release];
                 }
             }
 
-            if (version <= 223) {
-                _framework = [IBCocoaFramework copy];
-            } else {
-                _framework = [[coder decodeObject] retain];
+            if (version > 223) {
+                [_framework release];
+                _framework = nil;
+                [coder decodeValuesOfObjCTypes: "@", &_framework];
             }
         }
 
-        if (!NSMapMember(_oidTable, _fileOwner, NULL, NULL)) {
+        [self _instantiateCustomObjects];
+
+        if (_fileOwner != nil && !NSMapMember(_oidTable, _fileOwner, NULL, NULL)) {
             NSMapInsertKnownAbsent(_oidTable, _fileOwner, (const void *)(_nextOid++));
         }
 
@@ -417,6 +455,69 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
     }
 
     return self;
+}
+
+// NSArchiver data holds the custom objects as placeholders in the tables and connectors
+// (there is no decoder delegate to substitute them while decoding). Like the keyed form,
+// loading creates the object of the named class and puts it in the placeholder's place in
+// the tables and in the connectors; File's Owner stays a placeholder until the owner is
+// known (see buildConnectionsWithNameTable:), and a class that is not known gives a plain
+// NSObject (as observed on the Mac).
+- (void) _instantiateCustomObjects {
+    NSMutableArray *placeholders = [NSMutableArray array];
+
+    for (id key in NSAllMapTableKeys(_nameTable)) {
+        if ([key isKindOfClass: [NSCustomObject class]] && key != _fileOwner)
+            [placeholders addObject: key];
+    }
+    for (id key in NSAllMapTableKeys(_objectTable)) {
+        if ([key isKindOfClass: [NSCustomObject class]] && key != _fileOwner &&
+            [placeholders indexOfObjectIdenticalTo: key] == NSNotFound)
+            [placeholders addObject: key];
+    }
+
+    for (NSCustomObject *placeholder in placeholders) {
+        id replacement = [placeholder createCustomInstance];
+
+        // A class that is not known gives a plain NSObject (First Responder is no object).
+        if (replacement == nil && ![[placeholder className] isEqualToString: @"FirstResponder"])
+            replacement = [[NSObject alloc] init];
+        if (replacement == nil)
+            continue;
+
+        [self replaceObject: placeholder withObject: replacement];
+
+        id name = [_nameTable objectForKey: placeholder];
+        if (name != nil) {
+            [name retain];
+            [_nameTable removeObjectForKey: placeholder];
+            [_nameTable setObject: name forKey: replacement];
+            [name release];
+        }
+
+        for (id key in NSAllMapTableKeys(_objectTable)) {
+            id value = [_objectTable objectForKey: key];
+
+            if (key == placeholder) {
+                [_objectTable removeObjectForKey: key];
+                [_objectTable setObject: (value == placeholder ? replacement : value) forKey: replacement];
+            } else if (value == placeholder) {
+                [_objectTable setObject: replacement forKey: key];
+            }
+        }
+
+        if ([_visibleWindows containsObject: placeholder]) {
+            [_visibleWindows removeObject: placeholder];
+            [_visibleWindows addObject: replacement];
+        }
+        [replacement release];
+    }
+}
+
+// All objects of the object table in the order of their object ids (the order the nib
+// loader sends awakeFromNib in when the archive has no decoding order to offer).
+- (NSArray *) allObjects {
+    return [self _sortedAndFilteredMapTableKeys: _objectTable];
 }
 
 - (NSArray *) _sortedAndFilteredMapTableKeys: (NSMapTable *) mapTable {
@@ -520,6 +621,7 @@ NSString *const IBCocoaFramework = @"IBCocoaFramework";
     [_fontManager release];
     [_framework release];
     [_nameTable release];
+    [_instantiatedObjectTable release];
     [_objectTable release];
     [_oidTable release];
     [_instantiatedObjectTable release];

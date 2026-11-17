@@ -320,7 +320,7 @@ static NSDocumentController *s_sharedDocumentController = nil;
     return NO;
 }
 
-// Stored only: Cocotron doesn't autosave documents.
+// Documents that autosave in place are autosaved this long after an edit (see -[NSDocument updateChangeCount:]).
 - (void) setAutosavingDelay: (NSTimeInterval) value {
     _autosavingDelay = value;
 }

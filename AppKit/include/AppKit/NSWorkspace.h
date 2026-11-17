@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 
 @class NSImage, NSView, NSRunningApplication, NSWorkspaceOpenConfiguration;
@@ -28,6 +29,7 @@ APPKIT_EXPORT NSString *const NSWorkspaceWillPowerOffNotification;
 
 APPKIT_EXPORT NSString *const NSWorkspaceRecycleOperation;
 APPKIT_EXPORT NSString *const NSWorkspaceDuplicateOperation;
+APPKIT_EXPORT NSString *const NSWorkspaceMoveOperation;
 
 APPKIT_EXPORT NSString *const NSWorkspaceLaunchConfigurationAppleEvent;
 APPKIT_EXPORT NSString *const NSWorkspaceLaunchConfigurationArguments;
@@ -49,13 +51,36 @@ APPKIT_EXPORT NSNotificationName NSWorkspaceDidMountNotification;
 APPKIT_EXPORT NSNotificationName NSWorkspaceDidUnmountNotification;
 APPKIT_EXPORT NSNotificationName NSWorkspaceWillUnmountNotification;
 
-typedef NSUInteger NSWorkspaceIconCreationOptions;
+typedef NS_OPTIONS(NSUInteger, NSWorkspaceIconCreationOptions) {
+    NSExcludeQuickDrawElementsIconCreationOption = 1 << 1,
+    NSExclude10_4ElementsIconCreationOption = 1 << 2,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSWorkspaceLaunchOptions) {
+    NSWorkspaceLaunchAndPrint = 0x00000002,
+    NSWorkspaceLaunchWithErrorPresentation = 0x00000040,
+    NSWorkspaceLaunchInhibitingBackgroundOnly = 0x00000080,
+    NSWorkspaceLaunchWithoutAddingToRecents = 0x00000100,
+    NSWorkspaceLaunchWithoutActivation = 0x00000200,
+    NSWorkspaceLaunchAsync = 0x00010000,
+    NSWorkspaceLaunchNewInstance = 0x00080000,
+    NSWorkspaceLaunchAndHide = 0x00100000,
+    NSWorkspaceLaunchAndHideOthers = 0x00200000,
+    NSWorkspaceLaunchDefault = NSWorkspaceLaunchAsync,
+};
+
+typedef NS_ENUM(NSInteger, NSWorkspaceAuthorizationType) {
+    NSWorkspaceAuthorizationTypeCreateSymbolicLink,
+    NSWorkspaceAuthorizationTypeSetAttributes,
+    NSWorkspaceAuthorizationTypeReplaceFile,
+};
 
 @interface NSWorkspace : NSObject {
     NSNotificationCenter *_notificationCenter;
+    NS_LEGACY_IVAR_PAD(_NSWorkspaceReserved, 12)
 }
 
-@property (class, readonly, retain) NSWorkspace *sharedWorkspace;
+@property (class, readonly, retain, nonnull) NSWorkspace *sharedWorkspace;
 
 - (NSNotificationCenter *) notificationCenter;
 
@@ -65,6 +90,7 @@ typedef NSUInteger NSWorkspaceIconCreationOptions;
 @property(readonly) BOOL accessibilityDisplayShouldInvertColors;
 @property(readonly) BOOL accessibilityDisplayShouldReduceMotion;
 @property(readonly, getter=isVoiceOverEnabled) BOOL voiceOverEnabled;
+@property(readonly, getter=isSwitchControlEnabled) BOOL switchControlEnabled;
 
 - (NSImage *) iconForFile: (NSString *) path;
 - (NSImage *) iconForFiles: (NSArray *) array;
@@ -90,6 +116,11 @@ typedef NSUInteger NSWorkspaceIconCreationOptions;
 - (void) openURL: (NSURL *) url
         configuration: (NSWorkspaceOpenConfiguration *) configuration
     completionHandler: (void (^)(NSRunningApplication *app, NSError *error)) completionHandler;
+- (BOOL) openURLs: (NSArray<NSURL *> *) urls
+           withAppBundleIdentifier: (NSString *) bundleIdentifier
+                           options: (NSWorkspaceLaunchOptions) options
+    additionalEventParamDescriptor: (NSAppleEventDescriptor *) descriptor
+                 launchIdentifiers: (NSArray **) identifiers;
 
 - (BOOL) selectFile: (NSString *) path
         inFileViewerRootedAtPath: (NSString *) rootedAtPath;
@@ -129,9 +160,8 @@ typedef NSUInteger NSWorkspaceIconCreationOptions;
 - (NSString *) absolutePathForAppBundleWithIdentifier: (NSString *) identifier;
 - (NSString *) pathForApplication: (NSString *) application;
 - (NSArray *) launchedApplications;
-- (NSArray *) runningApplications;
+@property(nonatomic, readonly) NSArray *runningApplications;
 @property(readonly, retain) NSRunningApplication *frontmostApplication;
-- (NSRunningApplication *) frontmostApplication;
 - (BOOL) launchApplication: (NSString *) application;
 - (BOOL) launchApplication: (NSString *) application
                   showIcon: (BOOL) showIcon
@@ -211,3 +241,12 @@ typedef NSUInteger NSWorkspaceIconCreationOptions;
                                     configuration: (NSDictionary *) configuration
                                             error: (NSError **) error;
 @end
+
+APPKIT_EXPORT NSNotificationName const NSWorkspaceDidHideApplicationNotification;
+APPKIT_EXPORT NSNotificationName const NSWorkspaceDidUnhideApplicationNotification;
+APPKIT_EXPORT NSString * const NSWorkspaceVolumeLocalizedNameKey;
+APPKIT_EXPORT NSString * const NSWorkspaceVolumeURLKey;
+APPKIT_EXPORT NSString * const NSWorkspaceVolumeOldLocalizedNameKey;
+APPKIT_EXPORT NSString * const NSWorkspaceVolumeOldURLKey;
+APPKIT_EXPORT NSNotificationName const NSWorkspaceDidRenameVolumeNotification;
+APPKIT_EXPORT NSNotificationName const NSWorkspaceDidChangeFileLabelsNotification;

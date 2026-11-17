@@ -771,10 +771,24 @@ void O2ContextSetStrokeColor(O2ContextRef self, const O2Float *components) {
     O2ColorRelease(color);
 }
 
+// QUIRK: a NULL color, passed as the new fill or stroke color, selects opaque black instead of being ignored or
+// rejected; later painting is black. This is not documented. Evidence: black-box observation on macOS 26.7 (tier 2):
+// filling and stroking after setting a NULL color gives opaque black pixels where the previous color was red or green.
+// Test: tests/coregraphics-context-null-color.c (test_quirk_null_color_is_black)
+static O2ColorRef O2ContextCreateColorForNull(void) {
+    return O2ColorCreateGenericGray(0, 1);
+}
+
 void O2ContextSetStrokeColorWithColor(O2ContextRef self, O2ColorRef color) {
     if (self == nil)
         return;
 
+    if (color == NULL) {
+        color = O2ContextCreateColorForNull();
+        O2GStateSetStrokeColor(O2ContextCurrentGState(self), color);
+        O2ColorRelease(color);
+        return;
+    }
     O2GStateSetStrokeColor(O2ContextCurrentGState(self), color);
 }
 
@@ -841,6 +855,12 @@ void O2ContextSetFillColorWithColor(O2ContextRef self, O2ColorRef color) {
     if (self == nil)
         return;
 
+    if (color == NULL) {
+        color = O2ContextCreateColorForNull();
+        O2GStateSetFillColor(O2ContextCurrentGState(self), color);
+        O2ColorRelease(color);
+        return;
+    }
     O2GStateSetFillColor(O2ContextCurrentGState(self), color);
 }
 
@@ -1274,27 +1294,34 @@ void O2ContextDefaultShowText(O2ContextRef self, const char *text,
     O2GState *gState = O2ContextCurrentGState(self);
     O2Encoding *encoding = O2GStateEncoding(gState);
     O2PDFCharWidths *widths = O2GStateCharWidths(gState);
-    O2Glyph glyphs[length];
+    // A CID font takes two bytes per glyph.
+    NSUInteger count = O2EncodingGetGlyphCountForBytes(encoding, length);
+    O2Glyph glyphs[count + 1];
 
     O2EncodingGetGlyphsForBytes(encoding, glyphs, (const uint8_t *) text,
                                 length);
     if (widths == nil && gState->_characterSpacing == 0)
-        self->_showGlyphsFunction(self, NULL, glyphs, NULL, length);
+        self->_showGlyphsFunction(self, NULL, glyphs, NULL, count);
     else {
-        O2Size advances[length];
+        O2Size advances[count + 1];
         int i;
 
-        if (widths != nil)
+        if (widths != nil) {
+            // PDF widths are in text space units per unit of font size.
+            O2Float size = O2GStatePointSize(gState);
+
             O2PDFCharWidthsGetAdvances(widths, advances, (const uint8_t *) text,
                                        length);
-        else
-            O2ContextGetDefaultAdvances(self, glyphs, advances, length);
+            for (i = 0; i < count; i++)
+                advances[i].width *= size;
+        } else
+            O2ContextGetDefaultAdvances(self, glyphs, advances, count);
 
-        for (i = 0; i < length; i++) {
+        for (i = 0; i < count; i++) {
             advances[i].width += gState->_characterSpacing;
         }
 
-        self->_showGlyphsFunction(self, NULL, glyphs, advances, length);
+        self->_showGlyphsFunction(self, NULL, glyphs, advances, count);
     }
 }
 
@@ -1353,6 +1380,20 @@ void O2ContextDrawPDFPage(O2ContextRef self, O2PDFPageRef page) {
     if (self == nil)
         return;
 
+    // The page draws from the PDF initial graphics state (PDF 32000-1 8.4.1, Table 52),
+    // not from whatever the context was last set to, and leaves the context as it was.
+    NSUInteger depth = [self->_stateStack count];
+    O2ContextSaveGState(self);
+    O2ContextSetGrayFillColor(self, 0, 1);
+    O2ContextSetGrayStrokeColor(self, 0, 1);
+    O2ContextSetLineWidth(self, 1);
+    O2ContextSetLineCap(self, kO2LineCapButt);
+    O2ContextSetLineJoin(self, kO2LineJoinMiter);
+    O2ContextSetMiterLimit(self, 10);
+    O2ContextSetLineDash(self, 0, NULL, 0);
+    O2ContextSetAlpha(self, 1);
+    O2ContextSetBlendMode(self, kO2BlendModeNormal);
+
     // Per doc.s, these are initialized at the beginning of each page only
 
     O2ContextSetCharacterSpacing(self, 0);
@@ -1366,6 +1407,9 @@ void O2ContextDrawPDFPage(O2ContextRef self, O2PDFPageRef page) {
 
     O2ContextSetTextLineMatrix(self, O2AffineTransformIdentity);
     O2ContextSetTextMatrix(self, O2AffineTransformIdentity);
+    // Also pops what a page saved (q) and never restored (Q).
+    while ([self->_stateStack count] > depth)
+        O2ContextRestoreGState(self);
 }
 
 void O2ContextFlush(O2ContextRef self) {
@@ -1477,7 +1521,9 @@ void O2ContextGetDefaultAdvances(O2ContextRef self, const O2Glyph *glyphs,
     int intAdvances[256];
     O2Float unitsPerEm = O2FontGetUnitsPerEm(font);
     O2Float pointSize = O2GStatePointSize(gState);
-    O2Float scale = [font nativeSizeForSize: pointSize] / unitsPerEm;
+    // A font without a valid unitsPerEm has no usable advances.
+    O2Float scale =
+            unitsPerEm > 0 ? [font nativeSizeForSize: pointSize] / unitsPerEm : 0;
     for (size_t offset = 0; offset < count;) {
         size_t chunk = MIN(count - offset,
                            sizeof(intAdvances) / sizeof(intAdvances[0]));

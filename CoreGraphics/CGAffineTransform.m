@@ -19,8 +19,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <CoreGraphics/CGAffineTransform.h>
 
-#include <stdio.h>
-
 const CGAffineTransform CGAffineTransformIdentity = {1, 0, 0, 1, 0, 0};
 
 // Keep the header's inline helpers for source clients, but also provide the
@@ -42,9 +40,13 @@ bool CGAffineTransformIsIdentity(CGAffineTransform xform) {
            xform.tx == 0 && xform.ty == 0;
 }
 
-bool CGAffineTransformEqualToTransform(CGAffineTransform t1, CGAffineTransform t2) {
-    return (t1.a == t2.a && t1.b == t2.b && t1.c == t2.c && t1.d == t2.d &&
-            t1.tx == t2.tx && t1.ty == t2.ty);
+// Compares the six components with ==, so a transform containing NaN is not
+// equal to itself and 0 equals -0.
+bool CGAffineTransformEqualToTransform(CGAffineTransform t1,
+                                       CGAffineTransform t2)
+{
+    return t1.a == t2.a && t1.b == t2.b && t1.c == t2.c && t1.d == t2.d &&
+           t1.tx == t2.tx && t1.ty == t2.ty;
 }
 
 CGAffineTransform CGAffineTransformMakeRotation(CGFloat radians) {
@@ -118,19 +120,30 @@ CGAffineTransform CGAffineTransformTranslate(CGAffineTransform xform,
     return CGAffineTransformConcat(translate, xform);
 }
 
+// Transforms all four corners and returns the smallest rectangle that
+// contains them, since a rotation or skew does not keep the rectangle
+// axis-aligned.
 CGRect CGRectApplyAffineTransform(CGRect rect, CGAffineTransform t) {
     if (CGRectIsNull(rect))
-        return CGRectNull;
+        return rect;
 
-    CGPoint p1 = CGPointApplyAffineTransform(CGPointMake(CGRectGetMinX(rect), CGRectGetMinY(rect)), t);
-    CGPoint p2 = CGPointApplyAffineTransform(CGPointMake(CGRectGetMaxX(rect), CGRectGetMinY(rect)), t);
-    CGPoint p3 = CGPointApplyAffineTransform(CGPointMake(CGRectGetMinX(rect), CGRectGetMaxY(rect)), t);
-    CGPoint p4 = CGPointApplyAffineTransform(CGPointMake(CGRectGetMaxX(rect), CGRectGetMaxY(rect)), t);
+    CGFloat minX = 0, minY = 0, maxX = 0, maxY = 0;
 
-    CGFloat minX = fmin(fmin(p1.x, p2.x), fmin(p3.x, p4.x));
-    CGFloat maxX = fmax(fmax(p1.x, p2.x), fmax(p3.x, p4.x));
-    CGFloat minY = fmin(fmin(p1.y, p2.y), fmin(p3.y, p4.y));
-    CGFloat maxY = fmax(fmax(p1.y, p2.y), fmax(p3.y, p4.y));
+    for (int i = 0; i < 4; i++) {
+        CGFloat x = rect.origin.x + ((i & 1) ? rect.size.width : 0);
+        CGFloat y = rect.origin.y + ((i & 2) ? rect.size.height : 0);
+        CGFloat tx = t.a * x + t.c * y + t.tx;
+        CGFloat ty = t.b * x + t.d * y + t.ty;
+
+        if (i == 0 || tx < minX)
+            minX = tx;
+        if (i == 0 || ty < minY)
+            minY = ty;
+        if (i == 0 || tx > maxX)
+            maxX = tx;
+        if (i == 0 || ty > maxY)
+            maxY = ty;
+    }
 
     return CGRectMake(minX, minY, maxX - minX, maxY - minY);
 }

@@ -19,6 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import "NSCustomView.h"
 #import <Foundation/NSKeyedArchiver.h>
 #import <Foundation/NSString.h>
+#import <Foundation/NSUnarchiver.h>
 #import <objc/runtime.h>
 
 @implementation NSCustomView
@@ -52,16 +53,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             if ([coder containsValueForKey: @"NSvFlags"]) {
                 unsigned vFlags = [coder decodeIntForKey: @"NSvFlags"];
 
-                newView->_autoresizingMask = vFlags & 0x3F;
-                newView->_autoresizesSubviews = (vFlags & 0x100) ? YES : NO;
-                newView->_isHidden = (vFlags & 0x80000000) ? YES : NO;
+                NS_EXTRA(NSView, newView)->_autoresizingMask = vFlags & 0x3F;
+                NS_EXTRA(NSView, newView)->_autoresizesSubviews = (vFlags & 0x100) ? YES : NO;
+                NS_EXTRA(NSView, newView)->_isHidden = (vFlags & 0x80000000) ? YES : NO;
             }
             // Despite the fact it appears _autoresizesSubviews is encoded in
             // the flags, it should always be on
-            newView->_autoresizesSubviews = YES;
+            NS_EXTRA(NSView, newView)->_autoresizesSubviews = YES;
 
             if ([coder containsValueForKey: @"NSTag"])
-                newView->_tag = [coder decodeIntForKey: @"NSTag"];
+                NS_EXTRA(NSView, newView)->_tag = [coder decodeIntForKey: @"NSTag"];
             NSArray *subviews = [coder decodeObjectForKey: @"NSSubviews"];
 
             // For some unknown reason custom view subviews are presented in
@@ -87,27 +88,80 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
             return (NSCustomView*)newView;
         }
     } else {
+        // The NSView part comes first, then the class name and an extension
+        // object; the class name is a C string in the oldest layout.
+        NSInteger version = [coder versionForClassName: @"NSCustomView"];
+        NSString *className = nil;
+        id viewExtension = nil;
+
         self = [super initWithCoder: coder];
-        if (self) {
-            NSString *className = nil;
-            id extension = nil;
-            @try {
-                [coder decodeValuesOfObjCTypes: "@@", &className, &extension];
-            } @catch (id ex) {
-                @try {
-                    [coder decodeValuesOfObjCTypes: "@", &className];
-                } @catch (id ex2) {
-                }
+        if (self == nil) {
+            return nil;
+        }
+
+        if (version == 0) {
+            char *cName = NULL;
+
+            [coder decodeValuesOfObjCTypes: "*@", &cName, &viewExtension];
+            if (cName != NULL) {
+                className = [[[NSString alloc]
+                        initWithBytesNoCopy: cName
+                                     length: strlen(cName)
+                                   encoding: NSNEXTSTEPStringEncoding
+                               freeWhenDone: YES] autorelease];
             }
-            if (className) {
-                Class class = NSClassFromString(className);
-                if (class != Nil && [class isSubclassOfClass: [NSView class]]) {
-                    object_setClass(self, class);
-                }
+        } else if (version <= 16 || version > 40) {
+            [coder decodeValuesOfObjCTypes: "@@", &className, &viewExtension];
+            [className autorelease];
+        } else {
+            className = [coder decodeObject];
+            viewExtension = [[coder decodeObject] retain];
+        }
+        [viewExtension release];
+
+        if (className != nil) {
+            NSString *mapped = [NSUnarchiver classNameDecodedForArchiveClassName: className];
+            if (mapped != nil) {
+                className = mapped;
             }
         }
-        return self;
+
+        Class class = NSClassFromString(className);
+        if (class == nil || ![class isSubclassOfClass: [NSView class]]) {
+            NSLog(@"NSCustomView: %@ is not a known NSView subclass, using NSView",
+                  className);
+            object_setClass(self, [NSView class]);
+            return self;
+        }
+
+        NSView *newView = [[class alloc] initWithFrame: _frame];
+        if (newView == nil) {
+            NSLog(@"NSCustomView: -[%@ initWithFrame:] returned nil, using NSView",
+                  className);
+            object_setClass(self, [NSView class]);
+            return self;
+        }
+        // References decoded after this point (and by the unarchiver's table)
+        // must resolve to the real view.
+        if ([coder isKindOfClass: [NSUnarchiver class]]) {
+            [(NSUnarchiver *) coder replaceObject: self withObject: newView];
+        }
+
+        NS_EXTRA(NSView, newView)->_autoresizingMask = NS_EXTRA(NSView, self)->_autoresizingMask;
+        NS_EXTRA(NSView, newView)->_autoresizesSubviews = YES;
+        NS_EXTRA(NSView, newView)->_draggedTypes = [NS_EXTRA(NSView, self)->_draggedTypes retain];
+
+        [newView->_subviews addObjectsFromArray: _subviews];
+        [newView->_subviews
+                makeObjectsPerformSelector: @selector(_setSuperview:)
+                                withObject: newView];
+        [_subviews removeAllObjects];
+
+        [self release];
+        return (NSCustomView *) newView;
     }
+
+    return self;
 }
 
 @end

@@ -21,6 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSGraphicsContextFunctions.h>
 #import <AppKit/NSImageRep.h>
 #import <AppKit/NSPDFImageRep.h>
+#import <AppKit/NSPICTImageRep.h>
 #import <AppKit/NSPasteboard.h>
 #import <AppKit/NSRaise.h>
 
@@ -33,6 +34,7 @@ static NSMutableArray *_registeredClasses = nil;
         _registeredClasses = [NSMutableArray new];
         [_registeredClasses addObject: [NSBitmapImageRep class]];
         [_registeredClasses addObject: [NSPDFImageRep class]];
+        [_registeredClasses addObject: [NSPICTImageRep class]];
     }
 }
 
@@ -79,6 +81,9 @@ static NSArray *typesForFileTypes(NSArray *fileTypes) {
         @"bmp" : @"com.microsoft.bmp",
         @"icns" : @"com.apple.icns",
         @"pdf" : @"com.adobe.pdf",
+        @"pict" : @"com.apple.pict",
+        @"pct" : @"com.apple.pict",
+        @"pic" : @"com.apple.pict",
     };
     NSMutableArray *result = [NSMutableArray array];
 
@@ -280,12 +285,37 @@ static NSArray *typesForFileTypes(NSArray *fileTypes) {
     return nil;
 }
 
+// An NSArchiver archive holds the size, a byte for has-alpha, a byte for opaque, then the
+// pixel width and height, the bits per sample and the colour space name. Versions up to 16
+// are not read.
 - (instancetype) initWithCoder:(NSCoder *) coder
 {
-    [NSException raise: NSInvalidArgumentException
-                    format: @"-[%@ %s] is not implemented for coder %@",
-                            [self class], sel_getName(_cmd), coder];
-    return nil;
+    if ([coder allowsKeyedCoding] || [coder versionForClassName: @"NSImageRep"] < 17) {
+        [NSException raise: NSInvalidArgumentException
+                        format: @"-[%@ %s] is not implemented for coder %@",
+                                [self class], sel_getName(_cmd), coder];
+        return nil;
+    }
+    if ((self = [super init]) == nil)
+        return nil;
+
+    float width, height;
+    char hasAlpha, opaque;
+    int pixelsWide, pixelsHigh, bitsPerSample;
+    NSString *colorSpaceName = nil;
+
+    [coder decodeValuesOfObjCTypes: "ff", &width, &height];
+    [coder decodeValuesOfObjCTypes: "c", &hasAlpha];
+    [coder decodeValuesOfObjCTypes: "c", &opaque];
+    [coder decodeValuesOfObjCTypes: "iii@", &pixelsWide, &pixelsHigh, &bitsPerSample, &colorSpaceName];
+    _size = NSMakeSize(width, height);
+    _hasAlpha = hasAlpha != 0;
+    _isOpaque = opaque != 0;
+    _pixelsWide = pixelsWide;
+    _pixelsHigh = pixelsHigh;
+    _bitsPerSample = bitsPerSample;
+    _colorSpaceName = colorSpaceName;
+    return self;
 }
 
 - copyWithZone: (NSZone *) zone {

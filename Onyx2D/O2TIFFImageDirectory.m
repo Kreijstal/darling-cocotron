@@ -39,9 +39,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (id) initWithData: (NSData *) data;
 
 // Data access methods for libtiff
-- (int) write: (tdata_t) data size: (tsize_t) size;
-- (int) read: (tdata_t) data size: (tsize_t) size;
-- (toff_t) seek: (tsize_t) offset whence: (int) whence;
+- (intptr_t) write: (tdata_t) data size: (intptr_t) size;
+- (intptr_t) read: (tdata_t) data size: (intptr_t) size;
+- (toff_t) seek: (toff_t) offset whence: (int) whence;
 - (int) map: (tdata_t *) data size: (toff_t *) size;
 - (void) unmap: (tdata_t) data size: (toff_t) size;
 - (toff_t) size;
@@ -49,12 +49,41 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @end
 
-static tsize_t sTIFFWriteProc(thandle_t userData, tdata_t data, tsize_t size) {
+// libtiff is a native (Linux) library: Onyx2D reaches it through the stubs
+// generated for the ELF boundary (libelfloader / elfcalls), which pass the
+// arguments of a call on unchanged and do not translate variadic calls: the
+// calling convention of the caller is what libtiff sees. TIFFGetField() and
+// TIFFGetFieldDefaulted() are variadic. On x86 the Darwin and Linux variadic conventions agree, but on
+// arm64 Darwin passes variadic arguments on the stack while Linux reads them
+// from registers, so libtiff would dereference whatever was in x2. Calling
+// through a prototype with fixed arguments puts the pointer in x2 on arm64.
+// The X11 backend does the same for XCreateIC().
+#if defined(DARLING) && defined(__arm64__)
+static int O2TIFFGetUInt32Field(TIFF *tif, uint32 tag, uint32 *value) {
+    return ((int (*)(TIFF *, uint32, uint32 *)) TIFFGetField)(tif, tag, value);
+}
+
+static int O2TIFFGetDefaultedUInt16Field(TIFF *tif, uint32 tag, uint16_t *value) {
+    return ((int (*)(TIFF *, uint32, uint16_t *)) TIFFGetFieldDefaulted)(tif, tag, value);
+}
+#else
+#define O2TIFFGetUInt32Field(tif, tag, value) TIFFGetField(tif, tag, value)
+#define O2TIFFGetDefaultedUInt16Field(tif, tag, value) TIFFGetFieldDefaulted(tif, tag, value)
+#endif
+
+// The callbacks below use intptr_t for libtiff's tmsize_t. The tiffconf.h that
+// the build finds is the one generated for the 64-bit host and fixes tmsize_t
+// (and so tsize_t) at 64 bits, while the libtiff the 32-bit slice links against
+// uses a 32-bit tmsize_t; declaring the callbacks with tsize_t made them read
+// their size argument from the wrong stack slot. intptr_t has the width of
+// tmsize_t in both. They are cast to libtiff's callback types at the call.
+static intptr_t sTIFFWriteProc(thandle_t userData, tdata_t data,
+                               intptr_t size) {
     O2TIFFReader *reader = (O2TIFFReader *) userData;
     return [reader write: data size: size];
 }
 
-static tsize_t sTIFFReadProc(thandle_t userData, tdata_t data, tsize_t size) {
+static intptr_t sTIFFReadProc(thandle_t userData, tdata_t data, intptr_t size) {
     O2TIFFReader *reader = (O2TIFFReader *) userData;
     return [reader read: data size: size];
 }
@@ -97,18 +126,21 @@ static void sTIFFUnmapFileProc(thandle_t userData, tdata_t data, toff_t size) {
     [super dealloc];
 }
 
-- (int) write: (tdata_t) data size: (tsize_t) size {
+- (intptr_t) write: (tdata_t) data size: (intptr_t) size {
     return 0;
 }
 
-- (int) read: (tdata_t) data size: (tsize_t) size {
-    int bytesCount = MIN(size, [_data length] - _currentOffset);
+- (intptr_t) read: (tdata_t) data size: (intptr_t) size {
+    if (size <= 0 || _currentOffset >= [_data length])
+        return 0;
+    intptr_t bytesCount = (intptr_t) MIN((toff_t) size,
+                                         (toff_t) [_data length] - _currentOffset);
     memcpy(data, [_data bytes] + _currentOffset, bytesCount);
     _currentOffset += bytesCount;
     return bytesCount;
 }
 
-- (toff_t) seek: (tsize_t) offset whence: (int) whence {
+- (toff_t) seek: (toff_t) offset whence: (int) whence {
     /*
     If whence is SEEK_SET, the offset is set to offset bytes.
     If whence is SEEK_CUR, the offset is set to its current location plus offset
@@ -123,7 +155,7 @@ static void sTIFFUnmapFileProc(thandle_t userData, tdata_t data, toff_t size) {
         _currentOffset += offset;
         break;
     case SEEK_END:
-        _currentOffset = [_data length] + offset - 1;
+        _currentOffset = [_data length] + offset;
         break;
     }
     if (_currentOffset > [_data length]) {
@@ -157,30 +189,28 @@ static void sTIFFUnmapFileProc(thandle_t userData, tdata_t data, toff_t size) {
     // and with a lot of tiff files
     TIFFErrorHandler prevHandler = TIFFSetWarningHandler(NULL);
     TIFF *tif = TIFFClientOpen([NSStringFromClass([self class]) UTF8String],
-                               "r", self, sTIFFReadProc, sTIFFWriteProc,
+                               "r", self, (TIFFReadWriteProc) sTIFFReadProc,
+                               (TIFFReadWriteProc) sTIFFWriteProc,
                                sTIFFSeekProc, sTIFFCloseProc, sTIFFSizeProc,
                                sTIFFMapFileProc, sTIFFUnmapFileProc);
 
     uint32 width = 0;
     uint32 height = 0;
     TIFFSetDirectory(tif, directory);
-#if defined(DARLING) && defined(__arm64__)
-    // TIFFGetField() is variadic and lives in the native (Linux) libtiff. Darwin arm64 passes
-    // variadic arguments on the stack, Linux arm64 in registers, so call it through a
-    // non-variadic prototype: the pointer then goes in x2, where libtiff's va_arg reads it.
-    int (*getUInt32Field)(TIFF *, uint32, uint32 *) =
-            (int (*)(TIFF *, uint32, uint32 *)) TIFFGetField;
-#else
-#define getUInt32Field TIFFGetField
-#endif
-    if (getUInt32Field(tif, TIFFTAG_IMAGEWIDTH, &width) != 0 &&
-        getUInt32Field(tif, TIFFTAG_IMAGELENGTH, &height) != 0) {
-        // We want top-left orientation - libtiff default is bottom-left, which
-        // is giving flipped bitmaps libtiff is giving us pixels in the same
-        // order we need - so we can just fill the pixels using libtiff and no
-        // post-processing is needed
+    if (O2TIFFGetUInt32Field(tif, TIFFTAG_IMAGEWIDTH, &width) != 0 &&
+        O2TIFFGetUInt32Field(tif, TIFFTAG_IMAGELENGTH, &height) != 0) {
+        // The pixels as stored, row 0 at the top: asking libtiff for the file's
+        // own orientation makes it convert nothing (its default, bottom-left,
+        // would flip them). Like CGImageSourceCreateImageAtIndex on macOS, the
+        // image is not rotated: the orientation is reported in the properties
+        // (kCGImagePropertyOrientation) and applied by whoever asks for it, e.g.
+        // CGImageSourceCreateThumbnailAtIndex with ...WithTransform.
+        uint16_t storedOrientation = ORIENTATION_TOPLEFT;
+        O2TIFFGetDefaultedUInt16Field(tif, TIFFTAG_ORIENTATION, &storedOrientation);
+        if (storedOrientation < ORIENTATION_TOPLEFT || storedOrientation > ORIENTATION_LEFTBOT)
+            storedOrientation = ORIENTATION_TOPLEFT;
         if (TIFFReadRGBAImageOriented(tif, width, height, pixelBytes,
-                                      ORIENTATION_TOPLEFT, 1) == 0) {
+                                      storedOrientation, 1) == 0) {
             NSLog(@"Couldn't not decode TIFF Image at index %d", directory);
         }
     } else {
@@ -468,6 +498,28 @@ static void sTIFFUnmapFileProc(thandle_t userData, tdata_t data, toff_t size) {
     return _imageWidth;
 }
 
+- (unsigned) opaqueSamplesPerPixel {
+    unsigned i;
+
+    if (_sizeOfExtraSamples != 0 || _bitsPerSample == NULL || _sizeOfBitsPerSample != _samplesPerPixel)
+        return 0;
+    if (_planarConfiguration > 1)
+        return 0;
+    for (i = 0; i < _sizeOfBitsPerSample; i++)
+        if (_bitsPerSample[i] != 8)
+            return 0;
+    if (_sampleFormats != NULL)
+        for (i = 0; i < _sizeOfSampleFormats; i++)
+            if (_sampleFormats[i] != NSTIFFSampleFormat_UINT)
+                return 0;
+    // photometric interpretation: 0 and 1 are gray, 2 is RGB
+    if (_samplesPerPixel == 3 && _photometricInterpretation == 2)
+        return 3;
+    if (_samplesPerPixel == 1 && (_photometricInterpretation == 0 || _photometricInterpretation == 1))
+        return 1;
+    return 0;
+}
+
 #if !LIBTIFF_PRESENT
 static void decode_R8_G8_B8_A8(const unsigned char *stripBytes,
                                unsigned byteCount, unsigned char *pixelBytes,
@@ -712,6 +764,11 @@ void depredict_R8G8B8A8(uint8_t *pixelBytes, unsigned bytesPerRow,
                forKey: kO2ImagePropertyDPIWidth];
     [result setObject: [NSNumber numberWithDouble: _yResolution]
                forKey: kO2ImagePropertyDPIHeight];
+    // TIFF tag 274, same values as EXIF (1-8): the top-level kCGImagePropertyOrientation.
+    if (_orientation >= 1 && _orientation <= 8) {
+        [result setObject: [NSNumber numberWithUnsignedInt: _orientation]
+                   forKey: kO2ImagePropertyOrientation];
+    }
 
     return result;
 }

@@ -60,7 +60,6 @@ static inline NSMethodSignature *stubTouchBarSignature(SEL aSelector) {
 @implementation NSTouchBar
 @synthesize delegate = _delegate;
 @synthesize defaultItemIdentifiers = _defaultItemIdentifiers;
-@synthesize itemIdentifiers = _itemIdentifiers;
 
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector
 {

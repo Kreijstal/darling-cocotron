@@ -17,69 +17,64 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 
 @class NSTableView, NSCell;
 
-enum {
+typedef NS_OPTIONS(NSUInteger, NSTableColumnResizingOptions) {
     NSTableColumnNoResizing = 0x00,
     NSTableColumnAutoresizingMask = 0x01,
     NSTableColumnUserResizingMask = 0x02,
 };
 
+// Legacy ObjC ABI (i386): instance size must stay 0x28, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSTableColumn : NSObject <NSUserInterfaceItemIdentification> {
     NSUserInterfaceItemIdentifier _identifier;
-    NSTableView *_tableView;
-    NSCell *_headerCell;
-    NSCell *_dataCell;
-    NSString *_headerToolTip;
-    CGFloat _width;
-    CGFloat _minWidth;
-    CGFloat _maxWidth;
-    BOOL _isResizable;
-    BOOL _isEditable;
-    NSUInteger _resizingMask;
-    BOOL _hidden;
-    NSSortDescriptor *_sortDescriptorPrototype;
+    NS_LEGACY_IVAR_PAD(_NSTableColumnReserved1, 28)
+    NS_EXTRA_IVARS_BEGIN(NSTableColumn)
+        NSTableView *_tableView;
+        NSCell *_headerCell;
+        NSCell *_dataCell;
+        NSString *_headerToolTip;
+        CGFloat _width;
+        CGFloat _minWidth;
+        CGFloat _maxWidth;
+        BOOL _isResizable;
+        BOOL _isEditable;
+        NSUInteger _resizingMask;
+        BOOL _hidden;
+        NSSortDescriptor *_sortDescriptorPrototype;
+    NS_EXTRA_IVARS_END(NSTableColumn)
 }
 
 - (instancetype) initWithIdentifier: (NSUserInterfaceItemIdentifier) identifier;
 
 @property(copy) NSString *title;
 
-- (NSTableView *) tableView;
+@property(nonatomic, retain) NSTableView *tableView;
 - (NSString *) title;
-- (id) headerCell;
-- (id) dataCell;
-- (NSString *) headerToolTip;
+@property(nonatomic, retain) id headerCell;
+@property(nonatomic, retain) id dataCell;
+@property(nonatomic, copy) NSString *headerToolTip;
 
-- (BOOL) isHidden;
-- (void) setHidden: (BOOL) hidden;
-- (CGFloat) width;
-- (CGFloat) minWidth;
-- (CGFloat) maxWidth;
-- (BOOL) isResizable;
-- (BOOL) isEditable;
-- (NSUInteger) resizingMask;
+@property(nonatomic, getter=isHidden) BOOL hidden;
+@property(nonatomic) CGFloat width;
+@property(nonatomic) CGFloat minWidth;
+@property(nonatomic) CGFloat maxWidth;
+@property(nonatomic, getter=isResizable) BOOL resizable;
+@property(nonatomic, getter=isEditable) BOOL editable;
+@property(nonatomic) NSUInteger resizingMask;
 
-- (void) setTableView: (NSTableView *) tableView;
 - (void) setTitle: (NSString *) title;
-- (void) setHeaderCell: (NSCell *) cell;
-- (void) setDataCell: (NSCell *) cell;
-- (void) setHeaderToolTip: (NSString *) value;
 
-- (void) setWidth: (CGFloat) width;
-- (void) setMinWidth: (CGFloat) width;
-- (void) setMaxWidth: (CGFloat) width;
-- (void) setResizable: (BOOL) flag;
-- (void) setEditable: (BOOL) flag;
-- (void) setResizingMask: (NSUInteger) value;
 
 - (NSCell *) dataCellForRow: (NSInteger) row;
 
-- (NSSortDescriptor *) sortDescriptorPrototype;
-- (void) setSortDescriptorPrototype: (NSSortDescriptor *) value;
+@property(nonatomic, retain) NSSortDescriptor *sortDescriptorPrototype;
 
 // internal
 - (void) prepareCell: (id) cell inRow: (NSInteger) row;

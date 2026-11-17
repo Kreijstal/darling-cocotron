@@ -18,38 +18,40 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 #import <Foundation/NSString.h>
 
-typedef NSString* NSAppearanceName;
+typedef NSString* NSAppearanceName NS_EXTENSIBLE_STRING_ENUM;
 
-APPKIT_EXPORT NSString *const NSAppearanceNameAqua;
-APPKIT_EXPORT NSString *const NSAppearanceNameDarkAqua;
-APPKIT_EXPORT NSString *const NSAppearanceNameSystem;
-APPKIT_EXPORT NSString *const NSAppearanceNameTouchBar;
-APPKIT_EXPORT NSString *const NSAppearanceNameLightContent;
-APPKIT_EXPORT NSString *const NSAppearanceNameVibrantDark;
-APPKIT_EXPORT NSString *const NSAppearanceNameVibrantLight;
-APPKIT_EXPORT NSString *const NSAppearanceNameAccessibilityHighContrastAqua;
-APPKIT_EXPORT NSString *const NSAppearanceNameAccessibilityHighContrastDarkAqua;
-APPKIT_EXPORT NSString *const NSAppearanceNameAccessibilityHighContrastSystem;
-APPKIT_EXPORT NSString
-        *const NSAppearanceNameAccessibilityHighContrastVibrantLight;
-APPKIT_EXPORT NSString
-        *const NSAppearanceNameAccessibilityHighContrastVibrantDark;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAqua;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameDarkAqua;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameSystem;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameTouchBar;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameLightContent;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameVibrantDark;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameVibrantLight;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAccessibilityHighContrastAqua;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAccessibilityHighContrastDarkAqua;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAccessibilityHighContrastSystem;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAccessibilityHighContrastVibrantLight;
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameAccessibilityHighContrastVibrantDark;
 
-APPKIT_EXPORT NSString *const NSAppearanceNameControlStrip; // Undocumented
+APPKIT_EXPORT const NSAppearanceName NSAppearanceNameControlStrip; // Undocumented
 
 // Undocumented: whether the macOS 26 system design is in use.
 APPKIT_EXPORT BOOL NSSolariumEnabled(void);
 
 @interface NSAppearance : NSObject <NSSecureCoding> {
     NSAppearanceName _name;
+    NS_LEGACY_IVAR_PAD(_NSAppearanceReserved, 24)
 }
 
+// One shared appearance per known name; nil for any other name.
 + (NSAppearance *) appearanceNamed: (NSAppearanceName) name;
 // The appearance -performAsCurrentDrawingAppearance: installed on this thread,
-// else the process-wide one +setCurrentAppearance: sets (Aqua by default).
+// else the process-wide one +setCurrentAppearance: sets, else the application's
+// effective appearance (Aqua by default).
 + (NSAppearance *) currentDrawingAppearance NS_SWIFT_NAME(currentDrawing());
 + (NSAppearance *) currentAppearance;
 + (void) setCurrentAppearance: (NSAppearance *) appearance;

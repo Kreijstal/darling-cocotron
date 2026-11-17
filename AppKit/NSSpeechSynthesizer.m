@@ -18,6 +18,7 @@
 */
 
 #import <AppKit/NSSpeechSynthesizer.h>
+#import <Foundation/NSArray.h>
 
 NSVoiceGenderName const NSVoiceGenderFemale = @"VoiceGenderFemale";
 NSVoiceGenderName const NSVoiceGenderMale = @"VoiceGenderMale";
@@ -33,43 +34,43 @@ NSSpeechPropertyKey const NSSpeechVolumeProperty = @"volm";
 
 @implementation NSSpeechSynthesizer
 
-+ (NSArray *) availableVoices
-{
-    return @[];
+// There is no speech synthesizer, so there are no voices.
+
++ (NSArray<NSString *> *) availableVoices {
+    return [NSArray array];
 }
 
-+ (NSString *) voiceAtIndex: (NSInteger) index
-{
++ (NSString *) defaultVoice {
     return nil;
 }
 
-+ (NSDictionary *) attributesForVoice: (NSString *) voiceIdentifier
-{
-    return @{};
++ (NSDictionary<NSVoiceAttributeKey, id> *) attributesForVoice: (NSString *) voice {
+    return nil;
 }
 
-- (NSDictionary *) attributesForVoice: (NSString *) voiceIdentifier
-{
++ (NSString *) voiceAtIndex: (NSInteger) index {
+    return nil;
+}
+
+- (NSDictionary *) attributesForVoice: (NSString *) voiceIdentifier {
     return [[self class] attributesForVoice: voiceIdentifier];
 }
 
-- (instancetype) initWithVoice: (NSString *) voice
-{
+- (instancetype) initWithVoice: (NSString *) voice {
     self = [super init];
     if (self != nil) {
-        _voice = [voice copy];
+        NS_EXTRA(NSSpeechSynthesizer, self)->_voice = [voice copy];
     }
     return self;
 }
 
-- (NSString *) voice
-{
-    return _voice;
+- (NSString *) voice {
+    return NS_EXTRA(NSSpeechSynthesizer, self)->_voice;
 }
 
-- (void) dealloc
-{
-    [_voice release];
+- (void) dealloc {
+    [NS_EXTRA(NSSpeechSynthesizer, self)->_voice release];
+    NS_EXTRA_FREE(NSSpeechSynthesizer, self);
     [super dealloc];
 }
 

@@ -18,6 +18,7 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSResponder.h>
 #import <Foundation/NSGeometry.h>
 #import <Foundation/NSNotification.h>
@@ -36,6 +37,11 @@ typedef NS_ENUM(NSInteger, NSPopoverBehavior) {
     NSPopoverBehaviorSemitransient = 2,
 };
 
+typedef NS_ENUM(NSInteger, NSPopoverAppearance) {
+    NSPopoverAppearanceMinimal = 0,
+    NSPopoverAppearanceHUD = 1,
+};
+
 @interface NSPopover : NSResponder <NSCoding> {
     NSPopoverBehavior _behavior;
     BOOL _animates;
@@ -44,6 +50,7 @@ typedef NS_ENUM(NSInteger, NSPopoverBehavior) {
     id<NSPopoverDelegate> _delegate;
     NSRect _positioningRect;
     NSPanel *_panel;
+    NS_LEGACY_IVAR_PAD(_NSPopoverReserved, 44)
 }
 
 @property NSPopoverBehavior behavior;
@@ -70,3 +77,5 @@ typedef NS_ENUM(NSInteger, NSPopoverBehavior) {
 - (void) popoverWillClose: (NSNotification *) notification;
 - (void) popoverDidClose: (NSNotification *) notification;
 @end
+
+APPKIT_EXPORT NSString * const NSPopoverCloseReasonKey;

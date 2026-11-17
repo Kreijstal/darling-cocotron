@@ -40,10 +40,28 @@ NSString *const NSControlTextDidChangeNotification =
 NSString *const NSControlTextDidEndEditingNotification =
         @"NSControlTextDidEndEditingNotification";
 
+// Not declared in a public header.
+APPKIT_EXPORT const NSNotificationName NSControlWillBeginContinuousTrackingNotification;
+APPKIT_EXPORT const NSNotificationName NSControlDidEndContinuousTrackingNotification;
+const NSNotificationName NSControlWillBeginContinuousTrackingNotification =
+        @"NSControlWillBeginContinuousTrackingNotification";
+const NSNotificationName NSControlDidEndContinuousTrackingNotification =
+        @"NSControlDidEndContinuousTrackingNotification";
+
 @implementation NSControl
 
-@synthesize allowsExpansionToolTips = _allowsExpansionToolTips;
-@synthesize allowsLogicalLayoutDirection = _allowsLogicalLayoutDirection;
+// QUIRK: controls answer NO, whatever their opacity; NSTextField goes back
+// to the view rule. Not documented. Evidence: black-box observation on
+// macOS 27.0.1 arm64 (tier 2): NSButton and NSImageView answer NO, a label
+// text field YES and an editable one NO, while a plain non-opaque NSView
+// answers YES. Test: appkit_view_window_macos_defaults.m
+// (mouseDownCanMoveWindow QUIRK).
+- (BOOL) mouseDownCanMoveWindow {
+    return NO;
+}
+
+NS_EXTRA_SYNTHESIZE_ASSIGN(NSControl, allowsExpansionToolTips, _allowsExpansionToolTips, BOOL, allowsExpansionToolTips, setAllowsExpansionToolTips:)
+NS_EXTRA_SYNTHESIZE_ASSIGN(NSControl, allowsLogicalLayoutDirection, _allowsLogicalLayoutDirection, BOOL, allowsLogicalLayoutDirection, setAllowsLogicalLayoutDirection:)
 
 static NSMutableDictionary *cellClassDictionary = nil;
 
@@ -66,6 +84,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 
 - (void) setControlSize: (NSControlSize) size {
     [_cell setControlSize: size];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -105,41 +124,52 @@ static NSMutableDictionary *cellClassDictionary = nil;
         [_aux setTarget: [keyed decodeObjectForKey: @"NSControlTarget"]];
     } else {
         NSInteger version = [coder versionForClassName: @"NSControl"];
-        NSLog(@"NSControl version is %ld\n", (long) version);
 
+        // Layouts 17 and later start with a flag byte whose lowest bit is the
+        // control's own enabled state; it is what a control without a cell
+        // (a scroller, a colour well) reports, a control with a cell reports
+        // the cell's state and ignores it. The other flag bytes (and the flag
+        // short of the oldest layout) are read but not interpreted: setting
+        // them one at a time changes nothing that the control reports through
+        // public accessors on macOS, so what they stand for is unknown.
         if (version <= 16) {
-            NSInteger tag;
+            int tag;
             id cell;
             unsigned short flags;
 
             [coder decodeValuesOfObjCTypes: "i@s", &tag, &cell, &flags];
             [_aux setTag: tag];
+            NS_EXTRA(NSView, self)->_tag = tag;
             [self setCell: cell];
-
-            // TODO: flags
+            [cell release];
         } else if (version <= 40) {
-            NSInteger tag;
-            uint8_t flags1, flags2;
+            int tag = 0;
+            uint8_t flags1 = 0, flags2 = 0, flags3 = 0;
 
             [coder decodeValuesOfObjCTypes: "i", &tag];
-            flags1 = [coder decodeByte];
-            flags2 = [coder decodeByte];
+            [coder decodeValuesOfObjCTypes: "c", &flags1];
+            [coder decodeValuesOfObjCTypes: "c", &flags2];
+            [coder decodeValuesOfObjCTypes: "c", &flags3];
 
             [_aux setTag: tag];
+            NS_EXTRA(NSView, self)->_tag = tag;
             [self setCell: [coder decodeObject]];
-
-            // TODO: flags
+            if (_cell == nil)
+                [self setEnabled: (flags1 & 1) != 0];
         } else {
             int tag = 0;
             uint8_t flags1 = 0, flags2 = 0;
+            id cell = nil;
 
             [coder decodeValuesOfObjCTypes: "icc@", &tag, &flags1, &flags2,
-                                            &self->_cell];
-            [_cell retain];
+                                            &cell];
 
             [_aux setTag: tag];
-            NSLog(@"[NSControl initWithCoder] version=%ld done, cell=%@", (long)version, _cell);
-            // TODO: flags
+            NS_EXTRA(NSView, self)->_tag = tag;
+            [self setCell: cell];
+            [cell release];
+            if (_cell == nil)
+                [self setEnabled: (flags1 & 1) != 0];
         }
     }
 
@@ -164,6 +194,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
     [self _unbindAllBindings];
     [_aux release];
     [_cell release];
+    NS_EXTRA_FREE(NSControl, self);
     [super dealloc];
 }
 
@@ -198,7 +229,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (NSInteger) tag {
-    return _tag;
+    return NS_EXTRA(NSView, self)->_tag;
 }
 
 - (NSFont *) font {
@@ -321,21 +352,28 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (void) setTag: (NSInteger) tag {
-    _tag = tag;
+    NS_EXTRA(NSView, self)->_tag = tag;
 }
 
 - (void) setFont: (NSFont *) font {
+    NSFont *before = [[_cell font] retain];
+
     [_cell setFont: font];
+    if (!(before == font || [before isEqual: font]))
+        [self invalidateIntrinsicContentSize];
+    [before release];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setImage: (NSImage *) image {
     [[self cell] setImage: image];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAlignment: (NSTextAlignment) alignment {
     [_cell setAlignment: alignment];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -365,11 +403,13 @@ static NSMutableDictionary *cellClassDictionary = nil;
 
 - (void) setBordered: (BOOL) flag {
     [_cell setBordered: flag];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setBezeled: (BOOL) flag {
     [_cell setBezeled: flag];
+    [self invalidateIntrinsicContentSize];
     [self setNeedsDisplay: YES];
 }
 
@@ -394,81 +434,116 @@ static NSMutableDictionary *cellClassDictionary = nil;
     [_cell setUsesSingleLineMode: flag];
 }
 
+// The value a control shows is part of its intrinsic size; setting the value it already has changes nothing.
+- (void) _intrinsicContentSizeMayHaveChangedFromValue: (id) before {
+    id after = [[self selectedCell] objectValue];
+
+    if (!(before == after || [before isEqual: after]))
+        [self invalidateIntrinsicContentSize];
+    [before release];
+}
+
 - (void) setObjectValue: (id<NSCopying>) object {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [(NSCell *) [self selectedCell] setObjectValue: object];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setStringValue: (NSString *) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setStringValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setIntValue: (int) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setIntValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setFloatValue: (float) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setFloatValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setDoubleValue: (double) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setDoubleValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setIntegerValue: (NSInteger) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setIntegerValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) setAttributedStringValue: (NSAttributedString *) value {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] setAttributedStringValue: value];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeObjectValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeObjectValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeStringValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeStringValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeIntValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeIntValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeFloatValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeFloatValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeDoubleValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeDoubleValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
 - (void) takeIntegerValueFrom: sender {
     [self abortEditing];
+    id before = [[[self selectedCell] objectValue] retain];
     [[self selectedCell] takeIntegerValueFrom: sender];
+    [self _intrinsicContentSizeMayHaveChangedFromValue: before];
     [self setNeedsDisplay: YES];
 }
 
@@ -516,12 +591,12 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (NSText *) currentEditor {
-    return _currentEditor;
+    return NS_EXTRA(NSControl, self)->_currentEditor;
 }
 
 - (void) validateEditing {
-    if (_currentEditor) {
-        NSString *string = [_currentEditor string];
+    if (NS_EXTRA(NSControl, self)->_currentEditor) {
+        NSString *string = [NS_EXTRA(NSControl, self)->_currentEditor string];
         BOOL acceptsString = YES;
         NSFormatter *formatter = [self formatter];
         if (formatter) {
@@ -536,9 +611,9 @@ static NSMutableDictionary *cellClassDictionary = nil;
             }
         }
         if (acceptsString) {
-            if ([_currentEditor isRichText]) {
-                if ([_currentEditor isKindOfClass: [NSTextView class]]) {
-                    NSTextView *textview = (NSTextView *) _currentEditor;
+            if ([NS_EXTRA(NSControl, self)->_currentEditor isRichText]) {
+                if ([NS_EXTRA(NSControl, self)->_currentEditor isKindOfClass: [NSTextView class]]) {
+                    NSTextView *textview = (NSTextView *) NS_EXTRA(NSControl, self)->_currentEditor;
                     NSAttributedString *text = [textview textStorage];
                     NSAttributedString *string = [[[NSAttributedString alloc]
                             initWithAttributedString: text] autorelease];
@@ -554,20 +629,20 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (BOOL) abortEditing {
-    if (_currentEditor != nil) {
+    if (NS_EXTRA(NSControl, self)->_currentEditor != nil) {
         // this may be invalid after endEditingFor: if we dont retain it
-        NSView *superview = [[[_currentEditor superview] retain] autorelease];
+        NSView *superview = [[[NS_EXTRA(NSControl, self)->_currentEditor superview] retain] autorelease];
 
         // we don't want delegate messages when aborting
-        [_currentEditor setDelegate: nil];
+        [NS_EXTRA(NSControl, self)->_currentEditor setDelegate: nil];
 
         [[self window] endEditingFor: self];
 
         if ([superview isKindOfClass: [NSClipView class]])
             [superview removeFromSuperview];
 
-        [_currentEditor release];
-        _currentEditor = nil;
+        [NS_EXTRA(NSControl, self)->_currentEditor release];
+        NS_EXTRA(NSControl, self)->_currentEditor = nil;
     }
     return NO;
 }
@@ -578,6 +653,45 @@ static NSMutableDictionary *cellClassDictionary = nil;
 
 - (NSSize) intrinsicContentSize {
     return [[self cell] cellSize];
+}
+
+// Text is centered vertically in the alignment rectangle, whose height is the
+// control's intrinsic height when it has one (it is the height of one line of
+// the font otherwise): the first baseline is below the top by the space above
+// the line and the ascent, the last above the bottom by the space below it and
+// the descent. A control without a font has no baselines.
+- (CGFloat) _textBaselineSpaceAbove: (BOOL) above {
+    NSFont *font = [self font];
+
+    if (font == nil)
+        return -1;
+
+    CGFloat ascent = ceil([font ascender]);
+    CGFloat descent = ceil(-[font descender]);
+    CGFloat height = [self intrinsicContentSize].height;
+
+    // The two offsets always add up to the control's height: when the
+    // intrinsic height is less than the rounded-up ascent plus descent, the
+    // descent gives way.
+    if (height > 0 && height < ascent + descent)
+        descent = MAX(height - ascent, 0);
+
+    CGFloat spare = height > ascent + descent ? height - ascent - descent : 0;
+    CGFloat spaceAbove = floor(spare / 2);
+
+    return above ? spaceAbove + ascent : spare - spaceAbove + descent;
+}
+
+- (CGFloat) firstBaselineOffsetFromTop {
+    CGFloat offset = [self _textBaselineSpaceAbove: YES];
+
+    return offset >= 0 ? offset : [super firstBaselineOffsetFromTop];
+}
+
+- (CGFloat) lastBaselineOffsetFromBottom {
+    CGFloat offset = [self _textBaselineSpaceAbove: NO];
+
+    return offset >= 0 ? offset : [super lastBaselineOffsetFromBottom];
 }
 
 - (void) sizeToFit {
@@ -595,7 +709,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (BOOL) resignFirstResponder {
-    if (_currentEditor) {
+    if (NS_EXTRA(NSControl, self)->_currentEditor) {
         return [[self selectedCell] hasValidObjectValue];
     }
     return YES;
@@ -607,7 +721,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (void) textDidBeginEditing: (NSNotification *) note {
-    if ([note object] != _currentEditor)
+    if ([note object] != NS_EXTRA(NSControl, self)->_currentEditor)
         return;
 
     [[NSNotificationCenter defaultCenter]
@@ -630,7 +744,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (void) textDidChange: (NSNotification *) note {
-    if ([note object] != _currentEditor)
+    if ([note object] != NS_EXTRA(NSControl, self)->_currentEditor)
         return;
 
     // FIX, Add formatter logic here
@@ -648,7 +762,7 @@ static NSMutableDictionary *cellClassDictionary = nil;
 - (void) textDidEndEditing: (NSNotification *) note {
     // It is possible for an NSControl subclass to be the delegate of another
     // text view
-    if ([note object] != _currentEditor)
+    if ([note object] != NS_EXTRA(NSControl, self)->_currentEditor)
         return;
 
     [self validateEditing];
@@ -728,11 +842,11 @@ static NSMutableDictionary *cellClassDictionary = nil;
 }
 
 - (BOOL) _setsMaxLayoutWidthAtFirstLayout {
-    return _setsMaxLayoutWidthAtFirstLayout;
+    return NS_EXTRA(NSControl, self)->_setsMaxLayoutWidthAtFirstLayout;
 }
 
 - (void) _setSetsMaxLayoutWidthAtFirstLayout: (BOOL) setsMaxLayoutWidthAtFirstLayout {
-    _setsMaxLayoutWidthAtFirstLayout = setsMaxLayoutWidthAtFirstLayout;
+    NS_EXTRA(NSControl, self)->_setsMaxLayoutWidthAtFirstLayout = setsMaxLayoutWidthAtFirstLayout;
 }
 
 // NSEditor methods

@@ -18,6 +18,7 @@
  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  SOFTWARE. */
 #import <Foundation/NSDate.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
 @class CAMediaTimingFunction;
@@ -25,8 +26,12 @@
 // Animations aren't run: changes made in a group take effect immediately.
 @interface NSAnimationContext : NSObject <NSCopying> {
     NSTimeInterval _duration;
+    // Apple's footprint is 40 bytes; the last word holds the pointer to the extras.
+    NS_LEGACY_IVAR_PAD(_NSAnimationContextReserved, 12)
+    NS_EXTRA_IVARS_BEGIN(NSAnimationContext)
     BOOL _allowsImplicitAnimation;
     CAMediaTimingFunction *_timingFunction;
+    NS_EXTRA_IVARS_END(NSAnimationContext)
 }
 
 @property(retain) CAMediaTimingFunction *timingFunction;

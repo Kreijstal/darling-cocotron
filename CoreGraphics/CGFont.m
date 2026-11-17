@@ -57,7 +57,9 @@ CFStringRef CGFontCopyFullName(CGFontRef self) {
 }
 
 CFStringRef CGFontCopyPostScriptName(CGFontRef self) {
-    return (CFStringRef) O2FontCopyPostScriptName((O2FontRef)self);
+    if (self == NULL)
+        return NULL;
+    return O2FontCopyPostScriptName((O2FontRef) self);
 }
 
 int CGFontGetUnitsPerEm(CGFontRef self) {
@@ -122,7 +124,7 @@ CGFontRef _Nullable CGFontCreateWithDataProvider(CGDataProviderRef _Nullable pro
 {
     if (provider == NULL)
         return NULL;
-    return (CGFontRef)O2FontCreateWithDataProvider((O2DataProviderRef)provider);
+    return (CGFontRef) O2FontCreateWithDataProvider((O2DataProviderRef) provider);
 }
 
 CFStringRef const kCGFontVariationAxisName = CFSTR("kCGFontVariationAxisName");

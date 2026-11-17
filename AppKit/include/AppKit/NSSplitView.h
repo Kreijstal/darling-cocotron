@@ -17,29 +17,46 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSView.h>
+#import <AppKit/NSLayoutConstraint.h>
 
 APPKIT_EXPORT NSString *const NSSplitViewDidResizeSubviewsNotification;
 APPKIT_EXPORT NSString *const NSSplitViewWillResizeSubviewsNotification;
 
-typedef enum {
+typedef NS_ENUM(NSInteger, NSSplitViewDividerStyle) {
     NSSplitViewDividerStyleThick = 1,
     NSSplitViewDividerStyleThin,
     NSSplitViewDividerStylePaneSplitter,
-} NSSplitViewDividerStyle;
+};
 
+// Legacy ObjC ABI (i386): instance size must stay 0x54, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSSplitView : NSView {
-    id _delegate;
-    BOOL _isVertical;
-    NSSplitViewDividerStyle _dividerStyle;
-    NSString *_autosaveName;
+    NS_EXTRA_IVARS_BEGIN(NSSplitView)
+        id _delegate;
+        BOOL _isVertical;
+        NSSplitViewDividerStyle _dividerStyle;
+        NSString *_autosaveName;
+        NSMutableArray *_explicitArranged;
+        BOOL _arrangesOnlyExplicit;
+    NS_EXTRA_IVARS_END(NSSplitView)
 }
 
-- (id) delegate;
-- (BOOL) isVertical;
+@property(nonatomic, assign) id delegate;
+@property(nonatomic, getter=isVertical) BOOL vertical;
 
-- (void) setDelegate: (id) delegate;
-- (void) setVertical: (BOOL) flag;
+
+@property(readonly, copy) NSArray *arrangedSubviews;
+@property BOOL arrangesAllSubviews;
+
+- (void) addArrangedSubview: (NSView *) view;
+- (void) insertArrangedSubview: (NSView *) view atIndex: (NSInteger) index;
+- (void) removeArrangedSubview: (NSView *) view;
+
+- (NSLayoutPriority) holdingPriorityForSubviewAtIndex: (NSInteger) subviewIndex;
+- (void) setHoldingPriority: (NSLayoutPriority) priority forSubviewAtIndex: (NSInteger) subviewIndex;
 
 - (void) adjustSubviews;
 
@@ -48,8 +65,9 @@ typedef enum {
 
 - (BOOL) isSubviewCollapsed: (NSView *) subview;
 
-- (void) setDividerStyle: (NSSplitViewDividerStyle) style;
-- (NSSplitViewDividerStyle) dividerStyle;
+@property(nonatomic) NSSplitViewDividerStyle dividerStyle;
+
+@property(nonatomic, copy) NSString *autosaveName;
 
 - (NSString *) autosaveName;
 - (void) setAutosaveName: (NSString *) name;

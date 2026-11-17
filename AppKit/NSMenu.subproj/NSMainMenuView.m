@@ -19,6 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 // Original - Christopher Lloyd <cjwl@objc.net>
 #import <AppKit/NSFont.h>
+#import <AppKit/NSFontManager.h>
 #import <AppKit/NSGraphicsStyle.h>
 #import <AppKit/NSMainMenuView.h>
 #import <AppKit/NSMenuWindow.h>
@@ -51,7 +52,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - initWithFrame: (NSRect) frame menu: (NSMenu *) menu {
     [super initWithFrame: frame];
 
-    _menu = [menu retain];
+    NS_EXTRA(NSView, self)->_menu = [menu retain];
     _font = [[[self class] menuFont] retain];
     _selectedItemIndex = NSNotFound;
     [self sizeToFit];
@@ -62,6 +63,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) dealloc {
     [_menu release];
     [_font release];
+    [_applicationName release];
     [super dealloc];
 }
 
@@ -74,7 +76,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (NSMenu *) menu {
-    return _menu;
+    return NS_EXTRA(NSView, self)->_menu;
 }
 
 - (void) setMenu: (NSMenu *) menu {
@@ -87,11 +89,65 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [self setNeedsDisplay: YES];
 }
 
+// The menu bar names the first menu after the application and draws it in
+// bold, whatever title the item has.
+// A snapshot, because -visibleItemArray rebuilds one shared array on each call.
+- (NSArray *) visibleItems {
+    return [NSArray arrayWithArray: [self visibleItemArray]];
+}
+
+- (NSString *) applicationName {
+    return _applicationName;
+}
+
+- (void) setApplicationName: (NSString *) name {
+    if (name != _applicationName) {
+        [_applicationName release];
+        _applicationName = [name copy];
+        [self setNeedsDisplay: YES];
+    }
+}
+
+- (BOOL) isApplicationMenuItem: (NSMenuItem *) item {
+    return _applicationName != nil && item == [[self visibleItems] firstObject];
+}
+
+- (NSString *) displayTitleForItem: (NSMenuItem *) item {
+    return [self isApplicationMenuItem: item] ? _applicationName : [item _mainMenuTitle];
+}
+
+- (NSDictionary *) boldTitleAttributesSelected: (BOOL) selected {
+    NSFont *font = [[NSFontManager sharedFontManager]
+            convertFont: _font
+            toHaveTrait: NSBoldFontMask];
+
+    return @{
+        NSFontAttributeName : font,
+        NSForegroundColorAttributeName : selected
+                ? [NSColor selectedMenuItemTextColor]
+                : [NSColor menuItemTextColor]
+    };
+}
+
+- (NSSize) textSizeForItem: (NSMenuItem *) item {
+    NSString *title = [self displayTitleForItem: item];
+    NSSize size = [[self graphicsStyle] menuItemTextSize: title];
+
+    if ([self isApplicationMenuItem: item]) {
+        NSSize normal = [title sizeWithAttributes: @{NSFontAttributeName : _font}];
+        NSSize bold = [title sizeWithAttributes:
+                                     [self boldTitleAttributesSelected: NO]];
+
+        size.width += bold.width - normal.width;
+    }
+    return size;
+}
+
 - (NSRect) titleRectForItem: (NSMenuItem *) item
          previousBorderRect: (NSRect) previousBorderRect
 {
     NSRect result;
-    NSSize titleSize = [[self graphicsStyle] menuItemTextSize: [item _mainMenuTitle]];
+    NSSize titleSize = [self textSizeForItem: item];
 
     result.origin = NSMakePoint(
             NSMaxX(previousBorderRect) + 6,
@@ -115,7 +171,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [self setFrameSize: NSMakeSize([self frame].size.width,
                                    [[self class] menuHeight])];
 #else
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     int i, count = [items count];
     CGFloat height = 0;
 
@@ -184,7 +240,7 @@ static void drawSunkenBorder(NSRect rect) {
 
 - (void) drawRect: (NSRect) rect {
     NSRect bounds = [self bounds];
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     NSUInteger i, count = [items count];
     NSRect previousBorderRect = NSMakeRect(0, 0, 0, 0);
     BOOL overflow = NO;
@@ -196,7 +252,7 @@ static void drawSunkenBorder(NSRect rect) {
 
     for (i = 0; i < count; i++) {
         NSMenuItem *item = [items objectAtIndex: i];
-        NSString *title = [item _mainMenuTitle];
+        NSString *title = [self displayTitleForItem: item];
         NSRect titleRect = [self titleRectForItem: item
                                previousBorderRect: previousBorderRect];
         NSRect borderRect = [self borderRectFromTitleRect: titleRect];
@@ -212,10 +268,15 @@ static void drawSunkenBorder(NSRect rect) {
         titleRect.origin.y = borderRect.origin.y +
                              (NSHeight(borderRect) - NSHeight(titleRect)) / 2;
 
-        [[self graphicsStyle] drawMenuItemText: title
-                                        inRect: titleRect
-                                       enabled: YES
-                                      selected: (i == _selectedItemIndex)];
+        if ([self isApplicationMenuItem: item])
+            [title drawInRect: titleRect
+                    withAttributes: [self boldTitleAttributesSelected:
+                                                  (i == _selectedItemIndex)]];
+        else
+            [[self graphicsStyle] drawMenuItemText: title
+                                            inRect: titleRect
+                                           enabled: YES
+                                          selected: (i == _selectedItemIndex)];
 
         previousBorderRect = borderRect;
 
@@ -249,7 +310,7 @@ static void drawSunkenBorder(NSRect rect) {
 
 - (NSUInteger) overflowIndex {
     NSRect bounds = [self bounds];
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     NSUInteger i, count = [items count];
     NSRect previousBorderRect = NSMakeRect(0, 0, 0, 0);
 
@@ -271,7 +332,7 @@ static void drawSunkenBorder(NSRect rect) {
 - (NSUInteger) itemIndexAtPoint: (NSPoint) point {
     NSUInteger result = NSNotFound;
     NSRect bounds = [self bounds];
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     NSUInteger i, count = [items count];
     NSRect previousBorderRect = NSMakeRect(0, 0, 0, 0);
     BOOL overflow = NO;
@@ -302,7 +363,7 @@ static void drawSunkenBorder(NSRect rect) {
 - (NSUInteger) itemIndexAtPoint: (NSPoint) point rect: (NSRect*) rect {
     NSUInteger result = NSNotFound;
     NSRect bounds = [self bounds];
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     NSUInteger i, count = [items count];
     NSRect previousBorderRect = NSMakeRect(0, 0, 0, 0);
     BOOL overflow = NO;
@@ -339,7 +400,7 @@ static void drawSunkenBorder(NSRect rect) {
 {
     NSRect branchFrame = [branch frame];
     NSRect screenVisible = [screen visibleFrame];
-    NSArray *items = [[self menu] itemArray];
+    NSArray *items = [self visibleItems];
     NSUInteger i, count = [items count];
     NSRect previousBorderRect = NSMakeRect(0, 0, 0, 0);
     NSRect itemRect = NSZeroRect;
@@ -386,7 +447,7 @@ static void drawSunkenBorder(NSRect rect) {
 }
 
 - (NSMenuView *) viewAtSelectedIndexPositionOnScreen: (NSScreen *) screen {
-    NSArray *items = [self visibleItemArray];
+    NSArray *items = [self visibleItems];
 
     if (_selectedItemIndex == [items count]) {
         NSMenuWindow *branch =

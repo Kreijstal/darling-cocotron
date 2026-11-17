@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Ancillary test tooling, GPL-3.0; the patched cocotron sources keep their own licence.
-// Host test for AppKit/X11.backend/X11Monitors.h: which monitor is the main display, in which order the monitors
+// Host test for CoreGraphics/X11.backend/X11Monitors.h: which monitor is the main display, in which order the monitors
 // are listed, and the conversion between Cocoa's global space (origin at the main monitor) and root coordinates.
 // The RandR part runs on a real X server; use tests/x11-monitors.sh, which starts its own Xvfb.
 // Build: cc x11-monitors.c -lX11 -lXrandr
 #define _GNU_SOURCE
 #include <dlfcn.h>
-#include "../AppKit/X11.backend/X11Monitors.h"
+#include "../CoreGraphics/X11.backend/X11Monitors.h"
 #include "../CoreGraphics/CGDisplayGeometry.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int failures, checks;
@@ -34,8 +35,9 @@ static X11Monitor inactive(RROutput output) {
 }
 
 /* On nested X servers (such as Xephyr) RandR allows mode creation but refuses to move CRTC coordinates
- * outside (0, 0) or update output associations when disabled. Interpose RandR getters to reflect what
- * setCrtc requested so the unit test can verify X11MonitorsCopy on any X server. */
+ * outside (0, 0) or update output associations when disabled. When X11_MONITORS_NESTED is set (by
+ * x11-monitors.sh for Xephyr), the RandR getters are interposed to reflect what setCrtc requested, so the
+ * unit test can verify X11MonitorsCopy there too. */
 static struct {
     bool active;
     int x, y;
@@ -189,34 +191,6 @@ static void displayIDs(void) {
         CHECK(X11MonitorDisplayID(i) != 0, "no output has the null display ID");
 }
 
-static double scaleWith(const char *darling, const char *gdk, const char **source) {
-    if (darling)
-        setenv("DARLING_X11_SCALE", darling, 1);
-    else
-        unsetenv("DARLING_X11_SCALE");
-    if (gdk)
-        setenv("GDK_SCALE", gdk, 1);
-    else
-        unsetenv("GDK_SCALE");
-    return X11ScaleFromEnvironment(source);
-}
-
-static void scale(void) {
-    const char *source;
-    CHECK(scaleWith(NULL, NULL, &source) == 1 && source == NULL, "no variable: 1x");
-    CHECK(scaleWith("2", NULL, &source) == 2 && source && !strcmp(source, "DARLING_X11_SCALE"), "DARLING_X11_SCALE=2");
-    CHECK(scaleWith(NULL, "1.5", &source) == 1.5 && source && !strcmp(source, "GDK_SCALE"), "fractional GDK_SCALE");
-    CHECK(scaleWith("3", "2", &source) == 3, "DARLING_X11_SCALE wins over GDK_SCALE");
-    CHECK(scaleWith("0.5", NULL, &source) == 1 && source == NULL, "a scale under 1 is ignored");
-    CHECK(scaleWith("2x", NULL, &source) == 1 && source == NULL, "trailing junk is ignored");
-    CHECK(scaleWith("nan", NULL, &source) == 1 && source == NULL, "a non-finite scale is ignored");
-    CHECK(scaleWith("", NULL, &source) == 1 && source == NULL, "an empty scale is ignored");
-    CHECK(scaleWith("junk", "2", &source) == 2 && source && !strcmp(source, "GDK_SCALE"),
-          "an invalid first variable falls through to the second");
-    unsetenv("DARLING_X11_SCALE");
-    unsetenv("GDK_SCALE");
-}
-
 /* The three global spaces (Cocoa y up, CoreGraphics y down, root) must agree with each other for every monitor of a
  * layout: NSScreen.frame, CGDisplayBounds and the pointer are derived from the same root rectangles. */
 static void conventionFor(X11Frame primary, X11Frame monitor, const char *name) {
@@ -291,7 +265,8 @@ static void convention(void) {
 }
 
 static void setCrtc(Display *display, int x, int y, unsigned width, unsigned height, bool enable) {
-    crtcOverride.active = true;
+    /* Only a nested server needs the interposed getters; elsewhere the test reads what RandR really reports. */
+    crtcOverride.active = getenv("X11_MONITORS_NESTED") != NULL;
     crtcOverride.x = x;
     crtcOverride.y = y;
     crtcOverride.width = width;
@@ -412,13 +387,37 @@ static void randr(Display *display) {
     free(monitors);
 }
 
+static double scaleWith(double preferred, const char *gdk, const char **source) {
+    if (gdk)
+        setenv("GDK_SCALE", gdk, 1);
+    else
+        unsetenv("GDK_SCALE");
+    return X11ScaleChoose(preferred, source);
+}
+
+static void scale(void) {
+    const char *source;
+    CHECK(scaleWith(0, NULL, &source) == 1 && source == NULL, "nothing set: 1x");
+    CHECK(scaleWith(2, NULL, &source) == 2 && source && !strcmp(source, "preference"), "preference 2");
+    CHECK(scaleWith(0, "1.5", &source) == 1.5 && source && !strcmp(source, "GDK_SCALE"), "fractional GDK_SCALE");
+    CHECK(scaleWith(3, "2", &source) == 3, "the preference wins over GDK_SCALE");
+    CHECK(scaleWith(0.5, NULL, &source) == 1 && source == NULL, "a preference under 1 is ignored");
+    CHECK(scaleWith(NAN, "2", &source) == 2 && source && !strcmp(source, "GDK_SCALE"),
+          "a non-finite preference falls through to GDK_SCALE");
+    CHECK(scaleWith(0, "0.5", &source) == 1 && source == NULL, "GDK_SCALE under 1 is ignored");
+    CHECK(scaleWith(0, "2x", &source) == 1 && source == NULL, "trailing junk is ignored");
+    CHECK(scaleWith(0, "nan", &source) == 1 && source == NULL, "a non-finite GDK_SCALE is ignored");
+    CHECK(scaleWith(0, "", &source) == 1 && source == NULL, "an empty GDK_SCALE is ignored");
+    unsetenv("GDK_SCALE");
+}
+
 int main(void) {
     pickPrimary();
     order();
     frames();
     displayIDs();
-    scale();
     convention();
+    scale();
     Display *display = XOpenDisplay(NULL);
     if (!display) {
         printf("no X display: run through tests/x11-monitors.sh\n");

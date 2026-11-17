@@ -7,6 +7,8 @@ const CFStringRef kCTFontCollectionRemoveDuplicatesOption = CFSTR("CTFontCollect
 const CFStringRef kCTFontCollectionIncludeDisabledFontsOption = CFSTR("CTFontCollectionIncludeDisabledFontsOption");
 const CFStringRef kCTFontCollectionDisallowAutoActivationOption = CFSTR("CTFontCollectionDisallowAutoActivationOption");
 
+// Built-in face list, used for "all fonts" when no installed faces can be
+// listed (no fontconfig). Each entry is a font descriptor.
 static NSArray *defaultAvailableFontDescriptors(void) {
     static NSArray *s_defaultDescriptors = nil;
     static dispatch_once_t onceToken;
@@ -48,148 +50,232 @@ static NSArray *defaultAvailableFontDescriptors(void) {
             attrs[(id)kCTFontDisplayNameAttribute] = postscript;
             attrs[(id)kCTFontPostScriptNameAttribute] = postscript;
             attrs[(id)kCTFontSizeAttribute] = [NSNumber numberWithDouble:12.0];
-            [list addObject:attrs];
+            CTFontDescriptorRef descriptor = CTFontDescriptorCreateWithAttributes((CFDictionaryRef)attrs);
+            [list addObject:(id)descriptor];
+            CFRelease(descriptor);
         }
         s_defaultDescriptors = [list copy];
     });
     return s_defaultDescriptors;
 }
 
-@interface _CTFontCollection : NSObject <NSCopying, NSMutableCopying> {
-@public
-    NSMutableArray *_queryDescriptors;
-    NSMutableArray *_exclusionDescriptors;
+// A collection keeps the query descriptors it was made from; matching runs
+// each query against the installed fonts when it is asked for.
+@interface KTFontCollection : NSObject <NSCopying> {
+    NSArray *_queries;
     NSDictionary *_options;
+    NSArray *_exclusions;
 }
-- (instancetype)initWithDescriptors:(NSArray *)descriptors options:(NSDictionary *)options;
-- (NSArray *)matchingFontDescriptorsWithOptions:(NSDictionary *)options;
+- initWithQueries: (NSArray *) queries options: (NSDictionary *) options;
+- (NSArray *) queries;
+- (NSDictionary *) options;
+- (NSArray *) exclusions;
+- (void) setQueries: (NSArray *) queries;
+- (void) setExclusions: (NSArray *) exclusions;
 @end
 
-@implementation _CTFontCollection
+@implementation KTFontCollection
 
-- (instancetype)initWithDescriptors:(NSArray *)descriptors options:(NSDictionary *)options {
+- initWithQueries: (NSArray *) queries options: (NSDictionary *) options {
     self = [super init];
-    if (self) {
-        _queryDescriptors = descriptors ? [descriptors mutableCopy] : [[NSMutableArray alloc] init];
-        _exclusionDescriptors = [[NSMutableArray alloc] init];
-        _options = options ? [options copy] : nil;
-    }
+    if (self == nil)
+        return nil;
+    _queries = [queries copy];
+    _options = [options copy];
     return self;
 }
 
-- (void)dealloc {
-    [_queryDescriptors release];
-    [_exclusionDescriptors release];
+- (void) dealloc {
+    [_queries release];
     [_options release];
+    [_exclusions release];
     [super dealloc];
 }
 
-- (id)copyWithZone:(NSZone *)zone {
-    _CTFontCollection *copy = [[_CTFontCollection allocWithZone:zone] initWithDescriptors:_queryDescriptors options:_options];
-    [copy->_exclusionDescriptors addObjectsFromArray:_exclusionDescriptors];
-    return copy;
+- (CFTypeID) _cfTypeID {
+    return CTFontCollectionGetTypeID();
 }
 
-- (id)mutableCopyWithZone:(NSZone *)zone {
-    return [self copyWithZone:zone];
+- copyWithZone: (NSZone *) zone {
+    return [self retain];
 }
 
-- (NSArray *)matchingFontDescriptorsWithOptions:(NSDictionary *)options {
-    NSArray *source = (_queryDescriptors.count > 0) ? _queryDescriptors : defaultAvailableFontDescriptors();
-    BOOL removeDuplicates = NO;
+- (NSArray *) queries {
+    return _queries;
+}
 
-    id opt = [_options objectForKey:(id)kCTFontCollectionRemoveDuplicatesOption];
-    if (!opt && options) {
-        opt = [options objectForKey:(id)kCTFontCollectionRemoveDuplicatesOption];
-    }
-    if (opt && [opt respondsToSelector:@selector(boolValue)]) {
-        removeDuplicates = [opt boolValue];
-    }
+- (NSDictionary *) options {
+    return _options;
+}
 
-    NSMutableArray *result = [NSMutableArray arrayWithCapacity:source.count];
-    NSMutableSet *seenNames = removeDuplicates ? [NSMutableSet set] : nil;
+- (NSArray *) exclusions {
+    return _exclusions;
+}
 
-    for (id item in source) {
-        // Check exclusions:
-        // TODO: Full CoreText fuzzy attribute matching. For now, match against all attributes present in exclusion descriptor.
-        BOOL excluded = NO;
-        if (_exclusionDescriptors.count > 0 && [item isKindOfClass:[NSDictionary class]]) {
-            NSDictionary *itemDict = (NSDictionary *)item;
-            for (id excl in _exclusionDescriptors) {
-                if ([excl isKindOfClass:[NSDictionary class]]) {
-                    NSDictionary *exclDict = (NSDictionary *)excl;
-                    if (exclDict.count == 0) continue;
-                    BOOL allMatched = YES;
-                    for (id key in exclDict) {
-                        id expected = exclDict[key];
-                        id actual = itemDict[key];
-                        if (!actual || ![actual isEqual:expected]) {
-                            allMatched = NO;
-                            break;
-                        }
-                    }
-                    if (allMatched) {
-                        excluded = YES;
-                        break;
-                    }
-                }
-            }
-        }
-        if (excluded) continue;
+- (void) setQueries: (NSArray *) queries {
+    NSArray *copy = [queries copy];
+    [_queries release];
+    _queries = copy;
+}
 
-        NSString *name = nil;
-        if ([item isKindOfClass:[NSDictionary class]]) {
-            name = [item objectForKey:(id)kCTFontNameAttribute]
-                ?: [item objectForKey:(id)kCTFontPostScriptNameAttribute]
-                ?: [item objectForKey:(id)kCTFontFamilyNameAttribute];
-        }
-
-        if (seenNames && name) {
-            if ([seenNames containsObject:name]) continue;
-            [seenNames addObject:name];
-        }
-
-        [result addObject:item];
-    }
-
-    return result;
+- (void) setExclusions: (NSArray *) exclusions {
+    NSArray *copy = [exclusions copy];
+    [_exclusions release];
+    _exclusions = copy;
 }
 
 @end
 
-CFTypeID CTFontCollectionGetTypeID(void)
+static BOOL optionIsSet(NSDictionary *options, CFStringRef key) {
+    id value = [options objectForKey: (NSString *) key];
+    return [value respondsToSelector: @selector(boolValue)] && [value boolValue];
+}
+
+// Whether every attribute of the exclusion descriptor is present, with an equal
+// value, in the descriptor. An exclusion without attributes excludes nothing.
+static BOOL descriptorMatchesAttributes(CTFontDescriptorRef descriptor, CTFontDescriptorRef exclusion) {
+    NSDictionary *wanted = [(NSDictionary *) CTFontDescriptorCopyAttributes(exclusion) autorelease];
+    if ([wanted count] == 0)
+        return NO;
+    NSDictionary *actual = [(NSDictionary *) CTFontDescriptorCopyAttributes(descriptor) autorelease];
+    for (id key in wanted) {
+        id value = [actual objectForKey: key];
+        if (value == nil || ![value isEqual: [wanted objectForKey: key]])
+            return NO;
+    }
+    return YES;
+}
+
+CFTypeID CTFontCollectionGetTypeID(void) {
+    return (CFTypeID) [KTFontCollection self];
+}
+
+// The descriptors the collection matches. The options of the call apply when
+// the collection itself does not set the option.
+static NSArray *copyMatchingDescriptors(KTFontCollection *object, NSDictionary *callOptions)
 {
-    return (CFTypeID)[_CTFontCollection self];
+    NSArray *queries = [object queries];
+    BOOL allFonts = queries == nil;
+    if (allFonts) {
+        CTFontDescriptorRef all = CTFontDescriptorCreateWithAttributes(
+                (CFDictionaryRef) [NSDictionary dictionary]);
+        queries = [NSArray arrayWithObject: (id) all];
+        CFRelease(all);
+    }
+
+    // Several queries can match the same face. With
+    // kCTFontCollectionRemoveDuplicatesOption, faces with the same
+    // PostScript name are also reported once.
+    BOOL removeDuplicates;
+    if ([[object options] objectForKey: (NSString *) kCTFontCollectionRemoveDuplicatesOption] != nil)
+        removeDuplicates = optionIsSet([object options], kCTFontCollectionRemoveDuplicatesOption);
+    else
+        removeDuplicates = optionIsSet(callOptions, kCTFontCollectionRemoveDuplicatesOption);
+    NSMutableArray *matches = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+    for (id query in queries) {
+        CFArrayRef found = CTFontDescriptorCreateMatchingFontDescriptors(
+                (CTFontDescriptorRef) query, NULL);
+        if (found == NULL)
+            continue;
+        for (id match in (NSArray *) found) {
+            id key = match;
+            if (removeDuplicates) {
+                CFTypeRef name = CTFontDescriptorCopyAttribute(
+                        (CTFontDescriptorRef) match, kCTFontNameAttribute);
+                if (name != NULL)
+                    key = [(id) name autorelease];
+            }
+            if ([seen containsObject: key])
+                continue;
+            [seen addObject: key];
+            [matches addObject: match];
+        }
+        CFRelease(found);
+    }
+
+    // With no installed faces to list, "all fonts" is the built-in list.
+    if (allFonts && [matches count] == 0) {
+        for (id match in defaultAvailableFontDescriptors()) {
+            CTFontDescriptorRef descriptor = (CTFontDescriptorRef) match;
+            id key = match;
+            if (removeDuplicates) {
+                CFTypeRef name = CTFontDescriptorCopyAttribute(descriptor, kCTFontNameAttribute);
+                if (name != NULL)
+                    key = [(id) name autorelease];
+            }
+            if (![seen containsObject: key]) {
+                [seen addObject: key];
+                [matches addObject: match];
+            }
+        }
+    }
+
+    // Faces matched by an exclusion descriptor are left out: those it finds
+    // among the installed faces, and those that carry all of its attributes.
+    for (id exclusion in [object exclusions]) {
+        CFArrayRef excluded = CTFontDescriptorCreateMatchingFontDescriptors(
+                (CTFontDescriptorRef) exclusion, NULL);
+        if (excluded != NULL) {
+            [matches removeObjectsInArray: (NSArray *) excluded];
+            CFRelease(excluded);
+        }
+        for (NSUInteger i = [matches count]; i > 0; i--) {
+            if (descriptorMatchesAttributes((CTFontDescriptorRef) [matches objectAtIndex: i - 1],
+                                            (CTFontDescriptorRef) exclusion))
+                [matches removeObjectAtIndex: i - 1];
+        }
+    }
+
+    return [matches copy];
 }
 
 CTFontCollectionRef CTFontCollectionCreateFromAvailableFonts(CFDictionaryRef options)
 {
-    return (CTFontCollectionRef)[[_CTFontCollection alloc] initWithDescriptors:nil options:(NSDictionary *)options];
+    // Without query descriptors, matching lists every installed face.
+    return (CTFontCollectionRef) [[KTFontCollection alloc]
+            initWithQueries: nil
+                    options: (NSDictionary *) options];
 }
 
-CTFontCollectionRef CTFontCollectionCreateWithFontDescriptors(CFArrayRef queryDescriptors, CFDictionaryRef options)
+CTFontCollectionRef CTFontCollectionCreateWithFontDescriptors(CFArrayRef _Nullable queryDescriptors,
+                                                              CFDictionaryRef _Nullable options)
 {
-    return (CTFontCollectionRef)[[_CTFontCollection alloc] initWithDescriptors:(NSArray *)queryDescriptors options:(NSDictionary *)options];
+    // A collection made from no descriptors is empty, not "all fonts".
+    NSArray *queries = queryDescriptors ? (NSArray *) queryDescriptors : [NSArray array];
+    return (CTFontCollectionRef) [[KTFontCollection alloc]
+            initWithQueries: queries
+                    options: (NSDictionary *) options];
 }
 
-CTFontCollectionRef CTFontCollectionCreateCopyWithFontDescriptors(CTFontCollectionRef collection, CFArrayRef queryDescriptors, CFDictionaryRef options)
+CTFontCollectionRef CTFontCollectionCreateCopyWithFontDescriptors(CTFontCollectionRef original,
+                                                                  CFArrayRef _Nullable queryDescriptors,
+                                                                  CFDictionaryRef _Nullable options)
 {
-    if (!collection) return NULL;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    NSArray *descs = queryDescriptors ? (NSArray *)queryDescriptors : (NSArray *)col->_queryDescriptors;
-    NSDictionary *opts = options ? (NSDictionary *)options : col->_options;
-    _CTFontCollection *copy = [[_CTFontCollection alloc] initWithDescriptors:descs options:opts];
-    [copy->_exclusionDescriptors addObjectsFromArray:col->_exclusionDescriptors];
-    return (CTFontCollectionRef)copy;
+    if (original == NULL)
+        return NULL;
+    KTFontCollection *collection = (KTFontCollection *) original;
+    NSMutableArray *queries = [NSMutableArray array];
+    if ([collection queries] != nil)
+        [queries addObjectsFromArray: [collection queries]];
+    if (queryDescriptors != NULL)
+        [queries addObjectsFromArray: (NSArray *) queryDescriptors];
+    if (options == NULL)
+        options = (CFDictionaryRef) [collection options];
+    CTFontCollectionRef copy = CTFontCollectionCreateWithFontDescriptors((CFArrayRef) queries, options);
+    [(KTFontCollection *) copy setExclusions: [collection exclusions]];
+    return copy;
 }
 
-CTMutableFontCollectionRef CTFontCollectionCreateMutableCopy(CTFontCollectionRef collection)
+CTMutableFontCollectionRef CTFontCollectionCreateMutableCopy(CTFontCollectionRef original)
 {
-    if (!collection) return NULL;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    _CTFontCollection *copy = [[_CTFontCollection alloc] initWithDescriptors:col->_queryDescriptors options:col->_options];
-    [copy->_exclusionDescriptors addObjectsFromArray:col->_exclusionDescriptors];
-    return (CTMutableFontCollectionRef)copy;
+    if (original == NULL)
+        return NULL;
+    KTFontCollection *source = (KTFontCollection *) original;
+    KTFontCollection *copy = [[KTFontCollection alloc] initWithQueries: [source queries]
+                                                               options: [source options]];
+    [copy setExclusions: [source exclusions]];
+    return (CTMutableFontCollectionRef) copy;
 }
 
 CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef collection)
@@ -199,87 +285,90 @@ CFArrayRef CTFontCollectionCreateMatchingFontDescriptors(CTFontCollectionRef col
 
 CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsWithOptions(CTFontCollectionRef collection, CFDictionaryRef options)
 {
-    if (!collection) return NULL;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    NSArray *matched = [col matchingFontDescriptorsWithOptions:(NSDictionary *)options];
-    return (CFArrayRef)[matched copy];
+    if (collection == NULL)
+        return NULL;
+    NSArray *matches = copyMatchingDescriptors((KTFontCollection *) collection,
+                                               (NSDictionary *) options);
+    if ([matches count] == 0) {
+        [matches release];
+        return NULL;
+    }
+    return (CFArrayRef) matches;
 }
 
-CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsSortedWithCallback(
-    CTFontCollectionRef collection,
-    CTFontCollectionSortDescriptorsCallback sortCallback,
-    void *refCon)
+CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsForFamily(CTFontCollectionRef collection,
+                                                                 CFStringRef familyName,
+                                                                 CFDictionaryRef options)
 {
-    if (!collection) return NULL;
-    CFArrayRef tmp = CTFontCollectionCreateMatchingFontDescriptors(collection);
-    if (!tmp) return NULL;
-    NSArray *descriptors = (NSArray *)tmp;
-    if (!sortCallback) {
-        CFArrayRef result = (CFArrayRef)[descriptors copy];
-        CFRelease(tmp);
-        return result;
-    }
-    NSArray *sorted = [descriptors sortedArrayUsingFunction:(NSInteger (*)(id, id, void *))sortCallback context:refCon];
-    CFArrayRef result = (CFArrayRef)[sorted copy];
-    CFRelease(tmp);
-    return result;
-}
+    if (collection == NULL || familyName == NULL)
+        return NULL;
+    CFArrayRef all = CTFontCollectionCreateMatchingFontDescriptorsWithOptions(collection, options);
+    if (all == NULL)
+        return NULL;
 
-CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsForFamily(
-    CTFontCollectionRef collection,
-    CFStringRef familyName,
-    CFDictionaryRef options)
-{
-    if (!collection || !familyName) return NULL;
-    CFArrayRef tmp = CTFontCollectionCreateMatchingFontDescriptorsWithOptions(collection, options);
-    if (!tmp) return NULL;
-    NSArray *descriptors = (NSArray *)tmp;
-    NSMutableArray *filtered = [NSMutableArray array];
-    for (id desc in descriptors) {
-        if ([desc isKindOfClass:[NSDictionary class]]) {
-            NSString *fam = [desc objectForKey:(id)kCTFontFamilyNameAttribute];
-            if ([fam isEqualToString:(NSString *)familyName]) {
-                [filtered addObject:desc];
-            }
-        }
+    NSMutableArray *matches = [NSMutableArray array];
+    for (id match in (NSArray *) all) {
+        CFTypeRef family = CTFontDescriptorCopyAttribute(
+                (CTFontDescriptorRef) match, kCTFontFamilyNameAttribute);
+        if (family != NULL && CFEqual(family, familyName))
+            [matches addObject: match];
+        if (family != NULL)
+            CFRelease(family);
     }
-    CFArrayRef result = (CFArrayRef)[filtered copy];
-    CFRelease(tmp);
-    return result;
+    CFRelease(all);
+
+    if ([matches count] == 0)
+        return NULL;
+    return (CFArrayRef) [matches copy];
 }
 
 CFArrayRef CTFontCollectionCopyQueryDescriptors(CTFontCollectionRef collection)
 {
-    if (!collection) return NULL;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    return (CFArrayRef)[col->_queryDescriptors copy];
+    if (collection == NULL)
+        return NULL;
+    NSArray *queries = [(KTFontCollection *) collection queries];
+    return queries != nil ? (CFArrayRef) [queries copy] : NULL;
+}
+
+void CTFontCollectionSetQueryDescriptors(CTMutableFontCollectionRef collection,
+                                         CFArrayRef descriptors)
+{
+    if (collection == NULL)
+        return;
+    // No descriptors means the collection lists every installed face.
+    [(KTFontCollection *) collection setQueries: (NSArray *) descriptors];
 }
 
 CFArrayRef CTFontCollectionCopyExclusionDescriptors(CTFontCollectionRef collection)
 {
-    if (!collection) return NULL;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    return (CFArrayRef)[col->_exclusionDescriptors copy];
+    if (collection == NULL)
+        return NULL;
+    NSArray *exclusions = [(KTFontCollection *) collection exclusions];
+    return exclusions != nil ? (CFArrayRef) [exclusions copy] : NULL;
 }
 
-void CTFontCollectionSetQueryDescriptors(CTMutableFontCollectionRef collection, CFArrayRef descriptors)
+void CTFontCollectionSetExclusionDescriptors(CTMutableFontCollectionRef collection,
+                                             CFArrayRef descriptors)
 {
-    if (!collection) return;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    [col->_queryDescriptors removeAllObjects];
-    if (descriptors) {
-        [col->_queryDescriptors addObjectsFromArray:(NSArray *)descriptors];
-    }
+    if (collection == NULL)
+        return;
+    [(KTFontCollection *) collection setExclusions: (NSArray *) descriptors];
 }
 
-void CTFontCollectionSetExclusionDescriptors(CTMutableFontCollectionRef collection, CFArrayRef descriptors)
+CFArrayRef CTFontCollectionCreateMatchingFontDescriptorsSortedWithCallback(
+        CTFontCollectionRef collection, CTFontCollectionSortDescriptorsCallback sortCallback,
+        void *refCon)
 {
-    if (!collection) return;
-    _CTFontCollection *col = (_CTFontCollection *)collection;
-    [col->_exclusionDescriptors removeAllObjects];
-    if (descriptors) {
-        [col->_exclusionDescriptors addObjectsFromArray:(NSArray *)descriptors];
-    }
+    CFArrayRef matches = CTFontCollectionCreateMatchingFontDescriptors(collection);
+    if (matches == NULL || sortCallback == NULL)
+        return matches;
+    NSArray *sorted = [(NSArray *) matches
+            sortedArrayUsingComparator: ^NSComparisonResult(id first, id second) {
+                return (NSComparisonResult) sortCallback((CTFontDescriptorRef) first,
+                                                         (CTFontDescriptorRef) second, refCon);
+            }];
+    CFRelease(matches);
+    return (CFArrayRef) [sorted copy];
 }
 
 CFArrayRef CTFontCollectionCopyFontAttribute(CTFontCollectionRef collection, CFStringRef attributeName, CTFontCollectionCopyOptions options)
@@ -291,15 +380,13 @@ CFArrayRef CTFontCollectionCopyFontAttribute(CTFontCollectionRef collection, CFS
     NSMutableArray *result = [NSMutableArray array];
     NSMutableSet *seen = (options & kCTFontCollectionCopyUnique) ? [NSMutableSet set] : nil;
     for (id desc in descriptors) {
-        if ([desc isKindOfClass:[NSDictionary class]]) {
-            id val = [desc objectForKey:(id)attributeName];
-            if (val) {
-                if (seen) {
-                    if ([seen containsObject:val]) continue;
-                    [seen addObject:val];
-                }
-                [result addObject:val];
+        id val = [(id) CTFontDescriptorCopyAttribute((CTFontDescriptorRef) desc, attributeName) autorelease];
+        if (val) {
+            if (seen) {
+                if ([seen containsObject:val]) continue;
+                [seen addObject:val];
             }
+            [result addObject:val];
         }
     }
     if ((options & kCTFontCollectionCopyStandardSort) && result.count > 1) {
@@ -324,23 +411,21 @@ CFArrayRef CTFontCollectionCopyFontAttributes(CTFontCollectionRef collection, CF
     NSMutableArray *result = [NSMutableArray array];
     NSMutableSet *seen = (options & kCTFontCollectionCopyUnique) ? [NSMutableSet set] : nil;
     for (id desc in descriptors) {
-        if ([desc isKindOfClass:[NSDictionary class]]) {
-            NSMutableDictionary *subDict = [NSMutableDictionary dictionary];
-            for (id key in (NSSet *)attributeNames) {
-                id val = [desc objectForKey:key];
-                if (val) subDict[key] = val;
+        NSMutableDictionary *subDict = [NSMutableDictionary dictionary];
+        for (id key in (NSSet *)attributeNames) {
+            id val = [(id) CTFontDescriptorCopyAttribute((CTFontDescriptorRef) desc, (CFStringRef) key) autorelease];
+            if (val) subDict[key] = val;
+        }
+        if (subDict.count > 0) {
+            if (seen) {
+                // TODO: Apple deduplicates by font identity (PostScript name), not full dictionary equality.
+                id identityKey = [(id) CTFontDescriptorCopyAttribute((CTFontDescriptorRef) desc, kCTFontNameAttribute) autorelease]
+                    ?: [(id) CTFontDescriptorCopyAttribute((CTFontDescriptorRef) desc, kCTFontPostScriptNameAttribute) autorelease]
+                    ?: subDict;
+                if ([seen containsObject:identityKey]) continue;
+                [seen addObject:identityKey];
             }
-            if (subDict.count > 0) {
-                if (seen) {
-                    // TODO: Apple deduplicates by font identity (PostScript name), not full dictionary equality.
-                    id identityKey = [desc objectForKey:(id)kCTFontNameAttribute]
-                        ?: [desc objectForKey:(id)kCTFontPostScriptNameAttribute]
-                        ?: subDict;
-                    if ([seen containsObject:identityKey]) continue;
-                    [seen addObject:identityKey];
-                }
-                [result addObject:subDict];
-            }
+            [result addObject:subDict];
         }
     }
     if ((options & kCTFontCollectionCopyStandardSort) && result.count > 1) {

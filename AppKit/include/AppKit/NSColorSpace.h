@@ -18,27 +18,45 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <ApplicationServices/ApplicationServices.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
+
+typedef NS_ENUM(NSInteger, NSColorSpaceModel) {
+    NSColorSpaceModelUnknown = -1,
+    NSColorSpaceModelGray,
+    NSColorSpaceModelRGB,
+    NSColorSpaceModelCMYK,
+    NSColorSpaceModelLAB,
+    NSColorSpaceModelDeviceN,
+    NSColorSpaceModelIndexed,
+    NSColorSpaceModelPatterned,
+};
 
 @interface NSColorSpace : NSObject {
     CGColorSpaceRef _cgColorSpace;
+    NS_LEGACY_IVAR_PAD(_NSColorSpaceReserved, 28)
 }
 
 @property(class, strong, readonly) NSColorSpace *deviceRGBColorSpace;
 @property(class, strong, readonly) NSColorSpace *sRGBColorSpace;
+@property(class, strong, readonly) NSColorSpace *displayP3ColorSpace;
 @property(class, strong, readonly) NSColorSpace *genericRGBColorSpace;
 @property(class, strong, readonly) NSColorSpace *genericGrayColorSpace;
-@property(class, strong, readonly) NSColorSpace *displayP3ColorSpace;
+@property(class, strong, readonly) NSColorSpace *genericGamma22GrayColorSpace;
+@property(class, strong, readonly) NSColorSpace *extendedSRGBColorSpace;
 
 + (NSColorSpace *) deviceRGBColorSpace;
 + (NSColorSpace *) sRGBColorSpace;
 + (NSColorSpace *) genericRGBColorSpace;
 + (NSColorSpace *) genericGrayColorSpace;
 + (NSColorSpace *) genericGamma22GrayColorSpace;
++ (NSColorSpace *) extendedSRGBColorSpace;
 + (NSColorSpace *) adobeRGB1998ColorSpace;
 
 - initWithCGColorSpace: (CGColorSpaceRef) cgColorSpace;
 
 - (CGColorSpaceRef) CGColorSpace;
+
+@property(nullable, readonly, copy) NSString *localizedName;
 
 @end

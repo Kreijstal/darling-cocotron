@@ -54,6 +54,59 @@ extern void CGSRegionRetain(CGSRegionRef reg);
 extern void CGSRegionToRect(CGSRegionRef reg, CGRect* rect); // This is non-standard. We should support non-rectangular regions instead
 extern bool CGSRegionIsRectangular(CGSRegionRef reg);
 
+// CGRegion (the same region objects as CGSRegion)
+typedef CGSRegionRef CGRegionRef;
+extern CGRegionRef CGRegionCreateWithRect(CGRect rect);
+extern void CGRegionRelease(CGRegionRef region);
+
+// Global hot keys. Prototypes as in the CGSHotKeys.h of CGSInternal
+// (https://github.com/NUIKit/CGSInternal, MIT license), declared here independently.
+// The meaning of the arguments is not documented; what is implemented is inferred:
+// uid is chosen by the caller and names the hot key, key is the virtual key code,
+// options is ignored (the character the key produces, perhaps), modifierFlags are
+// CGEventFlags modifier bits, exclusion is ignored. The setters return nothing, so a hot key
+// that could not be set up (another client holds the combination) shows as
+// CGSGetHotKey() returning false.
+// A hot key's presses and releases are delivered as the window server does it: as events of
+// type NX_SYSDEFINED, here to the procs registered with CGSRegisterNotifyProc() for
+// CGSNotificationSingleEventType(NX_SYSDEFINED) (or kCGSNotificationAllEvents); the data is a
+// CGSEventRecord whose data.compound.subType is kCGSHotKeyPressedSubtype or
+// kCGSHotKeyReleasedSubtype, whose data.compound.misc.L[0] is the uid, and whose flags,
+// location and time are those of the key event. AppKit turns it into an NSEvent of type
+// NSSystemDefined, which NSApplication hands to HIToolbox.
+// QUIRK: system-defined subtype 6 is a hot key press, 9 a release, and the event's data1 names
+// the hot key (the uid given when it was set). Not documented. Evidence: public write-ups of
+// the observed event (The Register, 2009, https://www.theregister.co.uk/2009/02/24/hotkeys_framework2/;
+// cocoa-dev 2011-10, https://lists.apple.com/archives/cocoa-dev/2011/Oct/msg00526.html, data1 is the
+// hot key; cocoa-dev 2009-09, https://lists.apple.com/archives/cocoa-dev/2009/Sep/msg01824.html, on
+// 64-bit data1 is not the EventHotKeyRef), tier 4. What data1 holds on 64-bit macOS is not verified;
+// the uid is inference.
+// Test: tests/src/carbon_hotkeys_appkit.m (subtype and data1 seen in -sendEvent:).
+enum
+{
+	kCGSHotKeyPressedSubtype = 6,
+	kCGSHotKeyReleasedSubtype = 9,
+};
+typedef uint32_t CGSModifierFlags;
+extern void CGSSetHotKeyWithExclusion(CGSConnectionID cid, int uid, uint16_t options, uint16_t key, CGSModifierFlags modifierFlags, int exclusion);
+extern void CGSSetHotKey(CGSConnectionID cid, int uid, uint16_t options, uint16_t key, CGSModifierFlags modifierFlags);
+extern bool CGSGetHotKey(CGSConnectionID cid, int uid, uint16_t* options, uint16_t* key, CGSModifierFlags* modifierFlags);
+extern void CGSRemoveHotKey(CGSConnectionID cid, int uid);
+extern bool CGSIsHotKeyEnabled(CGSConnectionID cid, int uid);
+extern void CGSSetHotKeyEnabled(CGSConnectionID cid, int uid, bool enabled);
+extern CGError CGSGetGlobalHotKeyOperatingMode(CGSConnectionID cid, int* mode);
+extern CGError CGSSetGlobalHotKeyOperatingMode(CGSConnectionID cid, int mode);
+
+// Symbolic hot keys: the numbered system-wide shortcuts (Spotlight, Mission Control ...).
+// State is kept in the com.apple.symbolichotkeys preference domain; nothing acts on it in
+// Darling. A value is the key equivalent character (0xFFFF for none), the virtual key code
+// and CGEventFlags modifier bits. Unknown numbers give kCGErrorRangeCheck from the getter.
+extern bool CGSIsSymbolicHotKeyEnabled(int number);
+extern CGError CGSSetSymbolicHotKeyEnabled(int number, bool enabled);
+extern CGError CGSGetSymbolicHotKeyValue(int number, uint16_t* keyEquivalent, uint16_t* keyCode, CGSModifierFlags* modifiers);
+extern CGError CGSSetSymbolicHotKeyValue(int number, uint16_t keyEquivalent, uint16_t keyCode, CGSModifierFlags modifiers);
+
+
 extern CGError CGSNewWindow(CGSConnectionID conn, CFIndex flags, float, float, const CGSRegionRef region, CGSWindowID* windowID);
 extern CGError CGSReleaseWindow(CGSConnectionID cid, CGSWindowID wid);
 
@@ -62,6 +115,18 @@ extern OSStatus CGSOrderWindow(CGSConnectionID cid, CGSWindowID wid, CGSWindowOr
 extern CGError CGSMoveWindow(CGSConnectionID cid, CGSWindowID wid, const CGPoint *window_pos);
 extern CGError CGSSetWindowOpacity(CGSConnectionID cid, CGSWindowID wid, bool isOpaque);
 extern CGError CGSSetWindowLevel(CGSConnectionID cid, CGSWindowID wid, CGWindowLevel level);
+extern CGError CGSSetWindowTransform(CGSConnectionID cid, CGSWindowID wid, CGAffineTransform transform);
+extern CGError CGSSetWindowWarp(CGSConnectionID cid, CGSWindowID wid, int w, int h, float *mesh);
+extern CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid, CGSWindowID wid, CGRegionRef shape);
+
+// Window transforms. Argument layout as applications call these functions:
+// two 32-bit values (a placement selector and a reserved value; both 0 in
+// practice) come before the transform, which is passed by value.
+extern CGError CGSSetWindowTransformAtPlacement(CGSConnectionID cid, CGSWindowID wid, int32_t placement, int32_t reserved, CGAffineTransform transform);
+extern CGError CGSGetWindowTransformAtPlacement(CGSConnectionID cid, CGSWindowID wid, int32_t placement, void *reserved, CGAffineTransform *outTransform);
+
+// Queried window server state; 0 means the server is running normally.
+extern int CGSServerOperationState(int state);
 
 // Window transforms. Argument layout as applications call these functions:
 // two 32-bit values (a placement selector and a reserved value; both 0 in
@@ -154,9 +219,62 @@ extern uint32_t CGContextGetFontSmoothingStyle(CGContextRef context);
 extern void CGContextSetFontSmoothingStyle(CGContextRef context, uint32_t style);
 
 // Darling extras, e.g. for CGL
+// Asks the window system to give the windows of a process the input focus and raise them,
+// as a pager would (the window manager may still refuse). The pid is a Darling process
+// id. With kCGSActivateProcessFrontWindowOnly only the process' frontmost window is
+// activated; otherwise all of its windows are raised, keeping their stacking order.
+// A process this system has no direct way to activate (Wayland offers none) is asked
+// through a per-process Darwin notification that the process' own windowing backend
+// answers; so success only means the request was made. Returns kCGErrorIllegalArgument
+// for a pid that is not positive, kCGErrorSuccess otherwise, and
+// kCGErrorCannotComplete when no request could be made.
+#define kCGSActivateProcessFrontWindowOnly 1
+CGError _CGSActivateProcess(pid_t pid, uint32_t options);
+// The Darling process that has the input focus. The display server answers where it can (X11:
+// the owner of _NET_ACTIVE_WINDOW). A Wayland compositor does not tell clients, so the answer
+// is the process that most recently reported (through _CGSSetFrontProcess) that it was
+// activated, shared by all Darling processes. Returns kCGErrorSuccess and sets *pid,
+// kCGErrorNoneAvailable when no process is known, kCGErrorIllegalArgument for a NULL pid.
+CGError _CGSGetFrontProcess(pid_t* pid);
+// Reports that the process with this pid got the input focus. A windowing backend calls it
+// with its own pid when its windows get the focus on a display server that cannot be asked.
+CGError _CGSSetFrontProcess(pid_t pid);
+// The name of the Darwin notification that asks the process with this pid to activate its
+// windows (see above); a windowing backend observes the name of its own process.
+#define kCGSProcessActivationNotificationPrefix "org.darlinghq.process-activation."
+// The libnotify name whose state holds the pid _CGSSetFrontProcess() stored.
+#define kCGSFrontProcessNotificationName "org.darlinghq.front-process"
+
 void* _CGSNativeDisplay(CGSConnectionID connId);
 void* _CGSNativeWindowForID(CGSConnectionID connId, CGSWindowID winId);
 void* _CGSNativeWindowForSurfaceID(CGSConnectionID connId, CGSWindowID winId, CGSSurfaceID surfaceId);
+
+// Creates a window covering `bounds` (global display coordinates), above ordinary
+// windows and shown, so that a GL context can fill a display (CGLSetFullScreen).
+// The window is not one of the application's own: its keyboard and pointer input
+// is the application's, delivered as events with no window. *drawable is the
+// native window handle a GL surface is created on. Release it with
+// CGSReleaseWindow.
+//
+// Once the window is shown, _kCGSDisplayOverlayWindowCreated is posted to the
+// default notification center, with the drawable as the NSNumber
+// "NativeWindow" in the user info. The window system backend of the
+// application's UI layer takes it up to receive the application's input for
+// the overlay (keys, and the pointer where the backend supports it).
+#define _kCGSDisplayOverlayWindowCreated CFSTR("_CGSDisplayOverlayWindowCreated")
+CGError _CGSCreateDisplayOverlayWindow(CGSConnectionID connId, CGRect bounds,
+                                       CGSWindowID* winId, void** drawable);
+
+// Private context functions (see CGContext.m). The composite operation is the
+// context's blend mode under a different numbering.
+extern size_t CGContextGetLineDashCount(CGContextRef context);
+extern void CGContextGetLineDashPattern(CGContextRef context, CGFloat *phase, CGFloat *lengths, size_t capacity);
+extern int CGContextGetCompositeOperation(CGContextRef context);
+extern void CGContextSetCompositeOperation(CGContextRef context, int operation);
+
+// Private numeric helpers.
+extern bool CGFloatIsValid(CGFloat value);
+extern size_t CGBitmapGetAlignedBytesPerRow(size_t bytesPerRow);
 
 extern CGEventRef CGEventCreateWithEventRecord(const CGSEventRecordPtr event, uint32_t eventRecordSize);
 extern CGError CGEventGetEventRecord(CGEventRef event, CGSEventRecordPtr eventRecord, uint32_t eventRecordSize);
@@ -165,6 +283,11 @@ extern uint32_t CGEventGetEventRecordSize(CGEventRef event);
 
 // SPI declared by OpenSwiftUI (CoreGraphics_Private.h); both arguments are nullable.
 COREGRAPHICS_EXPORT bool CGImageGetHeadroom(CGImageRef image, float *headroom);
+
+// Registers the 'uchr' keyboard layout (a UCKeyboardLayout blob of `length` bytes, copied) of the
+// window system's current keymap, for a backend that cannot read the keymap itself. The Text Input
+// Sources API returns it. NULL or a zero length removes it.
+extern void _CGSSetProvidedKeyboardLayout(const void* uchr, uint32_t length, CFStringRef name, CFStringRef fullName);
 
 #ifdef __OBJC__
 @class CGSConnection;

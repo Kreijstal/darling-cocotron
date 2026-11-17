@@ -31,12 +31,64 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [super dealloc];
 }
 
+- (CFTypeID) _cfTypeID {
+    return CTFontGetTypeID();
+}
+
 - (CFStringRef) copyName {
     return CGFontCopyFullName(_font);
 }
 
 - (CGFontRef) cgFont {
     return _font;
+}
+
+// A CTFont can be used where an NSFont is expected (the two are toll-free
+// bridged), so answer NSFont's identity and glyph methods too. They are
+// derived from the CoreText functions so they work on any concrete class.
+- (NSString *) fontName {
+    return [(NSString *) CTFontCopyPostScriptName((CTFontRef) self) autorelease];
+}
+
+- (NSString *) familyName {
+    return [(NSString *) CTFontCopyFamilyName((CTFontRef) self) autorelease];
+}
+
+- (id) printerFont {
+    return self;
+}
+
+- (id) screenFont {
+    return self;
+}
+
+- (CGRect) boundingRectForGlyph: (NSUInteger) glyph {
+    CGGlyph cgGlyph = (CGGlyph) glyph;
+    CGRect rect = CGRectZero;
+    CTFontGetBoundingRectsForGlyphs((CTFontRef) self, kCTFontOrientationDefault, &cgGlyph,
+                                    &rect, 1);
+    return rect;
+}
+
+// NSNativeShortGlyphPacking
+- (NSUInteger) glyphPacking {
+    return 0;
+}
+
+- (NSUInteger) glyphWithName: (NSString *) name {
+    return name == nil ? 0 : CTFontGetGlyphWithName((CTFontRef) self, (CFStringRef) name);
+}
+
+- (BOOL) glyphIsEncoded: (NSUInteger) glyph {
+    return glyph < (NSUInteger) CTFontGetGlyphCount((CTFontRef) self);
+}
+
+- (CGSize) advancementForGlyph: (NSUInteger) glyph {
+    CGGlyph cgGlyph = (CGGlyph) glyph;
+    CGSize advance = CGSizeZero;
+    CTFontGetAdvancesForGlyphs((CTFontRef) self, kCTFontOrientationDefault, &cgGlyph,
+                               &advance, 1);
+    return advance;
 }
 
 - (CGFloat) pointSize {

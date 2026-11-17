@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSCell.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSFont.h>
 #import <Foundation/Foundation.h>
 
@@ -25,17 +26,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         NSTextView, NSRulerView;
 @class NSWindow, NSColor, NSCell;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSGlyphInscription) {
     NSGlyphInscribeBase,
     NSGlyphInscribeBelow,
     NSGlyphInscribeAbove,
     NSGlyphInscribeOverstrike,
     NSGlyphInscribeOverBelow,
-} NSGlyphInscription;
+};
 
 typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
     NSTextLayoutOrientationHorizontal,
     NSTextLayoutOrientationVertical,
+};
+
+typedef NS_OPTIONS(NSInteger, NSGlyphProperty) {
+    NSGlyphPropertyNull = (1 << 0),
+    NSGlyphPropertyControlCharacter = (1 << 1),
+    NSGlyphPropertyElastic = (1 << 2),
+    NSGlyphPropertyNonBaseCharacter = (1 << 3),
+};
+
+typedef NS_OPTIONS(NSInteger, NSControlCharacterAction) {
+    NSControlCharacterActionZeroAdvancement = (1 << 0),
+    NSControlCharacterActionWhitespace = (1 << 1),
+    NSControlCharacterActionHorizontalTab = (1 << 2),
+    NSControlCharacterActionLineBreak = (1 << 3),
+    NSControlCharacterActionParagraphBreak = (1 << 4),
+    NSControlCharacterActionContainerBreak = (1 << 5),
 };
 
 @interface NSLayoutManager : NSObject {
@@ -62,35 +79,31 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
     NSUInteger _rectCacheCapacity, _rectCacheCount;
     NSRect *_rectCache;
 
-    NSImageScaling _defaultAttachmentScaling;
-    BOOL _usesDefaultHyphenation;
-    float _hyphenationFactor;
     BOOL _showsControlCharacters;
     BOOL _showsInvisibleCharacters;
     BOOL _usesFontLeading;
     BOOL _backgroundLayoutEnabled;
     NSFont *_textFont;
+    NSImageScaling _defaultAttachmentScaling;
+    BOOL _usesDefaultHyphenation;
+    float _hyphenationFactor;
+    NS_LEGACY_IVAR_PAD(_NSLayoutManagerReserved, 108)
 }
 
 @property float hyphenationFactor;
 
 - init;
 
-- (NSFont *) textFont;
-- (void) setTextFont: (NSFont *) font;
+@property(nonatomic, retain) NSFont *textFont;
 
-- (BOOL) showsControlCharacters;
-- (void) setShowsControlCharacters: (BOOL) flag;
-- (BOOL) showsInvisibleCharacters;
-- (void) setShowsInvisibleCharacters: (BOOL) flag;
-- (BOOL) usesFontLeading;
-- (void) setUsesFontLeading: (BOOL) flag;
-- (BOOL) backgroundLayoutEnabled;
-- (void) setBackgroundLayoutEnabled: (BOOL) flag;
+@property(nonatomic) BOOL showsControlCharacters;
+@property(nonatomic) BOOL showsInvisibleCharacters;
+@property(nonatomic) BOOL usesFontLeading;
+@property(nonatomic) BOOL backgroundLayoutEnabled;
 
-- (NSTextStorage *) textStorage;
-- (NSGlyphGenerator *) glyphGenerator;
-- (NSTypesetter *) typesetter;
+@property(nonatomic, retain) NSTextStorage *textStorage;
+@property(nonatomic, retain) NSGlyphGenerator *glyphGenerator;
+@property(nonatomic, retain) NSTypesetter *typesetter;
 - delegate;
 - (NSArray *) textContainers;
 
@@ -98,14 +111,10 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
 - (NSTextView *) textViewForBeginningOfSelection;
 - (BOOL) layoutManagerOwnsFirstResponderInWindow: (NSWindow *) window;
 
-- (void) setTextStorage: (NSTextStorage *) textStorage;
 - (void) replaceTextStorage: (NSTextStorage *) textStorage;
-- (void) setGlyphGenerator: (NSGlyphGenerator *) generator;
-- (void) setTypesetter: (NSTypesetter *) typesetter;
 - (void) setDelegate: delegate;
 
-- (BOOL) usesScreenFonts;
-- (void) setUsesScreenFonts: (BOOL) yorn;
+@property(nonatomic) BOOL usesScreenFonts;
 
 - (void) addTextContainer: (NSTextContainer *) container;
 - (void) removeTextContainerAtIndex: (NSUInteger) index;
@@ -161,7 +170,7 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
 - (NSRect) extraLineFragmentUsedRect;
 - (NSTextContainer *) extraLineFragmentTextContainer;
 
-- (BOOL) allowsNonContiguousLayout;
+@property(nonatomic) BOOL allowsNonContiguousLayout;
 
 - (void) setTextContainer: (NSTextContainer *) container
             forGlyphRange: (NSRange) glyphRange;
@@ -310,17 +319,12 @@ typedef NS_ENUM(NSInteger, NSTextLayoutOrientation) {
                                      ruler: (NSRulerView *) ruler
                                    enabled: (BOOL) isEnabled;
 
-- (void) setAllowsNonContiguousLayout: (BOOL) value;
 
 // Stored only: attachments are drawn at their own size. NSImageScaleNone
 // by default.
-- (NSImageScaling) defaultAttachmentScaling;
-- (void) setDefaultAttachmentScaling: (NSImageScaling) scaling;
+@property(nonatomic) NSImageScaling defaultAttachmentScaling;
 // Stored only (NO by default): the typesetter doesn't hyphenate.
-- (BOOL) usesDefaultHyphenation;
-- (float) hyphenationFactor;
-- (void) setHyphenationFactor: (float) factor;
-- (void) setUsesDefaultHyphenation: (BOOL) flag;
+@property(nonatomic) BOOL usesDefaultHyphenation;
 @end
 
 @protocol NSLayoutManagerDelegate <NSObject>

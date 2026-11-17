@@ -18,21 +18,19 @@
 
 // Wayland display backend.
 //
-// Selection: the backend is opt-in. Its NSPriority is above X11's, but -init
-// returns nil unless DARLING_APPKIT_BACKEND=wayland, so NSDisplay goes on to
-// the X11 backend as before. It also returns nil (after logging why) when
-// libwayland-client/libxkbcommon can't be loaded or the compositor named by
-// WAYLAND_DISPLAY can't be reached, which falls back to X11 the same way.
+// Selection: see WaylandBackendSelected(): DARLING_APPKIT_BACKEND, then the DisplayBackend
+// preference, then whether WAYLAND_DISPLAY is set. -init returns nil when the backend is not
+// selected and (after logging why) when libwayland-client/libxkbcommon can't be loaded or the
+// compositor can't be reached, which makes NSDisplay go on to the X11 backend.
 //
-// WaylandDisplay subclasses X11Display to share its backend-independent parts
-// (system colours, fontconfig font enumeration, metrics) without copying them.
-// It never opens an X connection and overrides every method that uses one.
+// WaylandDisplay subclasses DarlingDisplay, which holds the parts shared with the
+// X11 backend (system colours, fontconfig font enumeration, metrics, click counts).
 //
 // Toplevel origins remain virtual because Wayland controls global placement.
-// Clipboard and incoming/outgoing COPY/MOVE drops use wl_data_device; EGL
-// subwindows use synchronized subsurfaces. Local-only drags keep data in process.
+// Clipboard and incoming copy drops use wl_data_device; EGL subwindows use
+// synchronized subsurfaces. Outgoing drags are a follow-on.
 
-#import "X11Display.h"
+#import "../private-include/AppKit/DarlingDisplay.h"
 #include <stdint.h>
 #include <wayland-util.h>
 #include "WaylandFullscreen.h"
@@ -44,6 +42,7 @@ struct xkb_context;
 struct xkb_keymap;
 struct xkb_state;
 
+@class WaylandOutputManager;
 @class WaylandCursor, WaylandWindow, WaylandPasteboard, WaylandDraggingManager;
 
 @protocol WaylandFractionalScaleOwner
@@ -65,15 +64,20 @@ typedef enum {
     WaylandObjectDecoration,
     WaylandObjectFrameCallback,
     WaylandObjectBuffer,
+    WaylandObjectKeyboardSync,
+    WaylandObjectLogicalOutput,
+    WaylandObjectPinchGesture,
     WaylandObjectDataDevice,
     WaylandObjectDataOffer,
     WaylandObjectDataSource,
-    WaylandObjectKeyboardSync,
-    WaylandObjectLogicalOutput,
     WaylandObjectFractionalScale,
-    WaylandObjectPinchGesture,
     WaylandObjectLockedPointer,
     WaylandObjectRelativePointer,
+    WaylandObjectOutputManager,
+    WaylandObjectOutputHead,
+    WaylandObjectOutputHeadMode,
+    WaylandObjectOutputConfiguration,
+    WaylandObjectActivationToken,
     WaylandObjectTouch,
 } WaylandObjectKind;
 
@@ -91,16 +95,25 @@ struct wl_proxy *WaylandCreateObject(struct wl_proxy *proxy, uint32_t opcode,
                                      union wl_argument *args,
                                      WaylandObjectKind kind, id object);
 
-@interface WaylandDisplay : X11Display {
+@interface WaylandDisplay : DarlingDisplay {
 @public
     struct wl_display *_wlDisplay;
     struct wl_proxy *_registry;
     struct wl_proxy *_compositor;
-    struct wl_proxy *_subcompositor;
     struct wl_proxy *_viewporter, *_fractionalScaleManager;
+    // xdg-activation: asks the compositor to focus one of our windows (see
+    // -requestActivation). The token object and the window it is for exist only
+    // while a request waits for the compositor's token.
+    struct wl_proxy *_activation, *_activationToken;
+    uint32_t _activationName;
+    WaylandWindow *_activationWindow;
     uint32_t _viewporterName, _fractionalScaleManagerName;
     struct wl_proxy *_logicalOutputManager, *_legacyLogicalOutputManager;
     uint32_t _logicalOutputManagerName;
+    // wlr-output-management, when the compositor has it: the only way to change a mode.
+    WaylandOutputManager *_outputManager;
+    uint32_t _outputManagerName;
+    struct wl_proxy *_subcompositor;
     BOOL _eglAvailable;
     struct wl_proxy *_shm;
     struct wl_proxy *_wmBase;
@@ -160,6 +173,8 @@ struct wl_proxy *WaylandCreateObject(struct wl_proxy *proxy, uint32_t opcode,
     struct xkb_context *_xkbContext;
     struct xkb_keymap *_xkbKeymap;
     struct xkb_state *_xkbState;
+    struct xkb_keymap *_publishedKeymap; // Not retained; compared only.
+    uint32_t _publishedGroup;
     WaylandWindow *_keyboardWindow;
     BOOL _syncModifierFlags;
     BOOL _classifyHeldKeys;
@@ -200,6 +215,7 @@ struct wl_proxy *WaylandCreateObject(struct wl_proxy *proxy, uint32_t opcode,
 - (void) preferredScaleChanged: (uint32_t) scale120;
 - (void) windowScaleChanged: (WaylandWindow *) window;
 - (WaylandWindow *) popupParentForWindow: (WaylandWindow *) window;
+- (WaylandWindow *) levelParentForWindow: (WaylandWindow *) window;
 - (uint32_t) popupGrabSerialForParent: (WaylandWindow *) parent;
 - (struct wl_proxy *) seat;
 // Fills `result` and `proxies` with up to `max` outputs in -screens order: their
@@ -227,4 +243,5 @@ struct wl_proxy *WaylandCreateObject(struct wl_proxy *proxy, uint32_t opcode,
 - (void) windowDestroyed: (WaylandWindow *) window;
 
 - (struct wl_proxy *) newFractionalScaleForSurface: (struct wl_proxy *) surface owner: (id<WaylandFractionalScaleOwner>) owner;
+- (void)publishKeyboardLayout;
 @end

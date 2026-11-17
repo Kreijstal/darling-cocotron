@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/AppKitExport.h>
 #import <Foundation/Foundation.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
@@ -44,15 +45,40 @@ APPKIT_EXPORT NSString *const _NSRecentDocumentsMenuName;
 APPKIT_EXPORT NSString *const _NSServicesMenuName;
 APPKIT_EXPORT NSString *const _NSWindowsMenuName;
 
+APPKIT_EXPORT const NSNotificationName NSMenuDidAddItemNotification;
+APPKIT_EXPORT const NSNotificationName NSMenuDidRemoveItemNotification;
+APPKIT_EXPORT const NSNotificationName NSMenuDidChangeItemNotification;
+
+typedef NS_ENUM(NSInteger, NSMenuSelectionMode) {
+    NSMenuSelectionModeAutomatic = 0,
+    NSMenuSelectionModeSelectOne = 1,
+    NSMenuSelectionModeSelectAny = 2,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSMenuProperties) {
+    NSMenuPropertyItemTitle = 1 << 0,
+    NSMenuPropertyItemAttributedTitle = 1 << 1,
+    NSMenuPropertyItemKeyEquivalent = 1 << 2,
+    NSMenuPropertyItemImage = 1 << 3,
+    NSMenuPropertyItemEnabled = 1 << 4,
+    NSMenuPropertyItemAccessibilityDescription = 1 << 5,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x1c, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSMenu : NSObject <NSCopying, NSUserInterfaceItemIdentification> {
     NSMenu *_supermenu;
     NSString *_title;
-    NSString *_name;
-    NSMutableArray *_itemArray;
-    BOOL _autoenablesItems;
-    id<NSMenuDelegate> _delegate;
-    BOOL _showsStateColumn;
-    NSUserInterfaceItemIdentifier _identifier;
+    NS_LEGACY_IVAR_PAD(_NSMenuReserved1, 12)
+    NS_EXTRA_IVARS_BEGIN(NSMenu)
+        NSString *_name;
+        NSMutableArray *_itemArray;
+        BOOL _autoenablesItems;
+        id<NSMenuDelegate> _delegate;
+        BOOL _showsStateColumn;
+        NSUserInterfaceItemIdentifier _identifier;
+    NS_EXTRA_IVARS_END(NSMenu)
 }
 
 @property BOOL showsStateColumn;
@@ -65,11 +91,11 @@ APPKIT_EXPORT NSString *const _NSWindowsMenuName;
 
 - initWithTitle: (NSString *) title;
 
-- (NSMenu *) supermenu;
-- (NSString *) title;
-- (NSInteger) numberOfItems;
-- (NSArray *) itemArray;
-- (BOOL) autoenablesItems;
+@property(nonatomic, retain) NSMenu *supermenu;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, readonly) NSInteger numberOfItems;
+- (NSArray<NSMenuItem *> *) itemArray;
+@property(nonatomic) BOOL autoenablesItems;
 
 - (NSMenuItem *) itemAtIndex: (NSInteger) index;
 - (NSMenuItem *) itemWithTag: (NSInteger) tag;
@@ -82,9 +108,6 @@ APPKIT_EXPORT NSString *const _NSWindowsMenuName;
 - (NSInteger) indexOfItemWithTarget: (id) target andAction: (SEL) action;
 - (NSInteger) indexOfItemWithSubmenu: (NSMenu *) menu;
 
-- (void) setSupermenu: (NSMenu *) value;
-- (void) setTitle: (NSString *) title;
-- (void) setAutoenablesItems: (BOOL) flag;
 - (void) setMenuChangedMessagesEnabled: (BOOL) flag;
 
 - (void) addItem: (NSMenuItem *) item;
@@ -107,11 +130,11 @@ APPKIT_EXPORT NSString *const _NSWindowsMenuName;
 - (void) update;
 
 - (void) itemChanged: (NSMenuItem *) item;
+- (void) performActionForItemAtIndex: (NSInteger) index;
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event;
 
-- (void) setDelegate: (id<NSMenuDelegate>) object;
-- (id<NSMenuDelegate>) delegate;
+@property(nonatomic, assign) id<NSMenuDelegate> delegate;
 
 @end
 

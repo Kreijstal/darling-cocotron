@@ -60,6 +60,22 @@ static NSArray *_preferredFontNames = nil;
     [super dealloc];
 }
 
+- (NSString *) copyPostScriptName {
+    return [_name copy];
+}
+
+- (NSString *) copyFamilyName {
+    return [_name copy];
+}
+
+- (NSString *) copyStyleName {
+    return nil;
+}
+
+- (O2Rect) boundingRectForGlyph: (O2Glyph) glyph {
+    return _bbox;
+}
+
 - (CFArrayRef) copyTableTags {
     return NULL;
 }
@@ -440,8 +456,15 @@ CFStringRef O2FontCopyFullName(O2FontRef self) {
 }
 
 CFStringRef O2FontCopyPostScriptName(O2FontRef self) {
-    if (self == nil) return NULL;
-    return (CFStringRef)[self->_name copy];
+    return (CFStringRef)[self copyPostScriptName];
+}
+
+CFStringRef O2FontCopyFamilyName(O2FontRef self) {
+    return (CFStringRef)[self copyFamilyName];
+}
+
+CFStringRef O2FontCopyStyleName(O2FontRef self) {
+    return (CFStringRef)[self copyStyleName];
 }
 
 int O2FontGetUnitsPerEm(O2FontRef self) {

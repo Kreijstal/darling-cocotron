@@ -18,9 +18,16 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 
-typedef NSString *NSTouchBarItemIdentifier;
+typedef NSString *NSTouchBarItemIdentifier NS_EXTENSIBLE_STRING_ENUM;
+
+typedef float NSTouchBarItemPriority NS_TYPED_EXTENSIBLE_ENUM;
+
+static const NSTouchBarItemPriority NSTouchBarItemPriorityHigh = 1000;
+static const NSTouchBarItemPriority NSTouchBarItemPriorityNormal = 0;
+static const NSTouchBarItemPriority NSTouchBarItemPriorityLow = -1000;
 
 APPKIT_EXPORT NSTouchBarItemIdentifier const
         NSTouchBarItemIdentifierFixedSpaceLarge;
@@ -30,10 +37,14 @@ APPKIT_EXPORT NSTouchBarItemIdentifier const
         NSTouchBarItemIdentifierFlexibleSpace;
 APPKIT_EXPORT NSTouchBarItemIdentifier const
         NSTouchBarItemIdentifierOtherItemsProxy;
+APPKIT_EXPORT NSTouchBarItemIdentifier const
+        NSTouchBarItemIdentifierCandidateList;
+APPKIT_EXPORT NSTouchBarItemIdentifier const
+        NSTouchBarItemIdentifierCharacterPicker;
 
-@interface NSTouchBarItem : NSObject <NSCoding>
-{
+@interface NSTouchBarItem : NSObject <NSCoding> {
     NSTouchBarItemIdentifier _identifier;
+    NS_LEGACY_IVAR_PAD(_NSTouchBarItemReserved, 28)
 }
 
 - (instancetype) initWithIdentifier: (NSTouchBarItemIdentifier) identifier;

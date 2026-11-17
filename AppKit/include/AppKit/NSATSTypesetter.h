@@ -18,6 +18,7 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSTypesetter.h>
 
 @interface NSATSTypesetter : NSTypesetter {

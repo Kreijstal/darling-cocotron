@@ -18,6 +18,7 @@ along with Darling.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #import "X11Pasteboard.h"
+#import "NSPasteboardAliases.h"
 
 static const NSUInteger X11IncrChunkSize = 64 * 1024;
 static const NSTimeInterval kSelectionPollInterval = 0.02;
@@ -105,14 +106,17 @@ static size_t MaximumPropertyBytes(Display *display) {
     _receivingProperty = XInternAtom(_display, "RECEIVING_PROPERTY", False);
     _incrAtom = XInternAtom(_display, "INCR", False);
     _targetsAtom = XInternAtom(_display, "TARGETS", False);
+    _textAtom = XInternAtom(_display, "TEXT", False);
+    _utf8StringAtom = XInternAtom(_display, "UTF8_STRING", False);
     _incrTransfers = [[NSMutableDictionary alloc] init];
 
     int screen = DefaultScreen(_display);
     _window = XCreateSimpleWindow(_display, RootWindow(_display, screen), -10,
                                   -10, 1, 1, 0, 0, 0);
-    XSelectInput(_display, _window,
-                 SelectionClear | SelectionRequest | SelectionNotify |
-                         PropertyNotify);
+    // XSelectInput() takes event masks, not event types. The selection events
+    // are always delivered; PropertyNotify is what an INCR transfer into this
+    // window waits for, and it needs PropertyChangeMask.
+    XSelectInput(_display, _window, PropertyChangeMask);
 
     [x11Display setWindow: self forID: _window];
 
@@ -139,6 +143,8 @@ static size_t MaximumPropertyBytes(Display *display) {
         _typeToData = [NSMutableDictionary new];
     if (_typeToOwner == nil)
         _typeToOwner = [NSMutableDictionary new];
+    if (_typeOrder == nil)
+        _typeOrder = [NSMutableArray new];
     [self discardRemoteTypes];
 
     _changeCount++;
@@ -153,6 +159,7 @@ static size_t MaximumPropertyBytes(Display *display) {
     NSArray *owners = [_typeToOwner allValues];
     [_typeToOwner removeAllObjects];
     [_typeToData removeAllObjects];
+    [_typeOrder removeAllObjects];
     // Bump here rather than only in ensureSelectionOwner, which fires once per ownership
     // transition: clearing twice in a row used to leave -changeCount unchanged, so a
     // poller saw no change even though the contents were replaced.
@@ -173,6 +180,8 @@ static size_t MaximumPropertyBytes(Display *display) {
 
     [_typeToData release];
     _typeToData = nil;
+    [_typeOrder release];
+    _typeOrder = nil;
 
     [self discardRemoteTypes];
     _changeCount++;
@@ -216,8 +225,10 @@ static size_t MaximumPropertyBytes(Display *display) {
 // return whether anybody took the event.
 + (BOOL) dispatchPropertyNotify: (XPropertyEvent *) event {
     for (X11Pasteboard *board in [nameToPboard allValues]) {
-        if ([board respondsToSelector: @selector(propertyNotify:)]
-                && board->_incrTransfers[[NSNumber numberWithUnsignedLong: event->window]] != nil
+        // The pasteboard whose own window this is has already seen the event.
+        if (board->_window == event->window)
+            continue;
+        if (board->_incrTransfers[[NSNumber numberWithUnsignedLong: event->window]] != nil
                 && event->state == PropertyDelete) {
             [board propertyNotify: event];
             return YES;
@@ -227,17 +238,13 @@ static size_t MaximumPropertyBytes(Display *display) {
 }
 
 + (NSArray<NSString *> *) targetsForType: (NSPasteboardType) type {
-    if ([type isEqual: NSStringPboardType] ||
-        [type isEqual: @"public.utf8-plain-text"] ||
-        [type isEqual: @"public.plain-text"]) {
+    if ([NSPasteboardCanonicalType(type) isEqual: NSPasteboardTypeString]) {
         return @[
             @"UTF8_STRING", @"STRING", @"TEXT", @"text/plain",
             @"text/plain;charset=utf-8"
         ];
     }
-    if ([type isEqual: NSRTFPboardType] || [type isEqual: @"public.rtf"]) {
-        return @[ @"text/rtf", @"application/rtf", @"text/richtext" ];
-    }
+    // TODO...
     return @[ type ];
 }
 
@@ -246,12 +253,9 @@ static size_t MaximumPropertyBytes(Display *display) {
         [target isEqual: @"text/plain"] ||
         [target isEqual: @"text/plain;charset=utf-8"] ||
         [target isEqual: @"UTF8_STRING"]) {
-        return NSStringPboardType;
+        return NSPasteboardTypeString;
     }
-    if ([target isEqual: @"text/rtf"] || [target isEqual: @"application/rtf"] ||
-        [target isEqual: @"text/richtext"]) {
-        return NSRTFPboardType;
-    }
+    // TODO...
     return target;
 }
 
@@ -276,7 +280,10 @@ static size_t MaximumPropertyBytes(Display *display) {
         return nil;
     }
 
-    if (type != target) {
+    // TEXT lets the owner pick the encoding, and the property type says which.
+    _receivedType = type;
+    if (type != target && !(target == _textAtom &&
+                            (type == XA_STRING || type == _utf8StringAtom))) {
         // The bytes would be read as a flavour nobody asked for.
         NSLog(@"X11 pasteboard: the selection owner answered one target with the "
               "type of another");
@@ -332,9 +339,15 @@ static size_t MaximumPropertyBytes(Display *display) {
         if (remaining <= 0)
             return NO;
 
+        // A PropertyNotify posts no NSEvent, so when the run loop's socket
+        // callback is the one that handles it, -nextEventMatchingMask: has
+        // nothing to return and would sleep until its date. Wait in short
+        // slices, as -receiveDataForTarget: does, so the next chunk is seen
+        // right away instead of after the whole remaining timeout.
+        NSTimeInterval slice = MIN(kSelectionPollInterval, remaining);
         [[NSDisplay currentDisplay]
                 nextEventMatchingMask: NSAnyEventMask
-                            untilDate: [NSDate dateWithTimeIntervalSinceNow: remaining]
+                            untilDate: [NSDate dateWithTimeIntervalSinceNow: slice]
                                inMode: NSDefaultRunLoopMode
                               dequeue: NO];
     }
@@ -498,25 +511,13 @@ static size_t MaximumPropertyBytes(Display *display) {
 }
 
 - (NSData *) dataForType: (NSPasteboardType) type {
+    type = NSPasteboardCanonicalType(type);
 
     if (_typeToOwner != nil) {
         // We're the owner; just fetch the data directly.
         id<NSPasteboardTypeOwner> owner = _typeToOwner[type];
-        if (owner != nil)
-            [owner pasteboard: self provideDataForType: type];
-        NSData *data = _typeToData[type];
-        if (data == nil) {
-            if ([type isEqual: @"public.utf8-plain-text"] || [type isEqual: @"public.plain-text"])
-                data = _typeToData[NSStringPboardType];
-            else if ([type isEqual: NSStringPboardType]) {
-                data = _typeToData[@"public.utf8-plain-text"];
-                if (data == nil) data = _typeToData[@"public.plain-text"];
-            } else if ([type isEqual: @"public.rtf"])
-                data = _typeToData[NSRTFPboardType];
-            else if ([type isEqual: NSRTFPboardType])
-                data = _typeToData[@"public.rtf"];
-        }
-        return data;
+        [owner pasteboard: self provideDataForType: type];
+        return _typeToData[type];
     }
 
     [self observeSelectionOwner];
@@ -524,41 +525,28 @@ static size_t MaximumPropertyBytes(Display *display) {
         // No owner, no reply, and waiting for one would block the caller.
         return nil;
 
-    NSArray *available = [self remoteTypes];
-    BOOL hasType = [available containsObject: type];
-    if (!hasType) {
-        if ([type isEqual: NSStringPboardType] ||
-            [type isEqual: @"public.utf8-plain-text"] ||
-            [type isEqual: @"public.plain-text"]) {
-            if ([available containsObject: @"public.utf8-plain-text"]) {
-                type = @"public.utf8-plain-text";
-                hasType = YES;
-            } else if ([available containsObject: NSStringPboardType]) {
-                type = NSStringPboardType;
-                hasType = YES;
-            } else if ([available containsObject: @"public.plain-text"]) {
-                type = @"public.plain-text";
-                hasType = YES;
-            }
-        } else if ([type isEqual: NSRTFPboardType] || [type isEqual: @"public.rtf"]) {
-            if ([available containsObject: NSRTFPboardType]) {
-                type = NSRTFPboardType;
-                hasType = YES;
-            } else if ([available containsObject: @"public.rtf"]) {
-                type = @"public.rtf";
-                hasType = YES;
-            }
-        }
-    }
-    if (!hasType)
-        return nil;
-
     NSTimeInterval deadline = [NSDate timeIntervalSinceReferenceDate]
             + SelectionTimeout;
     for (NSString *target in [X11Pasteboard targetsForType: type]) {
         Atom targetAtom = XInternAtom(_display, [target UTF8String], False);
+        _receivedType = None;
         NSData *data = [self receiveDataForTarget: targetAtom format: 8
                                          deadline: deadline];
+        if (data == nil)
+            continue;
+        if (![type isEqual: NSPasteboardTypeString])
+            return data;
+        // Text is kept as UTF-8. ICCCM's STRING is ISO Latin-1, and a TEXT
+        // reply is in whichever encoding its type names.
+        if (_receivedType == XA_STRING) {
+            NSString *text = [[[NSString alloc]
+                    initWithData: data
+                        encoding: NSISOLatin1StringEncoding] autorelease];
+            data = [text dataUsingEncoding: NSUTF8StringEncoding];
+        } else if (targetAtom == _textAtom && _receivedType != _utf8StringAtom) {
+            // COMPOUND_TEXT or something else we cannot decode.
+            continue;
+        }
         if (data != nil)
             return data;
     }
@@ -568,22 +556,26 @@ static size_t MaximumPropertyBytes(Display *display) {
 
 - (NSString *) stringForType: (NSPasteboardType) type {
     NSData *data = [self dataForType: type];
+    if (data == nil)
+        return nil;
 
-    NSStringEncoding encoding = NSUnicodeStringEncoding;
-    if ([type isEqual: NSStringPboardType] ||
-        [type isEqual: @"public.utf8-plain-text"] ||
-        [type isEqual: @"public.plain-text"]) {
-        encoding = NSUTF8StringEncoding;
-    }
-    return [[[NSString alloc] initWithData: data
-                                  encoding: encoding] autorelease];
+    // UTF-8 is what macOS reads strings of other clients' types as; data that is not valid UTF-8
+    // (what -setString:forType: stores for a type other than the string type) is read as Unicode.
+    NSString *string = [[[NSString alloc] initWithData: data encoding: NSUTF8StringEncoding] autorelease];
+    if (string == nil && ![NSPasteboardCanonicalType(type) isEqual: NSPasteboardTypeString])
+        string = [[[NSString alloc] initWithData: data encoding: NSUnicodeStringEncoding] autorelease];
+    return string;
 }
 
 - (NSInteger) addTypes: (NSArray<NSPasteboardType> *) types
                  owner: (id<NSPasteboardTypeOwner>) owner
 {
     [self ensureSelectionOwner];
-    for (NSPasteboardType type in types) {
+    for (NSPasteboardType declared in types) {
+        // Stored under the UTI spelling; the 10.0 name of the same type reaches it too.
+        NSPasteboardType type = NSPasteboardCanonicalType(declared);
+        if (![_typeOrder containsObject: type])
+            [_typeOrder addObject: type];
         [_typeToData removeObjectForKey: type];
         // A nil owner is valid: an object that does not want pasteboardChangedOwner: callbacks
         // declares its types with none, which is what -[NSTextView copy:] does. Storing nil in
@@ -605,21 +597,24 @@ static size_t MaximumPropertyBytes(Display *display) {
 }
 
 - (BOOL) setData: (NSData *) data forType: (NSPasteboardType) type {
+    type = NSPasteboardCanonicalType(type);
     [self ensureSelectionOwner];
+    if (![_typeOrder containsObject: type])
+        [_typeOrder addObject: type];
     // Make sure to retain data before releasing the owner,
     // because it might be the owner that is providing us
     // with this data.
     _typeToData[type] = data;
-    id prevOwner = _typeToOwner[type];
-    if ([prevOwner respondsToSelector: @selector(pasteboardChangedOwner:)])
-        [prevOwner pasteboardChangedOwner: self];
+    id previousOwner = _typeToOwner[type];
+    if ([previousOwner respondsToSelector: @selector(pasteboardChangedOwner:)])
+        [previousOwner pasteboardChangedOwner: self];
     [_typeToOwner removeObjectForKey: type];
     return YES;
 }
 
 - (BOOL) setString: (NSString *) string forType: (NSPasteboardType) type {
     NSStringEncoding encoding = NSUnicodeStringEncoding;
-    if ([type isEqual: NSStringPboardType]) {
+    if ([NSPasteboardCanonicalType(type) isEqual: NSPasteboardTypeString]) {
         encoding = NSUTF8StringEncoding;
     }
     NSData *data = [string dataUsingEncoding: encoding];
@@ -628,8 +623,10 @@ static size_t MaximumPropertyBytes(Display *display) {
 
 - (NSArray<NSPasteboardType> *) localTypes {
     NSMutableArray *types = [NSMutableArray array];
-    [types addObjectsFromArray: [_typeToData allKeys]];
-    [types addObjectsFromArray: [_typeToOwner allKeys]];
+    // Every declared type is listed, also one declared without an owner and not yet given data
+    // (declareTypes:owner: with a nil owner)
+    for (NSPasteboardType type in _typeOrder)
+        [types addObject: type];
     return types;
 }
 
@@ -702,9 +699,9 @@ static size_t MaximumPropertyBytes(Display *display) {
 
 - (NSArray<NSPasteboardType> *) types {
     if (_typeToOwner != nil)
-        return [self localTypes];
+        return NSPasteboardTypesWithAliases([self localTypes]);
 
-    return [self remoteTypes];
+    return NSPasteboardTypesWithAliases([self remoteTypes]);
 }
 
 - (void) selectionNotify: (XSelectionEvent *) event {
@@ -726,6 +723,7 @@ static size_t MaximumPropertyBytes(Display *display) {
       re->target = event->target;
       re->property = success ? ((event->property == None) ? event->target : event->property) : None;
       re->time = event->time;
+      // ICCCM 2.2: the SelectionNotify goes to the requestor alone (propagate False).
       XSendEvent(_display, event->requestor, False, NoEventMask, &replyEvent);
       XFlush(_display);
     };
@@ -803,12 +801,33 @@ static size_t MaximumPropertyBytes(Display *display) {
         return;
     }
 
+    // Text is held as UTF-8. STRING promises ISO Latin-1, so text that does not
+    // fit is refused and the requestor can ask for UTF8_STRING instead; TEXT
+    // leaves the encoding to the owner, and the reply's type names it.
+    Atom replyType = event->target;
+    if ([type isEqual: NSPasteboardTypeString]) {
+        if (event->target == XA_STRING) {
+            NSString *text = [[[NSString alloc]
+                    initWithData: data
+                        encoding: NSUTF8StringEncoding] autorelease];
+            data = [text dataUsingEncoding: NSISOLatin1StringEncoding];
+            if (data == nil) {
+                reply(NO);
+                return;
+            }
+        } else if (event->target == _textAtom) {
+            replyType = _utf8StringAtom;
+        }
+    }
+
     if ([data length] > MaximumPropertyBytes(_display)) {
         // ICCCM 2.7.2: more than fits in one property write, so hand it over as
         // INCR. The marker and the reply go out now; -propertyNotify: paces the
         // chunks from the requestor's acknowledgements, so nothing here waits on
         // the peer.
-        [self startIncrementalTransferForRequest: event data: data];
+        [self startIncrementalTransferForRequest: event
+                                            type: replyType
+                                            data: data];
         reply(YES);
         return;
     }
@@ -818,7 +837,7 @@ static size_t MaximumPropertyBytes(Display *display) {
         reply(NO);
         return;
     }
-    XChangeProperty(_display, event->requestor, targetProperty, event->target,
+    XChangeProperty(_display, event->requestor, targetProperty, replyType,
                     8, PropModeReplace, [data bytes], [data length]);
 
     reply(YES);
@@ -841,7 +860,6 @@ static size_t MaximumPropertyBytes(Display *display) {
         transfer->_property != event->atom)
         return;
 
-    [_incrTransfers removeObjectForKey: requestor];
     NSUInteger left = [transfer->_data length] - transfer->_offset;
     NSUInteger chunk = left > X11IncrChunkSize ? X11IncrChunkSize : left;
     if (chunk == 0) {
@@ -851,13 +869,29 @@ static size_t MaximumPropertyBytes(Display *display) {
         // receiver would wait for data that never comes.
         XChangeProperty(_display, event->window, event->atom, transfer->_type, 8,
                         PropModeReplace, NULL, 0);
+        [self stopWatchingRequestor: event->window];
+        // Releases the transfer; nothing of it is used past this point.
+        [_incrTransfers removeObjectForKey: requestor];
     } else {
         XChangeProperty(_display, event->window, event->atom, transfer->_type, 8,
                         PropModeReplace, [transfer->_data bytes] + transfer->_offset,
                         chunk);
+        // The transfer stays in the table until the terminator has been
+        // written: every chunk is asked for by its own deletion.
+        transfer->_offset += chunk;
     }
     XFlush(_display);
-    [transfer release];
+}
+
+// A requestor that is one of this process's windows already selects what it
+// needs, and XSelectInput() would replace that mask rather than add to it.
+- (BOOL) isForeignWindow: (Window) window {
+    return [(X11Display *) [NSDisplay currentDisplay] windowForID: window] == nil;
+}
+
+- (void) stopWatchingRequestor: (Window) requestor {
+    if ([self isForeignWindow: requestor])
+        XSelectInput(_display, requestor, NoEventMask);
 }
 
 // Start handing a selection over as INCR, because it is larger than one property
@@ -865,23 +899,28 @@ static size_t MaximumPropertyBytes(Display *display) {
 // requestor's window; this only has to write the INCR marker the requestor is
 // waiting for and subscribe to the deletions that pace it.
 - (void) startIncrementalTransferForRequest: (XSelectionRequestEvent *) event
+                                       type: (Atom) type
                                        data: (NSData *) data {
     // ICCCM 2.7.2: the owner writes the property with type INCR and the total
     // length as its value, and the requestor then deletes the property to say it
     // is ready for a chunk. The length is what lets the requestor size its read,
     // so it is the payload here, not the atom.
+    // An obsolete requestor names no property; ICCCM 2.2 has the owner use the
+    // target atom as the property name then.
+    Atom property = (event->property == None) ? event->target : event->property;
     unsigned long length = (unsigned long) [data length];
-    XChangeProperty(_display, event->requestor, event->property, _incrAtom, 32,
+    XChangeProperty(_display, event->requestor, property, _incrAtom, 32,
                     PropModeReplace, (unsigned char *) &length, 1);
 
     // Deletions arrive as PropertyNotify on the requestor's window, which we do
     // not otherwise select for: it belongs to another client.
-    XSelectInput(_display, event->requestor, PropertyChangeMask);
+    if ([self isForeignWindow: event->requestor])
+        XSelectInput(_display, event->requestor, PropertyChangeMask);
 
     NSNumber *requestor = [NSNumber numberWithUnsignedLong: event->requestor];
     _incrTransfers[requestor] =
-            [[[X11IncrTransfer alloc] initWithProperty: event->property
-                                                   type: event->target
+            [[[X11IncrTransfer alloc] initWithProperty: property
+                                                   type: type
                                                    data: data] autorelease];
 
     XFlush(_display);

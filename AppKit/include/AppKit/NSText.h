@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSSpellProtocol.h>
 #import <AppKit/NSView.h>
 
@@ -63,12 +64,13 @@ typedef NS_ENUM(NSInteger, NSTextAlignment) {
 };
 #endif // !__NSTEXT_ALIGNMENT_SHARED_SECTION__
 
-// Macros rather than constants so they still work as case labels and in C++.
-#define NSLeftTextAlignment NSTextAlignmentLeft
-#define NSRightTextAlignment NSTextAlignmentRight
-#define NSCenterTextAlignment NSTextAlignmentCenter
-#define NSJustifiedTextAlignment NSTextAlignmentJustified
-#define NSNaturalTextAlignment NSTextAlignmentNatural
+enum {
+    NSLeftTextAlignment = NSTextAlignmentLeft,
+    NSRightTextAlignment = NSTextAlignmentRight,
+    NSCenterTextAlignment = NSTextAlignmentCenter,
+    NSJustifiedTextAlignment = NSTextAlignmentJustified,
+    NSNaturalTextAlignment = NSTextAlignmentNatural
+};
 
 enum {
     NSIllegalTextMovement = 0x00,
@@ -96,73 +98,75 @@ APPKIT_EXPORT NSString *const NSTextDidBeginEditingNotification;
 APPKIT_EXPORT NSString *const NSTextDidEndEditingNotification;
 APPKIT_EXPORT NSString *const NSTextDidChangeNotification;
 
-@interface NSText : NSView <NSChangeSpelling, NSIgnoreMisspelledWords>
+typedef NS_ENUM(NSInteger, NSTextMovement) {
+    NSTextMovementReturn = 0x10,
+    NSTextMovementTab = 0x11,
+    NSTextMovementBacktab = 0x12,
+    NSTextMovementLeft = 0x13,
+    NSTextMovementRight = 0x14,
+    NSTextMovementUp = 0x15,
+    NSTextMovementDown = 0x16,
+    NSTextMovementCancel = 0x17,
+    NSTextMovementOther = 0,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x54, Apple's. The word is
+// NSTextView's pointer to its extra state (Apple's NSText has a word of its
+// own for what NSTextView keeps).
+@interface NSText : NSView <NSChangeSpelling, NSIgnoreMisspelledWords> {
+    NS_EXTRA_SLOT_FOR_SUBCLASS(NSTextView)
+}
 
 - (instancetype) initWithCoder: (NSCoder *) coder;
 - (instancetype) initWithFrame: (NSRect) frameRect;
 
 - delegate;
-- (NSString *) string;
+@property(nonatomic, copy) NSString *string;
 - (NSData *) RTFFromRange: (NSRange) range;
 - (NSData *) RTFDFromRange: (NSRange) range;
 
-- (BOOL) isEditable;
-- (BOOL) isSelectable;
-- (BOOL) isRichText;
-- (BOOL) isFieldEditor;
-- (BOOL) usesFontPanel;
-- (BOOL) importsGraphics;
+@property(nonatomic, getter=isEditable) BOOL editable;
+@property(nonatomic, getter=isSelectable) BOOL selectable;
+@property(nonatomic, getter=isRichText) BOOL richText;
+@property(nonatomic, getter=isFieldEditor) BOOL fieldEditor;
+@property(nonatomic) BOOL usesFontPanel;
+@property(nonatomic) BOOL importsGraphics;
 
-- (NSFont *) font;
-- (NSTextAlignment) alignment;
+@property(nonatomic, retain) NSFont *font;
+@property(nonatomic) NSTextAlignment alignment;
 
-- (NSColor *) textColor;
+@property(nonatomic, retain) NSColor *textColor;
 
-- (BOOL) drawsBackground;
-- (NSColor *) backgroundColor;
+@property(nonatomic) BOOL drawsBackground;
+@property(nonatomic, retain) NSColor *backgroundColor;
 
-- (BOOL) isHorizontallyResizable;
-- (BOOL) isVerticallyResizable;
-- (NSSize) maxSize;
-- (NSSize) minSize;
+@property(nonatomic, getter=isHorizontallyResizable) BOOL horizontallyResizable;
+@property(nonatomic, getter=isVerticallyResizable) BOOL verticallyResizable;
+@property(nonatomic) NSSize maxSize;
+@property(nonatomic) NSSize minSize;
 
-- (NSRange) selectedRange;
+@property(nonatomic) NSRange selectedRange;
 
 - (void) setDelegate: delegate;
-- (void) setString: (NSString *) string;
 
 - (void) replaceCharactersInRange: (NSRange) range
                        withString: (NSString *) string;
 
 - (BOOL) readRTFDFromFile: (NSString *) path;
+- (BOOL) writeRTFDToFile: (NSString *) path atomically: (BOOL) atomically;
 - (void) replaceCharactersInRange: (NSRange) range withRTF: (NSData *) rtf;
 - (void) replaceCharactersInRange: (NSRange) range withRTFD: (NSData *) rtfd;
 
-- (void) setEditable: (BOOL) flag;
-- (void) setSelectable: (BOOL) flag;
-- (void) setRichText: (BOOL) flag;
-- (void) setFieldEditor: (BOOL) flag;
-- (void) setUsesFontPanel: (BOOL) value;
-- (void) setImportsGraphics: (BOOL) value;
 
-- (void) setFont: (NSFont *) font;
 - (void) setFont: (NSFont *) font range: (NSRange) range;
-- (void) setAlignment: (NSTextAlignment) alignment;
 - (void) setBaseWritingDirection: (NSWritingDirection) direction
                            range: (NSRange) range;
+@property(nonatomic) NSWritingDirection baseWritingDirection;
 
-- (void) setTextColor: (NSColor *) color;
 - (void) setTextColor: (NSColor *) color range: (NSRange) range;
 
-- (void) setDrawsBackground: (BOOL) flag;
-- (void) setBackgroundColor: (NSColor *) color;
 
-- (void) setHorizontallyResizable: (BOOL) flag;
-- (void) setVerticallyResizable: (BOOL) flag;
-- (void) setMaxSize: (NSSize) size;
-- (void) setMinSize: (NSSize) size;
 
-- (void) setSelectedRange: (NSRange) range;
 
 - (void) sizeToFit;
 
@@ -173,6 +177,11 @@ APPKIT_EXPORT NSString *const NSTextDidChangeNotification;
 - (void) alignLeft: sender;
 - (void) alignRight: sender;
 - (void) underline: sender;
+- (void) superscript: sender;
+- (void) subscript: sender;
+- (void) unscript: sender;
+- (void) copyFont: sender;
+- (void) pasteFont: sender;
 - (void) selectAll: sender;
 - (void) delete: sender;
 - (void) toggleRuler: sender;
@@ -207,3 +216,5 @@ APPKIT_EXPORT NSString *const NSTextDidChangeNotification;
 @interface NSText (NSRTFDWriting)
 - (BOOL) writeRTFDToFile: (NSString *) path atomically: (BOOL) atomically;
 @end
+
+APPKIT_EXPORT NSString * const NSTextMovementUserInfoKey;

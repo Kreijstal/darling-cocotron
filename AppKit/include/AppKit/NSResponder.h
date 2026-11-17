@@ -17,11 +17,15 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSEvent.h>
 #import <Foundation/Foundation.h>
 
 @class NSMenu, NSUndoManager, NSTouchBar;
 
+#define _NS_SIDE_NSResponder 0, 1,
+// Legacy ObjC ABI (i386): instance size must stay 0x8, Apple's (only
+// _nextResponder, at 0x4). Add new state to the extra struct, never as an ivar.
 @interface NSResponder : NSObject <NSCoding>
 // The instance variables are AppKit's own. UIKit's classes are built on this one, and iOS
 // code that subclasses them must not see them: names such as _frame or _layer would clash
@@ -29,20 +33,22 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #if !TARGET_OS_IPHONE
 {
     id _nextResponder;
-    NSTouchBar *_touchBar;
-    NSUserActivity *_userActivity;
+    NS_EXTRA_IVARS_BEGIN(NSResponder)
+        NSTouchBar *_touchBar;
+        NSUserActivity *_userActivity;
+    NS_SIDE_IVARS_END(NSResponder)
 }
 #endif
 
 @property (weak) NSResponder *nextResponder NS_SWIFT_NAME(nextResponder);
 
+
 @property(retain) NSTouchBar *touchBar;
 - (NSTouchBar *) makeTouchBar;
 
-- (NSMenu *) menu;
+@property(nonatomic, retain) NSMenu *menu;
 - (NSUndoManager *) undoManager;
 
-- (void) setMenu: (NSMenu *) menu;
 
 - validRequestorForSendType: (NSString *) sendType
                  returnType: (NSString *) returnType;
@@ -50,6 +56,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (void) interpretKeyEvents: (NSArray *) events;
 - (BOOL) performKeyEquivalent: (NSEvent *) event;
 - (BOOL) tryToPerform: (SEL) action with: object;
+- (id) supplementalTargetForAction: (SEL) action sender: (id) sender;
 - (void) noResponderFor: (SEL) action;
 
 - (BOOL) acceptsFirstResponder;
@@ -71,8 +78,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) cursorUpdate: (NSEvent *) event NS_SWIFT_NAME(cursorUpdate(with:));
 - (void) scrollWheel: (NSEvent *) event NS_SWIFT_NAME(scrollWheel(with:));
-- (void) magnifyWithEvent: (NSEvent *) event;
-- (void) rotateWithEvent: (NSEvent *) event;
+- (void) magnifyWithEvent: (NSEvent *) event NS_SWIFT_NAME(magnify(with:));
+- (void) rotateWithEvent: (NSEvent *) event NS_SWIFT_NAME(rotate(with:));
 - (void) touchesBeganWithEvent: (NSEvent *) event;
 - (void) touchesMovedWithEvent: (NSEvent *) event;
 - (void) touchesEndedWithEvent: (NSEvent *) event;

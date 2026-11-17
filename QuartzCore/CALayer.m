@@ -6,7 +6,8 @@
 #import <QuartzCore/CALayerContext.h>
 #import <QuartzCore/CATransaction.h>
 #import <Onyx2D/O2Image.h>
-#import "CACoding.h"
+#import "CAKeyedCoding.h"
+#import "CALayerInternal.h"
 #import <objc/runtime.h>
 #import "CATransactionInternal.h"
 
@@ -37,7 +38,7 @@ NSString *const kCATransition = @"transition";
 NSString *const kCAContentsFormatRGBA8Uint = @"RGBA8";
 NSString *const kCAContentsFormatRGBA16Float = @"RGBAh";
 NSString *const kCAContentsFormatGray8Uint = @"Gray8";
-NSString *const kCAContentsFormatAutomatic = @"CocotronContentsFormatAutomatic";
+NSString *const kCAContentsFormatAutomatic = @"Automatic";
 
 NSString *const CADynamicRangeAutomatic = @"automatic";
 NSString *const CADynamicRangeStandard = @"standard";
@@ -94,6 +95,10 @@ static char swiftUIViewTestPropertiesAssociationKey;
     [_mask _setContext: context];
 }
 
+- (id) _contentsForRendering: (CGRect *) rect {
+    return [self contents];
+}
+
 - (CALayer *) superlayer {
     return _superlayer;
 }
@@ -104,6 +109,23 @@ static char swiftUIViewTestPropertiesAssociationKey;
 
 - (void) setSublayers: (NSArray *) sublayers {
     sublayers = [sublayers copy];
+
+    // A layer has a single superlayer, so the new sublayers leave the layers
+    // they are in now.
+    for (CALayer *layer in sublayers) {
+        if (layer->_superlayer != nil && layer->_superlayer != self)
+            [layer removeFromSuperlayer];
+    }
+
+    // Sublayers that are not kept stop pointing at this layer and its context
+    // before the array that may own them goes away.
+    for (CALayer *layer in _sublayers) {
+        if ([sublayers indexOfObjectIdenticalTo: layer] == NSNotFound) {
+            layer->_superlayer = nil;
+            [layer _setContext: nil];
+        }
+    }
+
     [_sublayers release];
     _sublayers = sublayers;
     [_sublayers makeObjectsPerformSelector: @selector(_setSuperLayer:)
@@ -119,14 +141,6 @@ static char swiftUIViewTestPropertiesAssociationKey;
 
 - (void) setDelegate: (id<CALayerDelegate>)value {
     _delegate = value;
-}
-
-- (CAAutoresizingMask) autoresizingMask {
-    return _autoresizingMask;
-}
-
-- (void) setAutoresizingMask: (CAAutoresizingMask) mask {
-    _autoresizingMask = mask;
 }
 
 - (CGRect) visibleRect {
@@ -171,10 +185,9 @@ static char swiftUIViewTestPropertiesAssociationKey;
 
     if (animation == nil && [CATransaction hasOpenTransaction] &&
         ![CATransaction disableActions]) {
-        id action = [self actionForKey: @"position"];
+        id<CAAction> action = [self actionForKey: @"position"];
 
-        if (action != nil)
-            [self addAnimation: action forKey: @"position"];
+        [action runActionForKey: @"position" object: self arguments: nil];
     }
 
     _position = value;
@@ -189,10 +202,9 @@ static char swiftUIViewTestPropertiesAssociationKey;
 
     if (animation == nil && [CATransaction hasOpenTransaction] &&
         ![CATransaction disableActions]) {
-        id action = [self actionForKey: @"bounds"];
+        id<CAAction> action = [self actionForKey: @"bounds"];
 
-        if (action != nil)
-            [self addAnimation: action forKey: @"bounds"];
+        [action runActionForKey: @"bounds" object: self arguments: nil];
     }
 
     BOOL sizeChanged = !CGSizeEqualToSize(_bounds.size, value.size);
@@ -238,10 +250,9 @@ static char swiftUIViewTestPropertiesAssociationKey;
 
     if (animation == nil && [CATransaction hasOpenTransaction] &&
         ![CATransaction disableActions]) {
-        id action = [self actionForKey: @"opacity"];
+        id<CAAction> action = [self actionForKey: @"opacity"];
 
-        if (action != nil)
-            [self addAnimation: action forKey: @"opacity"];
+        [action runActionForKey: @"opacity" object: self arguments: nil];
     }
 
     _opacity = value;
@@ -263,6 +274,80 @@ static char swiftUIViewTestPropertiesAssociationKey;
     value = [value retain];
     [_contents release];
     _contents = value;
+    [_context startTimerIfNeeded];
+}
+
+- (CGFloat) contentsScale {
+    return _contentsScale;
+}
+
+- (void) setContentsScale: (CGFloat) value {
+    _contentsScale = value;
+}
+
+- (CGRect) contentsCenter {
+    return _contentsCenter;
+}
+
+- (void) setContentsCenter: (CGRect) value {
+    _contentsCenter = value;
+}
+
+- (CALayerContentsFormat) contentsFormat {
+    return _contentsFormat;
+}
+
+- (void) setContentsFormat: (CALayerContentsFormat) value {
+    value = [value copy];
+    [_contentsFormat release];
+    _contentsFormat = value;
+}
+
+- (CALayerContentsGravity) contentsGravity {
+    return _contentsGravity;
+}
+
+- (void) setContentsGravity: (CALayerContentsGravity) value {
+    value = [value copy];
+    [_contentsGravity release];
+    _contentsGravity = value;
+    [_context startTimerIfNeeded];
+}
+
+- (CADynamicRange) preferredDynamicRange {
+    return _preferredDynamicRange;
+}
+
+- (void) setPreferredDynamicRange: (CADynamicRange) value {
+    value = [value copy];
+    [_preferredDynamicRange release];
+    _preferredDynamicRange = value;
+}
+
+- (CAToneMapMode) toneMapMode {
+    return _toneMapMode;
+}
+
+- (void) setToneMapMode: (CAToneMapMode) value {
+    value = [value copy];
+    [_toneMapMode release];
+    _toneMapMode = value;
+}
+
+- (BOOL) allowsEdgeAntialiasing {
+    return _allowsEdgeAntialiasing;
+}
+
+- (void) setAllowsEdgeAntialiasing: (BOOL) value {
+    _allowsEdgeAntialiasing = value;
+}
+
+- (CAEdgeAntialiasingMask) edgeAntialiasingMask {
+    return _edgeAntialiasingMask;
+}
+
+- (void) setEdgeAntialiasingMask: (CAEdgeAntialiasingMask) value {
+    _edgeAntialiasingMask = value;
 }
 
 - (CGFloat) contentsScale {
@@ -395,21 +480,24 @@ static char swiftUIViewTestPropertiesAssociationKey;
     _position = CGPointZero;
     _bounds = CGRectZero;
     _opacity = 1.0;
-    _opaque = YES;
+    _opaque = NO;
     _contents = nil;
     _contentsScale = 1.0;
     // The whole contents image stretches, i.e. no fixed border.
     _contentsCenter = CGRectMake(0, 0, 1, 1);
+    _contentsRect = CGRectMake(0, 0, 1, 1);
+    _doubleSided = YES;
+    _rasterizationScale = 1.0;
     _contentsFormat = [kCAContentsFormatRGBA8Uint copy];
     _contentsGravity = [kCAGravityResize copy];
     _cornerCurve = [kCACornerCurveCircular copy];
-    _preferredDynamicRange = [CADynamicRangeStandard copy];
-    _toneMapMode = [CAToneMapModeAutomatic copy];
     _allowsGroupOpacity = YES;
     _shadowColor = CGColorCreateGenericRGB(0, 0, 0, 1);
     _shadowOpacity = 0;
     _shadowRadius = 3;
     _shadowOffset = CGSizeMake(0, -3);
+    _preferredDynamicRange = [CADynamicRangeStandard copy];
+    _toneMapMode = [CAToneMapModeAutomatic copy];
     _allowsEdgeAntialiasing = NO;
     _edgeAntialiasingMask = kCALayerLeftEdge | kCALayerRightEdge | kCALayerBottomEdge | kCALayerTopEdge;
     _transform = CATransform3DIdentity;
@@ -424,63 +512,20 @@ static char swiftUIViewTestPropertiesAssociationKey;
     return self;
 }
 
+// A copy of a layer starts with the default state; the properties of the layer
+// it is made from are not carried over, and the argument is not examined.
+// Subclasses copy their own state in their overrides. The defaults are set
+// without calling -init, so that a subclass's -init does not run again.
+// QUIRK: macOS leaves the new layer in its default state, accepts any object
+// (or nil) as the argument and does not raise. Not documented (the
+// presentation layer copy is filled in by the system, not by this method).
+// Evidence: black-box observation on macOS 26.7.3 (tier 2),
+// vd-upstream mac-probes/v314-initwithlayer.m.
+// Test: tests/quartzcore-layer-init-with-layer.swift
 - initWithLayer: (id) layer {
-    if (![layer isKindOfClass: [CALayer class]]) {
-        [self release];
-        [NSException raise: NSInvalidArgumentException
-                    format: @"-[CALayer initWithLayer:] needs a CALayer, not %@", layer];
-    }
     self = [super init];
-    [self _setDefaults];
-    CALayer *other = layer;
-
-    // Scalars are assigned directly: some setters (opacity) would start
-    // implicit animations on the copy.
-    _delegate = other->_delegate;
-    _anchorPoint = other->_anchorPoint;
-    _position = other->_position;
-    _bounds = other->_bounds;
-    _opacity = other->_opacity;
-    _opaque = other->_opaque;
-    _contentsScale = other->_contentsScale;
-    _contentsCenter = other->_contentsCenter;
-    _allowsGroupOpacity = other->_allowsGroupOpacity;
-    _allowsEdgeAntialiasing = other->_allowsEdgeAntialiasing;
-    _edgeAntialiasingMask = other->_edgeAntialiasingMask;
-    _transform = other->_transform;
-    _sublayerTransform = other->_sublayerTransform;
-    _borderWidth = other->_borderWidth;
-    _cornerRadius = other->_cornerRadius;
-    _masksToBounds = other->_masksToBounds;
-    _shadowOpacity = other->_shadowOpacity;
-    _shadowRadius = other->_shadowRadius;
-    _shadowOffset = other->_shadowOffset;
-    _hidden = other->_hidden;
-    _needsDisplayOnBoundsChange = other->_needsDisplayOnBoundsChange;
-    _geometryFlipped = other->_geometryFlipped;
-
-    // The copy has no context yet, so these setters only do the retain/copy.
-    [self setContents: other->_contents];
-    [self setContentsFormat: other->_contentsFormat];
-    [self setContentsGravity: other->_contentsGravity];
-    [self setCornerCurve: other->_cornerCurve];
-    [self setPreferredDynamicRange: other->_preferredDynamicRange];
-    [self setToneMapMode: other->_toneMapMode];
-    [self setMinificationFilter: other->_minificationFilter];
-    [self setMagnificationFilter: other->_magnificationFilter];
-    [self setBackgroundColor: other->_backgroundColor];
-    [self setBorderColor: other->_borderColor];
-    [self setShadowColor: other->_shadowColor];
-    [self setShadowPath: other->_shadowPath];
-    [self setFilters: other->_filters];
-    [self setCompositingFilter: other->_compositingFilter];
-    [self setName: other->_name];
-    // Assigned directly: the setters would mark this copy and its superlayer for layout.
-    _layoutManager = [other->_layoutManager retain];
-    _constraints = [other->_constraints copy];
-    // Shared, not re-parented: -setMask: would move the mask to this
-    // context-less copy.
-    _mask = [other->_mask retain];
+    if (self != nil)
+        [self _setDefaults];
     return self;
 }
 
@@ -488,168 +533,317 @@ static char swiftUIViewTestPropertiesAssociationKey;
     return YES;
 }
 
-// The delegate, the superlayer and the render context are not archived; the
-// superlayer is restored when the parent decodes its sublayers.
-- (void) encodeWithCoder: (NSCoder *) coder {
-    CARequireKeyedCoder(coder);
-    if ([_animations count] > 0)
-        [NSException raise: NSInvalidArchiveOperationException
-                    format: @"Cannot archive %@: its animations do not support archiving", self];
-    if ([_filters count] > 0)
-        [NSException raise: NSInvalidArchiveOperationException
-                    format: @"Cannot archive %@: its filters do not support archiving", self];
-    if (_compositingFilter != nil && ![_compositingFilter isKindOfClass: [NSString class]])
-        [NSException raise: NSInvalidArchiveOperationException
-                    format: @"Cannot archive %@: compositing filter %@ does not support archiving", self,
-                            _compositingFilter];
-    if (_contents != nil && ![_contents isKindOfClass: [O2Image class]])
-        [NSException raise: NSInvalidArchiveOperationException
-                    format: @"Cannot archive %@: contents %@ are not a CGImage", self, _contents];
-    if (_layoutManager != nil && ![_layoutManager conformsToProtocol: @protocol(NSCoding)])
-        [NSException raise: NSInvalidArchiveOperationException
-                    format: @"Cannot archive %@: layout manager %@ does not support archiving", self,
-                            _layoutManager];
+static BOOL isOpaqueBlack(CGColorRef color) {
+    if (color == NULL || CGColorGetNumberOfComponents(color) != 4)
+        return NO;
+    const CGFloat *c = CGColorGetComponents(color);
+    return c[0] == 0 && c[1] == 0 && c[2] == 0 && c[3] == 1;
+}
 
-    [coder encodeObject: _sublayers forKey: @"sublayers"];
-    [coder encodeObject: _mask forKey: @"mask"];
-    CAEncodePoint(coder, _anchorPoint, @"anchorPoint");
-    CAEncodePoint(coder, _position, @"position");
-    CAEncodeRect(coder, _bounds, @"bounds");
-    [coder encodeDouble: _opacity forKey: @"opacity"];
-    [coder encodeBool: _opaque forKey: @"opaque"];
-    CAEncodeImage(coder, (CGImageRef) _contents, @"contents");
-    [coder encodeDouble: _contentsScale forKey: @"contentsScale"];
-    CAEncodeRect(coder, _contentsCenter, @"contentsCenter");
-    [coder encodeObject: _contentsFormat forKey: @"contentsFormat"];
-    [coder encodeObject: _contentsGravity forKey: @"contentsGravity"];
-    [coder encodeObject: _cornerCurve forKey: @"cornerCurve"];
-    [coder encodeObject: _preferredDynamicRange forKey: @"preferredDynamicRange"];
-    [coder encodeObject: _toneMapMode forKey: @"toneMapMode"];
-    [coder encodeBool: _allowsGroupOpacity forKey: @"allowsGroupOpacity"];
-    CAEncodePath(coder, _shadowPath, @"shadowPath");
-    [coder encodeBool: _allowsEdgeAntialiasing forKey: @"allowsEdgeAntialiasing"];
-    [coder encodeInt: _edgeAntialiasingMask forKey: @"edgeAntialiasingMask"];
-    CAEncodeTransform3D(coder, _transform, @"transform");
-    CAEncodeTransform3D(coder, _sublayerTransform, @"sublayerTransform");
-    [coder encodeObject: _minificationFilter forKey: @"minificationFilter"];
-    [coder encodeObject: _magnificationFilter forKey: @"magnificationFilter"];
-    CAEncodeColor(coder, _backgroundColor, @"backgroundColor");
-    CAEncodeColor(coder, _borderColor, @"borderColor");
-    [coder encodeDouble: _borderWidth forKey: @"borderWidth"];
-    [coder encodeDouble: _cornerRadius forKey: @"cornerRadius"];
-    [coder encodeBool: _masksToBounds forKey: @"masksToBounds"];
-    [coder encodeObject: _compositingFilter forKey: @"compositingFilter"];
-    CAEncodeColor(coder, _shadowColor, @"shadowColor");
-    [coder encodeFloat: _shadowOpacity forKey: @"shadowOpacity"];
-    [coder encodeDouble: _shadowRadius forKey: @"shadowRadius"];
-    CAEncodeSize(coder, _shadowOffset, @"shadowOffset");
-    [coder encodeBool: _hidden forKey: @"hidden"];
-    [coder encodeBool: _needsDisplayOnBoundsChange forKey: @"needsDisplayOnBoundsChange"];
-    [coder encodeBool: _geometryFlipped forKey: @"geometryFlipped"];
-    [coder encodeObject: _name forKey: @"name"];
-    [coder encodeObject: _constraints forKey: @"constraints"];
-    [coder encodeObject: _layoutManager forKey: @"layoutManager"];
+// A layer archive holds the layer's own state: the delegate, the superlayer,
+// animations and the render context are left out; the parent restores the
+// superlayer when it decodes its sublayers. Properties at their default value
+// are not written (macOS writes some that were set explicitly to a default
+// value; that is not tracked here), except the four that always are.
+// Subclasses add their keys by overriding -_encodeAttributes:.
+- (void) encodeWithCoder: (NSCoder *) coder {
+    CAArchiveWriter *writer = [CAArchiveWriter writerWithCoder: coder];
+    [self _encodeAttributes: writer];
+    [writer finish];
+}
+
+- (void) _encodeAttributes: (CAArchiveWriter *) w {
+    [w encodeBool: _allowsEdgeAntialiasing forKey: @"allowsEdgeAntialiasing"];
+    [w encodeBool: _allowsGroupOpacity forKey: @"allowsGroupOpacity"];
+    [w encodeObject: _contentsFormat forKey: @"contentsFormat"];
+    [w encodeObject: _cornerCurve forKey: @"cornerCurve"];
+
+    if ([_sublayers count] > 0)
+        [w encodeArray: _sublayers forKey: @"sublayers"];
+    if (_mask != nil)
+        [w encodeObject: _mask forKey: @"mask"];
+    if (_name != nil)
+        [w encodeObject: _name forKey: @"name"];
+    if (_anchorPoint.x != 0.5 || _anchorPoint.y != 0.5)
+        [w encodePoint: _anchorPoint forKey: @"anchorPoint"];
+    if (_anchorPointZ != 0)
+        [w encodeDouble: _anchorPointZ forKey: @"anchorPointZ"];
+    if (_position.x != 0 || _position.y != 0)
+        [w encodePoint: _position forKey: @"position"];
+    if (_zPosition != 0)
+        [w encodeDouble: _zPosition forKey: @"zPosition"];
+    if (!CGRectEqualToRect(_bounds, CGRectZero))
+        [w encodeRect: _bounds forKey: @"bounds"];
+    if (_opacity != 1)
+        [w encodeFloat: _opacity forKey: @"opacity"];
+    if (_opaque)
+        [w encodeBool: YES forKey: @"opaque"];
+    if (_contents != nil)
+        [w encodeContents: _contents forKey: @"contents"];
+    if (_contentsScale != 1)
+        [w encodeDouble: _contentsScale forKey: @"contentsScale"];
+    if (!CGRectEqualToRect(_contentsCenter, CGRectMake(0, 0, 1, 1)))
+        [w encodeRect: _contentsCenter forKey: @"contentsCenter"];
+    if (!CGRectEqualToRect(_contentsRect, CGRectMake(0, 0, 1, 1)))
+        [w encodeRect: _contentsRect forKey: @"contentsRect"];
+    if (![_contentsGravity isEqualToString: kCAGravityResize])
+        [w encodeObject: _contentsGravity forKey: @"contentsGravity"];
+    if (_shadowPath != NULL)
+        [w encodePath: _shadowPath forKey: @"shadowPath"];
+    if (_edgeAntialiasingMask != (kCALayerLeftEdge | kCALayerRightEdge | kCALayerBottomEdge | kCALayerTopEdge))
+        [w encodeInt: _edgeAntialiasingMask forKey: @"edgeAntialiasingMask"];
+    if (_autoresizingMask != 0)
+        [w encodeInt: _autoresizingMask forKey: @"autoresizingMask"];
+    if (!CATransform3DIsIdentity(_transform))
+        [w encodeTransform: _transform forKey: @"transform"];
+    if (!CATransform3DIsIdentity(_sublayerTransform))
+        [w encodeTransform: _sublayerTransform forKey: @"sublayerTransform"];
+    if (![_minificationFilter isEqualToString: kCAFilterLinear])
+        [w encodeObject: _minificationFilter forKey: @"minificationFilter"];
+    if (![_magnificationFilter isEqualToString: kCAFilterLinear])
+        [w encodeObject: _magnificationFilter forKey: @"magnificationFilter"];
+    if (_minificationFilterBias != 0)
+        [w encodeFloat: _minificationFilterBias forKey: @"minificationFilterBias"];
+    if (_backgroundColor != NULL)
+        [w encodeColor: _backgroundColor forKey: @"backgroundColor"];
+    if (_borderColor != NULL && !isOpaqueBlack(_borderColor))
+        [w encodeColor: _borderColor forKey: @"borderColor"];
+    if (_borderWidth != 0)
+        [w encodeDouble: _borderWidth forKey: @"borderWidth"];
+    if (_cornerRadius != 0)
+        [w encodeDouble: _cornerRadius forKey: @"cornerRadius"];
+    if (_masksToBounds)
+        [w encodeBool: YES forKey: @"masksToBounds"];
+    if (_filters != nil)
+        [w encodeArray: _filters forKey: @"filters"];
+    if (_backgroundFilters != nil)
+        [w encodeArray: _backgroundFilters forKey: @"backgroundFilters"];
+    if (_compositingFilter != nil)
+        [w encodeObject: _compositingFilter forKey: @"compositingFilter"];
+    if (_shadowColor != NULL && !isOpaqueBlack(_shadowColor))
+        [w encodeColor: _shadowColor forKey: @"shadowColor"];
+    if (_shadowOpacity != 0)
+        [w encodeFloat: _shadowOpacity forKey: @"shadowOpacity"];
+    if (_shadowRadius != 3)
+        [w encodeDouble: _shadowRadius forKey: @"shadowRadius"];
+    if (_shadowOffset.width != 0 || _shadowOffset.height != -3)
+        [w encodeSize: _shadowOffset forKey: @"shadowOffset"];
+    if (_hidden)
+        [w encodeBool: YES forKey: @"hidden"];
+    if (_geometryFlipped)
+        [w encodeBool: YES forKey: @"geometryFlipped"];
+    if (!_doubleSided)
+        [w encodeBool: NO forKey: @"doubleSided"];
+    if (_shouldRasterize)
+        [w encodeBool: YES forKey: @"shouldRasterize"];
+    if (_rasterizationScale != 1)
+        [w encodeDouble: _rasterizationScale forKey: @"rasterizationScale"];
+    if (_drawsAsynchronously)
+        [w encodeBool: YES forKey: @"drawsAsynchronously"];
+    if (_needsDisplayOnBoundsChange)
+        [w encodeBool: YES forKey: @"needsDisplayOnBoundsChange"];
+    if (_constraints != nil)
+        [w encodeArray: _constraints forKey: @"constraints"];
+    if (_layoutManager != nil)
+        [w encodeObject: _layoutManager forKey: @"layoutManager"];
+    if (_actions != nil)
+        [w encodeObject: _actions forKey: @"actions"];
+    if (_style != nil)
+        [w encodeObject: _style forKey: @"style"];
 }
 
 - initWithCoder: (NSCoder *) coder {
-    CARequireKeyedCoder(coder);
+    CAArchiveReader *reader = [CAArchiveReader readerWithCoder: coder];
     self = [super init];
+    if (self == nil)
+        return nil;
     [self _setDefaults];
-
-    NSSet *layers = [NSSet setWithObjects: [NSArray class], [CALayer class], nil];
-    [self setSublayers: [coder decodeObjectOfClasses: layers forKey: @"sublayers"]];
-    [self setMask: [coder decodeObjectOfClass: [CALayer class] forKey: @"mask"]];
-
-    // Scalars are assigned directly, as in -initWithLayer:.
-    _anchorPoint = CADecodePoint(coder, @"anchorPoint");
-    _position = CADecodePoint(coder, @"position");
-    _bounds = CADecodeRect(coder, @"bounds");
-    _opacity = [coder decodeDoubleForKey: @"opacity"];
-    _opaque = [coder decodeBoolForKey: @"opaque"];
-    _contentsScale = [coder decodeDoubleForKey: @"contentsScale"];
-    _contentsCenter = CADecodeRect(coder, @"contentsCenter");
-    _allowsGroupOpacity = [coder decodeBoolForKey: @"allowsGroupOpacity"];
-    _allowsEdgeAntialiasing = [coder decodeBoolForKey: @"allowsEdgeAntialiasing"];
-    _edgeAntialiasingMask = [coder decodeIntForKey: @"edgeAntialiasingMask"];
-    _transform = CADecodeTransform3D(coder, @"transform");
-    _sublayerTransform = CADecodeTransform3D(coder, @"sublayerTransform");
-    _borderWidth = [coder decodeDoubleForKey: @"borderWidth"];
-    _cornerRadius = [coder decodeDoubleForKey: @"cornerRadius"];
-    _masksToBounds = [coder decodeBoolForKey: @"masksToBounds"];
-    _shadowOpacity = [coder decodeFloatForKey: @"shadowOpacity"];
-    _shadowRadius = [coder decodeDoubleForKey: @"shadowRadius"];
-    _shadowOffset = CADecodeSize(coder, @"shadowOffset");
-    _hidden = [coder decodeBoolForKey: @"hidden"];
-    _needsDisplayOnBoundsChange = [coder decodeBoolForKey: @"needsDisplayOnBoundsChange"];
-    _geometryFlipped = [coder decodeBoolForKey: @"geometryFlipped"];
-
-    Class string = [NSString class];
-    [self setContentsFormat: [coder decodeObjectOfClass: string forKey: @"contentsFormat"]];
-    [self setContentsGravity: [coder decodeObjectOfClass: string forKey: @"contentsGravity"]];
-    [self setCornerCurve: [coder decodeObjectOfClass: string forKey: @"cornerCurve"]];
-    [self setPreferredDynamicRange: [coder decodeObjectOfClass: string forKey: @"preferredDynamicRange"]];
-    [self setToneMapMode: [coder decodeObjectOfClass: string forKey: @"toneMapMode"]];
-    [self setMinificationFilter: [coder decodeObjectOfClass: string forKey: @"minificationFilter"]];
-    [self setMagnificationFilter: [coder decodeObjectOfClass: string forKey: @"magnificationFilter"]];
-    [self setCompositingFilter: [coder decodeObjectOfClass: string forKey: @"compositingFilter"]];
-    [self setName: [coder decodeObjectOfClass: string forKey: @"name"]];
-    NSSet *constraintClasses = [NSSet setWithObjects: [NSArray class], [CAConstraint class], nil];
-    id constraints = [coder decodeObjectOfClasses: constraintClasses forKey: @"constraints"];
-    if (constraints != nil && ![constraints isKindOfClass: [NSArray class]])
-        [NSException raise: NSInvalidUnarchiveOperationException
-                    format: @"Layer constraints %@ are not an array", constraints];
-    for (id constraint in constraints)
-        if (![constraint isKindOfClass: [CAConstraint class]])
-            [NSException raise: NSInvalidUnarchiveOperationException
-                        format: @"Layer constraint %@ is not a CAConstraint", constraint];
-    [self setConstraints: constraints];
-    // Any class may be a layout manager, so the archive decides; it must still be one.
-    id layoutManager = [coder decodeObjectOfClass: [NSObject class] forKey: @"layoutManager"];
-    if (layoutManager != nil && ![layoutManager conformsToProtocol: @protocol(CALayoutManager)])
-        [NSException raise: NSInvalidUnarchiveOperationException
-                    format: @"Layout manager %@ does not conform to CALayoutManager", layoutManager];
-    [self setLayoutManager: layoutManager];
-
-    CGImageRef image = CADecodeImage(coder, @"contents");
-    [self setContents: (id) image];
-    CGImageRelease(image);
-    CGPathRef shadowPath = CADecodePath(coder, @"shadowPath");
-    [self setShadowPath: shadowPath];
-    CGPathRelease(shadowPath);
-
-    CGColorRef color = CADecodeColor(coder, @"backgroundColor");
-    [self setBackgroundColor: color];
-    CGColorRelease(color);
-    color = CADecodeColor(coder, @"borderColor");
-    [self setBorderColor: color];
-    CGColorRelease(color);
-    color = CADecodeColor(coder, @"shadowColor");
-    [self setShadowColor: color];
-    CGColorRelease(color);
+    [self _decodeAttributes: reader];
     return self;
 }
 
+// Keys that are absent keep their defaults. Scalars are assigned directly, since
+// some setters start implicit animations or notify the context.
+- (void) _decodeAttributes: (CAArchiveReader *) r {
+    BOOL flag;
+    int integer;
+    float single;
+    double real;
+    CGPoint point;
+    CGSize size;
+    CGRect rect;
+    CATransform3D transform;
+
+    if ([r decodeBool: &flag forKey: @"allowsEdgeAntialiasing"])
+        _allowsEdgeAntialiasing = flag;
+    if ([r decodeBool: &flag forKey: @"allowsGroupOpacity"])
+        _allowsGroupOpacity = flag;
+    NSString *string = [r decodeStringForKey: @"contentsFormat"];
+    if (string != nil)
+        [self setContentsFormat: string];
+    string = [r decodeStringForKey: @"cornerCurve"];
+    if (string != nil)
+        [self setCornerCurve: string];
+    string = [r decodeStringForKey: @"contentsGravity"];
+    if (string != nil)
+        [self setContentsGravity: string];
+    string = [r decodeStringForKey: @"minificationFilter"];
+    if (string != nil)
+        [self setMinificationFilter: string];
+    string = [r decodeStringForKey: @"magnificationFilter"];
+    if (string != nil)
+        [self setMagnificationFilter: string];
+    string = [r decodeStringForKey: @"name"];
+    if (string != nil)
+        [self setName: string];
+    id compositingFilter = [r decodeObjectOfClasses: [NSSet setWithObjects: [NSString class], nil]
+                                             forKey: @"compositingFilter"];
+    if (compositingFilter != nil)
+        [self setCompositingFilter: compositingFilter];
+
+    if ([r decodePoint: &point forKey: @"anchorPoint"])
+        _anchorPoint = point;
+    if ([r decodePoint: &point forKey: @"position"])
+        _position = point;
+    if ([r decodeDouble: &real forKey: @"anchorPointZ"])
+        _anchorPointZ = real;
+    if ([r decodeDouble: &real forKey: @"zPosition"])
+        _zPosition = real;
+    if ([r decodeRect: &rect forKey: @"bounds"])
+        _bounds = rect;
+    if ([r decodeFloat: &single forKey: @"opacity"])
+        _opacity = single;
+    if ([r decodeBool: &flag forKey: @"opaque"])
+        _opaque = flag;
+    if ([r decodeDouble: &real forKey: @"contentsScale"])
+        _contentsScale = real;
+    if ([r decodeRect: &rect forKey: @"contentsCenter"])
+        _contentsCenter = rect;
+    if ([r decodeRect: &rect forKey: @"contentsRect"])
+        _contentsRect = rect;
+    if ([r decodeInt: &integer forKey: @"edgeAntialiasingMask"])
+        _edgeAntialiasingMask = integer;
+    if ([r decodeInt: &integer forKey: @"autoresizingMask"])
+        _autoresizingMask = integer;
+    if ([r decodeTransform: &transform forKey: @"transform"])
+        _transform = transform;
+    if ([r decodeTransform: &transform forKey: @"sublayerTransform"])
+        _sublayerTransform = transform;
+    if ([r decodeFloat: &single forKey: @"minificationFilterBias"])
+        _minificationFilterBias = single;
+    if ([r decodeDouble: &real forKey: @"borderWidth"])
+        _borderWidth = real;
+    if ([r decodeDouble: &real forKey: @"cornerRadius"])
+        _cornerRadius = real;
+    if ([r decodeBool: &flag forKey: @"masksToBounds"])
+        _masksToBounds = flag;
+    if ([r decodeFloat: &single forKey: @"shadowOpacity"])
+        _shadowOpacity = single;
+    if ([r decodeDouble: &real forKey: @"shadowRadius"])
+        _shadowRadius = real;
+    if ([r decodeSize: &size forKey: @"shadowOffset"])
+        _shadowOffset = size;
+    if ([r decodeBool: &flag forKey: @"hidden"])
+        _hidden = flag;
+    if ([r decodeBool: &flag forKey: @"geometryFlipped"])
+        _geometryFlipped = flag;
+    if ([r decodeBool: &flag forKey: @"doubleSided"])
+        _doubleSided = flag;
+    if ([r decodeBool: &flag forKey: @"shouldRasterize"])
+        _shouldRasterize = flag;
+    if ([r decodeDouble: &real forKey: @"rasterizationScale"])
+        _rasterizationScale = real;
+    if ([r decodeBool: &flag forKey: @"drawsAsynchronously"])
+        _drawsAsynchronously = flag;
+    if ([r decodeBool: &flag forKey: @"needsDisplayOnBoundsChange"])
+        _needsDisplayOnBoundsChange = flag;
+
+    // The copies below have no context yet, so the setters only retain or copy.
+    CGColorRef color = [r copyColorForKey: @"backgroundColor"];
+    if (color != NULL) {
+        [self setBackgroundColor: color];
+        CGColorRelease(color);
+    }
+    color = [r copyColorForKey: @"borderColor"];
+    if (color != NULL) {
+        [self setBorderColor: color];
+        CGColorRelease(color);
+    }
+    color = [r copyColorForKey: @"shadowColor"];
+    if (color != NULL) {
+        [self setShadowColor: color];
+        CGColorRelease(color);
+    }
+    CGPathRef path = [r copyPathForKey: @"shadowPath"];
+    if (path != NULL) {
+        [self setShadowPath: path];
+        CGPathRelease(path);
+    }
+    id contents = [r copyContentsForKey: @"contents"];
+    if (contents != nil) {
+        [self setContents: contents];
+        [contents release];
+    }
+
+    NSArray *array = [r decodeArrayForKey: @"filters"];
+    if (array != nil)
+        [self setFilters: array];
+    array = [r decodeArrayForKey: @"backgroundFilters"];
+    if (array != nil)
+        [self setBackgroundFilters: array];
+    array = [r decodeArrayForKey: @"constraints"];
+    if (array != nil)
+        [self setConstraints: array];
+    // Any class may be a layout manager, so the archive names it; it must
+    // conform to CALayoutManager and be a coding class of ours or the application's.
+    id layoutManager = [r decodeObjectOfClasses: [NSSet setWithObjects: [CAConstraintLayoutManager class], nil]
+                                         forKey: @"layoutManager"];
+    if (layoutManager != nil)
+        [self setLayoutManager: layoutManager];
+    NSDictionary *dictionary = [r decodeObjectOfClasses: [NSSet setWithObjects: [NSDictionary class], [NSString class],
+                                                                                [NSNumber class], [NSNull class], nil]
+                                                 forKey: @"actions"];
+    if ([dictionary isKindOfClass: [NSDictionary class]])
+        [self setActions: dictionary];
+    dictionary = [r decodeObjectOfClasses: [NSSet setWithObjects: [NSDictionary class], [NSString class],
+                                                                  [NSNumber class], [NSNull class], nil]
+                                   forKey: @"style"];
+    if ([dictionary isKindOfClass: [NSDictionary class]])
+        [self setStyle: dictionary];
+
+    CALayer *mask = [r decodeObjectOfClasses: [NSSet setWithObject: [CALayer class]] forKey: @"mask"];
+    if (mask != nil)
+        [self setMask: mask];
+    array = [r decodeArrayForKey: @"sublayers"];
+    if (array != nil)
+        [self setSublayers: array];
+}
+
 - (void) dealloc {
+    for (CALayer *layer in _sublayers)
+        layer->_superlayer = nil;
     [_sublayers release];
     [_name release];
     [_layoutManager release];
     [_constraints release];
-    [_actions release];
     [_animations release];
     [_minificationFilter release];
     [_magnificationFilter release];
     [_contentsFormat release];
     [_contentsGravity release];
     [_cornerCurve release];
-    [_preferredDynamicRange release];
-    [_toneMapMode release];
     if (_shadowPath)
         CGPathRelease(_shadowPath);
     [_mask release];
     [_filters release];
     [_compositingFilter release];
+    [_backgroundFilters release];
+    [_actions release];
+    [_style release];
     if (_shadowColor)
         CGColorRelease(_shadowColor);
+    [_preferredDynamicRange release];
+    [_toneMapMode release];
     if (_backgroundColor)
         CGColorRelease(_backgroundColor);
     if (_borderColor)
@@ -834,6 +1028,111 @@ static void replaceColor(CGColorRef *slot, CGColorRef value) {
     [_context startTimerIfNeeded];
 }
 
+- (CAAutoresizingMask) autoresizingMask {
+    return _autoresizingMask;
+}
+
+- (void) setAutoresizingMask: (CAAutoresizingMask) value {
+    _autoresizingMask = value;
+}
+
+- (CGFloat) zPosition {
+    return _zPosition;
+}
+
+- (void) setZPosition: (CGFloat) value {
+    _zPosition = value;
+    [_context startTimerIfNeeded];
+}
+
+- (CGFloat) anchorPointZ {
+    return _anchorPointZ;
+}
+
+- (void) setAnchorPointZ: (CGFloat) value {
+    _anchorPointZ = value;
+    [_context startTimerIfNeeded];
+}
+
+- (CGRect) contentsRect {
+    return _contentsRect;
+}
+
+- (void) setContentsRect: (CGRect) value {
+    _contentsRect = value;
+    [_context startTimerIfNeeded];
+}
+
+- (float) minificationFilterBias {
+    return _minificationFilterBias;
+}
+
+- (void) setMinificationFilterBias: (float) value {
+    _minificationFilterBias = value;
+}
+
+- (NSArray *) backgroundFilters {
+    return _backgroundFilters;
+}
+
+- (void) setBackgroundFilters: (NSArray *) value {
+    value = [value copy];
+    [_backgroundFilters release];
+    _backgroundFilters = value;
+}
+
+- (BOOL) isDoubleSided {
+    return _doubleSided;
+}
+
+- (void) setDoubleSided: (BOOL) value {
+    _doubleSided = value;
+}
+
+- (BOOL) shouldRasterize {
+    return _shouldRasterize;
+}
+
+- (void) setShouldRasterize: (BOOL) value {
+    _shouldRasterize = value;
+}
+
+- (CGFloat) rasterizationScale {
+    return _rasterizationScale;
+}
+
+- (void) setRasterizationScale: (CGFloat) value {
+    _rasterizationScale = value;
+}
+
+- (BOOL) drawsAsynchronously {
+    return _drawsAsynchronously;
+}
+
+- (void) setDrawsAsynchronously: (BOOL) value {
+    _drawsAsynchronously = value;
+}
+
+- (NSDictionary *) actions {
+    return _actions;
+}
+
+- (void) setActions: (NSDictionary *) value {
+    value = [value copy];
+    [_actions release];
+    _actions = value;
+}
+
+- (NSDictionary *) style {
+    return _style;
+}
+
+- (void) setStyle: (NSDictionary *) value {
+    value = [value copy];
+    [_style release];
+    _style = value;
+}
+
 - (void) _setSuperLayer: (CALayer *) parent {
     _superlayer = parent;
 }
@@ -882,16 +1181,60 @@ static void replaceColor(CGColorRef *slot, CGColorRef value) {
     [_context startTimerIfNeeded];
 }
 
+- (void) insertSublayer: (CALayer *) layer below: (CALayer *) sibling {
+    [self _insertSublayer: layer nextTo: sibling above: NO];
+}
+
+- (void) insertSublayer: (CALayer *) layer above: (CALayer *) sibling {
+    [self _insertSublayer: layer nextTo: sibling above: YES];
+}
+
+- (void) _insertSublayer: (CALayer *) layer
+                  nextTo: (CALayer *) sibling
+                   above: (BOOL) above
+{
+    if (layer == sibling)
+        return;
+
+    // Take the layer out first, so that the sibling's index is the one it
+    // has once the layer is no longer in the array.
+    [layer retain];
+    if (layer != nil && [layer superlayer] == self)
+        [layer removeFromSuperlayer];
+
+    NSUInteger index = [_sublayers indexOfObjectIdenticalTo: sibling];
+    if (index == NSNotFound) {
+        [layer autorelease];
+        [NSException raise: NSInvalidArgumentException
+                    format: @"The sibling layer is not a sublayer of this layer"];
+    }
+
+    [self insertSublayer: layer atIndex: (unsigned int) (above ? index + 1 : index)];
+    [layer release];
+}
+
 - (void) replaceSublayer: (CALayer *) layer with: (CALayer *) other {
+    if (layer == other)
+        return;
+    if ([_sublayers indexOfObjectIdenticalTo: layer] == NSNotFound)
+        return;
+    if (other == nil) {
+        [layer removeFromSuperlayer];
+        return;
+    }
+
+    [other retain];
+    if ([other superlayer] != nil)
+        [other removeFromSuperlayer];
+
     NSMutableArray *layers = [_sublayers mutableCopy];
-    NSUInteger index = [_sublayers indexOfObjectIdenticalTo: layer];
-
-    [layers replaceObjectAtIndex: index withObject: other];
-
+    [layers replaceObjectAtIndex: [layers indexOfObjectIdenticalTo: layer]
+                      withObject: other];
+    // Clears the replaced layer's superlayer and context.
     [self setSublayers: layers];
     [layers release];
-
-    layer->_superlayer = nil;
+    [other release];
+    [_context startTimerIfNeeded];
 }
 
 // Draws the layer's content with -drawInContext: (or the delegate's
@@ -1023,9 +1366,8 @@ static void replaceColor(CGColorRef *slot, CGColorRef value) {
 }
 
 - (void) addAnimation: (CAAnimation *) animation forKey: (NSString *) key {
-    if (_context == nil)
-        return;
-
+    // The animation is recorded for any layer, also one that is not part of a
+    // hosted layer tree; the context, if there is one, starts driving it.
     [_animations setObject: animation forKey: key];
     [_context startTimerIfNeeded];
 }
@@ -1076,26 +1418,51 @@ static char CALayerUndefinedValuesKey;
     return [super valueForKey: key];
 }
 
-- (NSDictionary *) actions {
-    return _actions;
+static id<CAAction> actionInStyle(NSDictionary *style, NSString *key) {
+    for (; style != nil; style = [style objectForKey: @"style"]) {
+        if (![style isKindOfClass: [NSDictionary class]])
+            return nil;
+        id actions = [style objectForKey: @"actions"];
+        id action = [actions isKindOfClass: [NSDictionary class]]
+                        ? [actions objectForKey: key] : nil;
+        if (action != nil)
+            return action;
+    }
+    return nil;
 }
 
-- (void) setActions: (NSDictionary *) actions {
-    if (_actions != actions) {
-        [_actions release];
-        _actions = [actions copy];
-    }
++ (id<CAAction>) defaultActionForKey: (NSString *) key {
+    return nil;
 }
 
 - (id<CAAction>) actionForKey: (NSString *) key {
-    if (_actions != nil) {
-        id customAction = [_actions objectForKey: key];
-        if (customAction != nil) {
-            if (customAction == (id)[NSNull null])
-                return nil;
-            return customAction;
-        }
-    }
+    id<CAAction> action = nil;
+
+    if ([_delegate respondsToSelector: @selector(actionForLayer:forKey:)])
+        action = [_delegate actionForLayer: self forKey: key];
+    if (action == nil)
+        action = [_actions objectForKey: key];
+    if (action == nil)
+        action = actionInStyle(_style, key);
+    if (action == nil)
+        action = [[self class] defaultActionForKey: key];
+    if (action != nil)
+        return [(id) action isKindOfClass: [NSNull class]] ? nil : action;
+
+    // QUIRK: the implicit action for a property change exists only while the
+    // layer belongs to a layer tree hosted by a window (it has a layer
+    // context). A layer outside such a tree returns nil, with or without an
+    // explicitly begun transaction, so its property changes never animate.
+    // The documentation does not say when implicit actions apply. Evidence:
+    // black-box observation on macOS 26.7.3 (tier 2): a standalone layer, a
+    // sublayer of a standalone root and an off-window view's backing layer
+    // return nil from -actionForKey: and gain no animation keys, while a
+    // sublayer in a window-hosted tree gets an implicit action. macOS 10.14.4
+    // behaves the same.
+    // Test: quartzcore-implicit-actions (standalone and window-hosted cases).
+    if (_context == nil)
+        return nil;
+
     CABasicAnimation *basic = [CABasicAnimation animationWithKeyPath: key];
 
     [basic setFromValue: [self valueForKey: key]];
@@ -1123,12 +1490,30 @@ static char CALayerUndefinedValuesKey;
     _textureContents = value;
 }
 
+- (uint32_t) _textureSeed {
+    return _textureSeed;
+}
+
+- (void) _setTextureSeed: (uint32_t) value {
+    _textureSeed = value;
+}
+
 - (BOOL) _drawsOwnContent {
     return NO;
 }
 
 - (BOOL) _drawLayerContents: (CGRect) bounds opacity: (CGFloat) opacity {
     return NO;
+}
+
+@end
+
+@implementation NSNull (CAActionAdditions)
+
+- (void) runActionForKey: (NSString *) event
+                  object: (id) anObject
+               arguments: (NSDictionary *) dict
+{
 }
 
 @end

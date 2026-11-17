@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <CoreGraphics/CGSubWindow.h>
 #import <Foundation/NSObject.h>
 #import <OpenGL/CGLInternal.h>
@@ -24,23 +25,43 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @class NSOpenGLPixelFormat, NSOpenGLPixelBuffer, NSView;
 
-typedef enum {
-    NSOpenGLCPSwapRectangle = 200,
-    NSOpenGLCPSwapRectangleEnable = 201,
-    NSOpenGLCPRasterizationEnable = 221,
-    NSOpenGLCPSwapInterval = 222,
-    NSOpenGLCPSurfaceOrder = 235,
-    NSOpenGLCPSurfaceOpacity = 236,
-    NSOpenGLCPStateValidation = 301,
-} NSOpenGLContextParameter;
+typedef NS_ENUM(NSInteger, NSOpenGLContextParameter) {
+    NSOpenGLContextParameterSwapRectangle = 200,
+    NSOpenGLContextParameterSwapRectangleEnable = 201,
+    NSOpenGLContextParameterRasterizationEnable = 221,
+    NSOpenGLContextParameterSwapInterval = 222,
+    NSOpenGLContextParameterSurfaceOrder = 235,
+    NSOpenGLContextParameterSurfaceOpacity = 236,
+    NSOpenGLContextParameterStateValidation = 301,
+};
 
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSOpenGLCPSwapRectangle = NSOpenGLContextParameterSwapRectangle,
+    NSOpenGLCPSwapRectangleEnable = NSOpenGLContextParameterSwapRectangleEnable,
+    NSOpenGLCPRasterizationEnable = NSOpenGLContextParameterRasterizationEnable,
+    NSOpenGLCPSwapInterval = NSOpenGLContextParameterSwapInterval,
+    NSOpenGLCPSurfaceOrder = NSOpenGLContextParameterSurfaceOrder,
+    NSOpenGLCPSurfaceOpacity = NSOpenGLContextParameterSurfaceOpacity,
+    NSOpenGLCPStateValidation = NSOpenGLContextParameterStateValidation,
+};
+
+#define _NS_SIDE_NSOpenGLContext 0, 1,
+// Legacy ObjC ABI (i386): instance size must stay 0xc, Apple's; the ivars
+// before the extras keep their position in the original order. The CGL context
+// is the one at offset 8: code written against the original layout reads it
+// from there directly (the _contextAuxiliary ivar). Add new state to the
+// extra struct (kept in side storage, no room left for a pointer), never as
+// an ivar.
 @interface NSOpenGLContext : NSObject {
     NSOpenGLPixelFormat *_pixelFormat;
-    NSView *_view;
     void *_glContext;
-    CGSubWindow *_subwindow;
-    CGLWindowRef _cglWindow;
-    BOOL _hasPrepared, _drawableAttachmentSucceeded;
+    NS_EXTRA_IVARS_BEGIN(NSOpenGLContext)
+        NSView *_view;
+        CGSubWindow *_subwindow;
+        CGLWindowRef _cglWindow;
+        BOOL _hasPrepared, _drawableAttachmentSucceeded;
+    NS_SIDE_IVARS_END(NSOpenGLContext)
 }
 
 + (NSOpenGLContext *) currentContext;

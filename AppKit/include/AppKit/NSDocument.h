@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSUserInterfaceValidation.h>
 #import <Foundation/Foundation.h>
 
@@ -33,7 +34,7 @@ typedef enum NSDocumentChangeType : NSUInteger {
     NSChangeDiscardable = 256,
 } NSDocumentChangeType;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSSaveOperationType) {
     NSSaveOperation,
     NSSaveAsOperation,
     NSSaveToOperation,
@@ -41,23 +42,31 @@ typedef enum {
     NSAutosaveInPlaceOperation,
     NSAutosaveAsOperation,
     NSAutosaveOperation,
-} NSSaveOperationType;
+};
 
+// Legacy ObjC ABI (i386): instance size must stay 0x34, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSDocument : NSObject {
-    NSMutableArray *_windowControllers;
-    NSURL *_fileURL;
-    NSString *_fileType;
-    NSDate *_fileModificationDate;
-    NSString *_lastComponentOfFileName;
-    NSURL *_autosavedContentsFileURL;
-    NSPrintInfo *_printInfo;
-    int _changeCount;
-    unsigned _untitledNumber;
-    NSUndoManager *_undoManager;
-    BOOL _hasUndoManager;
-    NSMutableArray *_activeEditors; // registered via NSEditorRegistration
-    BOOL _autosaveScheduled;
-    BOOL _draft;
+    NS_LEGACY_IVAR_PAD(_NSDocumentReserved1, 44)
+    NS_EXTRA_IVARS_BEGIN(NSDocument)
+        NSMutableArray *_windowControllers;
+        NSURL *_fileURL;
+        NSString *_fileType;
+        NSDate *_fileModificationDate;
+        NSString *_lastComponentOfFileName;
+        NSURL *_autosavedContentsFileURL;
+        NSPrintInfo *_printInfo;
+        int _changeCount;
+        unsigned _untitledNumber;
+        NSUndoManager *_undoManager;
+        BOOL _hasUndoManager;
+        NSMutableArray *_activeEditors; // registered via NSEditorRegistration
+        BOOL _draft;
+        BOOL _autosaveScheduled;
+        NSString *_displayName;
+        BOOL _displayNameReset;
+    NS_EXTRA_IVARS_END(NSDocument)
 }
 
 + (NSArray *) readableTypes;
@@ -75,21 +84,14 @@ typedef enum {
                    ofType: (NSString *) type
                     error: (NSError **) error;
 
-- (NSURL *) autosavedContentsFileURL;
-- (NSDate *) fileModificationDate;
-- (NSURL *) fileURL;
-- (NSPrintInfo *) printInfo;
-- (NSString *) fileType;
-- (BOOL) hasUndoManager;
-- (NSUndoManager *) undoManager;
+@property(nonatomic, copy) NSURL *autosavedContentsFileURL;
+@property(nonatomic, retain) NSDate *fileModificationDate;
+@property(nonatomic, copy) NSURL *fileURL;
+@property(nonatomic, retain) NSPrintInfo *printInfo;
+@property(nonatomic, copy) NSString *fileType;
+@property(nonatomic) BOOL hasUndoManager;
+@property(nonatomic, retain) NSUndoManager *undoManager;
 
-- (void) setAutosavedContentsFileURL: (NSURL *) url;
-- (void) setFileModificationDate: (NSDate *) value;
-- (void) setFileURL: (NSURL *) url;
-- (void) setPrintInfo: (NSPrintInfo *) value;
-- (void) setFileType: (NSString *) value;
-- (void) setHasUndoManager: (BOOL) value;
-- (void) setUndoManager: (NSUndoManager *) value;
 
 - (BOOL) hasUnautosavedChanges;
 - (NSString *) autosavingFileType;
@@ -108,11 +110,11 @@ typedef enum {
 - (void) removeWindowController: (NSWindowController *) controller;
 
 - (NSString *) displayName;
+- (void) setDisplayName: (NSString *) displayNameOrNil;
 - (NSWindow *) windowForSheet;
 
 - (BOOL) isDocumentEdited;
-- (BOOL) isDraft;
-- (void) setDraft: (BOOL) value;
+@property(nonatomic, getter=isDraft) BOOL draft;
 - (void) updateChangeCount: (NSDocumentChangeType) changeType;
 
 - (BOOL) readFromData: (NSData *) data
@@ -234,7 +236,7 @@ typedef enum {
 - (NSDictionary *) fileAttributesToWriteToFile: (NSString *) path
                                         ofType: (NSString *) type
                                  saveOperation: (NSSaveOperationType) operation;
-- (NSString *) fileName;
+@property(nonatomic, copy) NSString *fileName;
 - (NSString *) fileNameFromRunningSavePanelForSaveOperation:
         (NSSaveOperationType) operation;
 - (NSFileWrapper *) fileWrapperRepresentationOfType: (NSString *) type;
@@ -251,7 +253,6 @@ typedef enum {
 - (int) runModalSavePanel: (NSSavePanel *) savePanel
         withAccessoryView: (NSView *) accessoryView;
 - (int) runModalPageLayoutWithPrintInfo: (NSPrintInfo *) printInfo;
-- (void) setFileName: (NSString *) path;
 - (void) saveToFile: (NSString *) path
           saveOperation: (NSSaveOperationType) operation
                delegate: delegate

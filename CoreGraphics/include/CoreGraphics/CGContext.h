@@ -57,6 +57,7 @@ typedef CF_ENUM(int32_t, CGInterpolationQuality) {
     kCGInterpolationNone,
     kCGInterpolationLow,
     kCGInterpolationHigh,
+    kCGInterpolationMedium = 4,
 };
 
 typedef CF_ENUM(int32_t, CGBlendMode) {
@@ -105,6 +106,9 @@ COREGRAPHICS_EXPORT void CGContextSetAllowsAntialiasing(CGContextRef context,
 // layers
 COREGRAPHICS_EXPORT void
 CGContextBeginTransparencyLayer(CGContextRef context, CFDictionaryRef unused);
+COREGRAPHICS_EXPORT void
+CGContextBeginTransparencyLayerWithRect(CGContextRef context, CGRect rect,
+                                        CFDictionaryRef auxiliaryInfo);
 COREGRAPHICS_EXPORT void CGContextEndTransparencyLayer(CGContextRef context);
 
 // path
@@ -155,8 +159,10 @@ COREGRAPHICS_EXPORT CGPathRef CGContextCopyPath(CGContextRef context);
 
 // gstate
 
-COREGRAPHICS_EXPORT void CGContextSaveGState(CGContextRef context);
-COREGRAPHICS_EXPORT void CGContextRestoreGState(CGContextRef context);
+COREGRAPHICS_EXPORT void CGContextSaveGState(CGContextRef context)
+    CF_SWIFT_NAME(CGContext.saveGState(self:));
+COREGRAPHICS_EXPORT void CGContextRestoreGState(CGContextRef context)
+    CF_SWIFT_NAME(CGContext.restoreGState(self:));
 
 COREGRAPHICS_EXPORT CGAffineTransform
 CGContextGetUserSpaceToDeviceSpaceTransform(CGContextRef context);
@@ -230,7 +236,8 @@ COREGRAPHICS_EXPORT void CGContextSetFillColor(CGContextRef context,
 COREGRAPHICS_EXPORT void CGContextSetFillColorWithColor(CGContextRef context,
                                                         CGColorRef color);
 COREGRAPHICS_EXPORT void CGContextSetGrayFillColor(CGContextRef context,
-                                                   CGFloat gray, CGFloat alpha);
+                                                   CGFloat gray, CGFloat alpha)
+    CF_SWIFT_NAME(CGContext.setFillColor(self:gray:alpha:));
 COREGRAPHICS_EXPORT void CGContextSetRGBFillColor(CGContextRef context,
                                                   CGFloat r, CGFloat g,
                                                   CGFloat b, CGFloat alpha);

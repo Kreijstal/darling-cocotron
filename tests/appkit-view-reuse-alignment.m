@@ -10,21 +10,28 @@ static void expect(BOOL condition, NSString *message)
     }
 }
 
-@interface InsetView : NSView
+@interface InsetView : NSView {
+    BOOL _flippedView;
+}
 @property BOOL flippedView;
 @end
 
 @implementation InsetView
+@synthesize flippedView = _flippedView;
 - (BOOL)isFlipped { return self.flippedView; }
 - (NSEdgeInsets)alignmentRectInsets { return NSEdgeInsetsMake(1, 2, 3, 4); }
 @end
 
-@interface CountingView : NSView
+@interface CountingView : NSView {
+    BOOL _updates;
+    NSInteger _draws, _layerUpdates;
+}
 @property BOOL updates;
 @property NSInteger draws, layerUpdates;
 @end
 
 @implementation CountingView
+@synthesize updates = _updates, draws = _draws, layerUpdates = _layerUpdates;
 - (BOOL)wantsUpdateLayer { return self.updates; }
 - (void)updateLayer { self.layerUpdates++; }
 - (void)drawRect:(NSRect)rect { self.draws++; }
@@ -53,9 +60,9 @@ int main(void)
                @"the two conversions are inverses");
 
         plain.alphaValue = 0.25;
-        plain.hidden = YES;
+        [plain setHidden: YES];
         [plain prepareForReuse];
-        expect(plain.alphaValue == 1.0 && !plain.hidden, @"prepareForReuse makes the view visible and opaque");
+        expect(plain.alphaValue == 1.0 && ![plain isHidden], @"prepareForReuse makes the view visible and opaque");
 
         expect(!plain.wantsUpdateLayer, @"views draw with drawRect: by default");
         NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 100, 100)

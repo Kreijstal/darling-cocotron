@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSClipView.h>
+#import "NSCoder+AppKit.h"
 #import <AppKit/NSColor.h>
 #import <AppKit/NSCursor.h>
 #import <AppKit/NSEvent.h>
@@ -39,10 +40,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         NSKeyedUnarchiver *keyed = (NSKeyedUnarchiver *) coder;
         unsigned flags = [keyed decodeIntForKey: @"NScvFlags"];
 
-        _drawsBackground = (flags & 0x04) ? YES : NO;
+        NS_EXTRA(NSClipView, self)->_drawsBackground = (flags & 0x04) ? YES : NO;
         _backgroundColor = [[keyed decodeObjectForKey: @"NSBGColor"] retain];
         _docView = [[keyed decodeObjectForKey: @"NSDocView"] retain];
-        _automaticallyAdjustsContentInsets =
+        NS_EXTRA(NSClipView, self)->_automaticallyAdjustsContentInsets =
                 [keyed containsValueForKey: @"NSAutomaticallyAdjustsContentInsets"]
                         ? [keyed decodeBoolForKey: @"NSAutomaticallyAdjustsContentInsets"]
                         : YES;
@@ -59,38 +60,85 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                        name: NSViewBoundsDidChangeNotification
                      object: _docView];
     } else {
+        // Layouts per class version as recorded from Mac archives, with the same grouping
+        // of the decode calls. From version 17 the document view, background colour and
+        // document cursor come first (as one object, then a group of two from 41, as
+        // three objects before), then bytes: one of unknown meaning, one that is set when
+        // the view does not copy on scroll and, from 18, one that is set when the view
+        // draws its background (always drawn at 17). Versions 4 to 16 have a group of
+        // document view, background colour, a short and the cursor; versions 0 to 3 are
+        // read and kept only in their sequence (their values are not interpreted).
         NSInteger version = [coder versionForClassName: @"NSClipView"];
-        NSLog(@"[NSClipView initWithCoder] unkeyed version=%ld", (long)version);
+        id docView = nil, background = nil, cursor = nil;
+        char unknownByte = 0, noCopy = 0, drawsBackground = 1;
+
         [self setAutoresizesSubviews: YES];
 
-        _backgroundColor = [[coder decodeObject] retain];
-
-        id docCursor = nil;
-        id docView = nil;
-        uint8_t copyOnScroll = 0, drawsBg = 0, flag3 = 0;
-
-        [coder decodeValuesOfObjCTypes: "@@ccc", &docCursor, &docView,
-                                        &copyOnScroll, &drawsBg, &flag3];
-
-        if ([docCursor isKindOfClass: [NSColor class]]) {
-            _backgroundColor = [docCursor retain];
-        } else if ([docCursor isKindOfClass: [NSCursor class]]) {
-            _documentCursor = [docCursor retain];
-        }
-
-        if ([docView isKindOfClass: [NSView class]]) {
-            [self setDocumentView: docView];
-        } else if ([[self subviews] count] > 0) {
-            NSView *document = [[self subviews] objectAtIndex: 0];
-            if ([document isKindOfClass: [NSView class]]) {
-                [document retain];
-                [document removeFromSuperview];
-                [self setDocumentView: document];
-                [document release];
+        if (version >= 41) {
+            docView = [[coder decodeObject] retain];
+            [coder decodeValuesOfObjCTypes: "@@ccc", &background, &cursor, &unknownByte, &noCopy, &drawsBackground];
+        } else if (version >= 17) {
+            docView = [[coder decodeObject] retain];
+            background = [[coder decodeObject] retain];
+            cursor = [[coder decodeObject] retain];
+            [coder decodeValuesOfObjCTypes: "c", &unknownByte];
+            [coder decodeValuesOfObjCTypes: "c", &noCopy];
+            if (version >= 18) {
+                [coder decodeValuesOfObjCTypes: "c", &drawsBackground];
+            }
+        } else if (version >= 4) {
+            short unknownShort = 0;
+            [coder decodeValuesOfObjCTypes: "@@s@", &docView, &background, &unknownShort, &cursor];
+        } else {
+            // Values of unknown meaning.
+            float unknownFloat = 0;
+            short unknownShort = 0;
+            char unknownChar = 0;
+            id unknownObject = nil;
+            if (version == 0) {
+                [coder decodeValuesOfObjCTypes: "fc", &unknownFloat, &unknownChar];
+            } else {
+                [coder decodeValuesOfObjCTypes: "@fs", &unknownObject, &unknownFloat, &unknownShort];
+                [unknownObject release];
+                if (version >= 2) {
+                    [coder decodeNXColor];
+                }
+                if (version >= 3) {
+                    unknownObject = nil;
+                    [coder decodeValuesOfObjCTypes: "@", &unknownObject];
+                    [unknownObject release];
+                }
             }
         }
-        _copiesOnScroll = copyOnScroll ? YES : NO;
-        _drawsBackground = drawsBg ? YES : NO;
+
+        if ([background isKindOfClass: [NSColor class]]) {
+            _backgroundColor = background;
+        } else {
+            [background release];
+            _backgroundColor = [[NSColor controlBackgroundColor] retain];
+        }
+        if ([cursor isKindOfClass: [NSCursor class]]) {
+            _documentCursor = cursor;
+        } else {
+            [cursor release];
+        }
+        NS_EXTRA(NSClipView, self)->_copiesOnScroll = noCopy ? NO : YES;
+        NS_EXTRA(NSClipView, self)->_drawsBackground = drawsBackground ? YES : NO;
+
+        // The document view is already a subview from NSView decoding.
+        if ([docView isKindOfClass: [NSView class]]) {
+            _docView = docView;
+            [[NSNotificationCenter defaultCenter] addObserver: self
+                                                     selector: @selector(viewFrameChanged:)
+                                                         name: NSViewFrameDidChangeNotification
+                                                       object: _docView];
+            [[NSNotificationCenter defaultCenter] addObserver: self
+                                                     selector: @selector(viewBoundsChanged:)
+                                                         name: NSViewBoundsDidChangeNotification
+                                                       object: _docView];
+        } else {
+            [docView release];
+        }
     }
     return self;
 }
@@ -98,8 +146,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - initWithFrame: (NSRect) frame {
     [super initWithFrame: frame];
     _backgroundColor = [[NSColor controlBackgroundColor] retain];
-    _drawsBackground = YES;
-    _automaticallyAdjustsContentInsets = YES;
+    NS_EXTRA(NSClipView, self)->_drawsBackground = YES;
+    NS_EXTRA(NSClipView, self)->_automaticallyAdjustsContentInsets = YES;
     return self;
 }
 
@@ -107,32 +155,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [[NSNotificationCenter defaultCenter] removeObserver: self];
     [_backgroundColor release];
     [_docView release];
+    NS_EXTRA_FREE(NSClipView, self);
     [super dealloc];
 }
 
 - (BOOL) drawsBackground {
-    return _drawsBackground;
-}
-
-// Stored only: document view layout doesn't apply content insets yet.
-- (BOOL) automaticallyAdjustsContentInsets {
-    return _automaticallyAdjustsContentInsets;
-}
-
-- (void) setAutomaticallyAdjustsContentInsets: (BOOL) value {
-    _automaticallyAdjustsContentInsets = value;
-}
-
-- (NSEdgeInsets) contentInsets {
-    return _contentInsets;
-}
-
-- (void) setContentInsets: (NSEdgeInsets) insets {
-    _contentInsets = insets;
+    return NS_EXTRA(NSClipView, self)->_drawsBackground;
 }
 
 - (BOOL) copiesOnScroll {
-    return _copiesOnScroll;
+    return NS_EXTRA(NSClipView, self)->_copiesOnScroll;
 }
 
 - (NSColor *) backgroundColor {
@@ -148,12 +180,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) setDrawsBackground: (BOOL) value {
-    _drawsBackground = value;
+    NS_EXTRA(NSClipView, self)->_drawsBackground = value;
     [self setNeedsDisplay: YES];
 }
 
 - (void) setCopiesOnScroll: (BOOL) value {
-    _copiesOnScroll = value;
+    NS_EXTRA(NSClipView, self)->_copiesOnScroll = value;
 }
 
 - (void) setBackgroundColor: (NSColor *) color {
@@ -270,7 +302,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (BOOL) isOpaque {
-    return _drawsBackground && [_backgroundColor alphaComponent] >= 1.;
+    return NS_EXTRA(NSClipView, self)->_drawsBackground && [_backgroundColor alphaComponent] >= 1.;
 }
 
 - (BOOL) isFlipped {

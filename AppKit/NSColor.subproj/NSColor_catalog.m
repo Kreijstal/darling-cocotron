@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @interface NSColor (NSAppKitPrivate)
 - (CGColorRef) CGColorRef;
+- (NSColor *) _resolvedColor;
 @end
 
 void NSColorSetCatalogColor(NSColorListName catalogName, NSColorName colorName,
@@ -99,8 +100,31 @@ NSColor *NSColorGetCatalogColor(NSColorListName catalogName,
                                         color: color] autorelease];
 }
 
++ (NSColor *) colorWithArchivedCatalogName: (NSColorListName) catalogName
+                                 colorName: (NSColorName) colorName
+                             fallbackColor: (NSColor *) fallback
+{
+    NSColor *named = NSColorGetCatalogColor(catalogName, colorName);
+
+    return [[[self alloc] initWithCatalogName: catalogName
+                                    colorName: colorName
+                                        color: named ? named : fallback]
+            autorelease];
+}
+
 - (NSColorSpaceName) colorSpaceName {
     return NSNamedColorSpace;
+}
+
+- (NSColorSpace *) colorSpace {
+    // QUIRK: a catalog color has no color space of its own; asking for it raises
+    // NSInvalidArgumentException (convert the color to a color space first). Not documented.
+    // Evidence: black-box observation on macOS 26.7.3 (tier 2, MAC-EVIDENCE MC26.5).
+    // Test: tests/appkit-api-batch.m (catalog color colorSpace raises)
+    [NSException raise: NSInvalidArgumentException
+                format: @"-[%@ colorSpace]: catalog colors have no color space; convert the color first",
+                        NSStringFromClass([self class])];
+    return nil;
 }
 
 - (NSColorListName) catalogNameComponent {
@@ -150,10 +174,9 @@ NSColor *NSColorGetCatalogColor(NSColorListName catalogName,
     [_color setStroke];
 }
 
-- (NSColor *) highlightWithLevel: (CGFloat) level {
-    level = MIN(1.0, MAX(0.0, level));
-
-    return self;
+// The color the catalog entry stands for now (a dynamic one resolves for the current appearance).
+- (NSColor *) _resolvedColor {
+    return [_color _resolvedColor];
 }
 
 @end

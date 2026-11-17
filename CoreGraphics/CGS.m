@@ -21,11 +21,15 @@
 #include <dispatch/dispatch.h>
 #include <stdatomic.h>
 #import <CoreGraphics/CGSConnection.h>
+#import <CoreGraphics/CGSKeyboardLayout.h>
 #import <CoreGraphics/CGSWindow.h>
 #import <CoreGraphics/CGWindowPrivate.h>
 #import <CoreGraphics/CGSSurface.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <CoreFoundation/CFNotificationCenter.h>
+#include <notify.h>
 
 static NSMutableDictionary<NSNumber*, CGSConnection*>* g_connections = nil;
 static Boolean g_denyConnections = FALSE;
@@ -113,6 +117,14 @@ static void _CGSLoadBackend(void)
 	[backends release];
 }
 
+static void _CGSLoadBackendOnce(void)
+{
+	static dispatch_once_t once;
+	dispatch_once(&once, ^{
+		_CGSLoadBackend();
+	});
+}
+
 CGError CGSNewConnection(CGSDictionaryObj attribs, CGSConnectionID* connId)
 {
 	*connId = -1;
@@ -120,10 +132,7 @@ CGError CGSNewConnection(CGSDictionaryObj attribs, CGSConnectionID* connId)
 	if (g_denyConnections)
 		return kCGErrorCannotComplete;
 
-	static dispatch_once_t once;
-	dispatch_once(&once, ^{
-		_CGSLoadBackend();
-	});
+	_CGSLoadBackendOnce();
 
 	if (!g_backendClass)
 		return kCGErrorCannotComplete;
@@ -143,6 +152,83 @@ CGError CGSNewConnection(CGSDictionaryObj attribs, CGSConnectionID* connId)
 	}
 	else
 		return kCGErrorFailure;
+}
+
+CGError _CGSActivateProcess(pid_t pid, uint32_t options)
+{
+	if (pid <= 0)
+		return kCGErrorIllegalArgument;
+
+	// The display server first, directly. Whatever it cannot do (it has no such request, or the
+	// process has no window of its own kind there, as a Wayland client has none on an X server
+	// that Xwayland provides) is asked of the process itself.
+	_CGSLoadBackendOnce();
+	if (g_backendClass != nil &&
+		[g_backendClass activateWindowsOfProcess: pid options: options] == kCGErrorSuccess)
+		return kCGErrorSuccess;
+
+	char name[64];
+	snprintf(name, sizeof(name), kCGSProcessActivationNotificationPrefix "%d", (int) pid);
+	CFStringRef notification = CFStringCreateWithCString(NULL, name, kCFStringEncodingUTF8);
+	if (notification == NULL)
+		return kCGErrorCannotComplete;
+	CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+		notification, NULL, NULL, true);
+	CFRelease(notification);
+	return kCGErrorSuccess;
+}
+
+// The process that was activated last, for a display server that cannot be asked: the state of a
+// libnotify name, which is shared by all processes.
+static int frontProcessToken(void)
+{
+	static dispatch_once_t once;
+	static int token = -1;
+	dispatch_once(&once, ^{
+		if (notify_register_check(kCGSFrontProcessNotificationName, &token) != NOTIFY_STATUS_OK)
+			token = -1;
+	});
+	return token;
+}
+
+CGError _CGSGetFrontProcess(pid_t* pid)
+{
+	if (pid == NULL)
+		return kCGErrorIllegalArgument;
+
+	_CGSLoadBackendOnce();
+	if (g_backendClass != nil)
+	{
+		pid_t front = 0;
+		CGError err = [g_backendClass copyFrontProcessID: &front];
+		if (err == kCGErrorSuccess)
+		{
+			*pid = front;
+			return kCGErrorSuccess;
+		}
+		if (err != kCGErrorNotImplemented)
+			return err;
+	}
+
+	int token = frontProcessToken();
+	uint64_t state = 0;
+	if (token < 0 || notify_get_state(token, &state) != NOTIFY_STATUS_OK)
+		return kCGErrorCannotComplete;
+	if (state == 0 || state > INT32_MAX)
+		return kCGErrorNoneAvailable;
+	*pid = (pid_t) state;
+	return kCGErrorSuccess;
+}
+
+CGError _CGSSetFrontProcess(pid_t pid)
+{
+	if (pid <= 0)
+		return kCGErrorIllegalArgument;
+
+	int token = frontProcessToken();
+	if (token < 0 || notify_set_state(token, (uint64_t) pid) != NOTIFY_STATUS_OK)
+		return kCGErrorCannotComplete;
+	return kCGErrorSuccess;
 }
 
 CGSConnection* _CGSConnectionForID(CGSConnectionID connId)
@@ -168,6 +254,101 @@ void* _CGSNativeWindowForSurfaceID(CGSConnectionID connId, CGSWindowID winId, CG
 {
 	CGSConnection* conn = _CGSConnectionForID(connId);
 	return [[[conn windowForId: winId] surfaceForId: surfaceId] nativeWindow];
+}
+
+CGError _CGSCreateDisplayOverlayWindow(CGSConnectionID connId, CGRect bounds,
+                                       CGSWindowID* winId, void** drawable)
+{
+	if (winId == NULL || drawable == NULL)
+		return kCGErrorIllegalArgument;
+
+	CGSConnection* c = _CGSConnectionForID(connId);
+	if (!c)
+		return kCGErrorInvalidConnection;
+
+	CGSRegionRef region = NULL;
+	CGError err = CGSNewRegionWithRect(&bounds, &region);
+	if (err != kCGErrorSuccess || region == NULL)
+		return kCGErrorIllegalArgument;
+
+	CGSWindow* window = [c newWindow: region];
+	CGSRegionRelease(region);
+	if (!window)
+		return kCGErrorIllegalArgument;
+
+	CGSWindowID wid = window.windowId;
+	void* native = NULL;
+	err = [window becomeDisplayOverlay: &native];
+	if (err == kCGSErrorSuccess)
+		err = [window orderWindow: kCGSOrderAbove relativeTo: nil];
+	if (err != kCGSErrorSuccess)
+	{
+		[c destroyWindow: wid];
+		return err;
+	}
+
+	*winId = wid;
+	*drawable = native;
+	[[NSNotificationCenter defaultCenter]
+		postNotificationName: (NSString*) _kCGSDisplayOverlayWindowCreated
+		object: nil
+		userInfo: @{ @"NativeWindow": @((uintptr_t) native) }];
+	return kCGSErrorSuccess;
+}
+
+void CGSSetHotKeyWithExclusion(CGSConnectionID connId, int uid, uint16_t options, uint16_t key, CGSModifierFlags modifierFlags, int exclusion)
+{
+	[_CGSConnectionForID(connId) setHotKeyWithUID: uid keyCode: key flags: modifierFlags exclusion: exclusion];
+}
+
+void CGSSetHotKey(CGSConnectionID connId, int uid, uint16_t options, uint16_t key, CGSModifierFlags modifierFlags)
+{
+	CGSSetHotKeyWithExclusion(connId, uid, options, key, modifierFlags, 0);
+}
+
+bool CGSGetHotKey(CGSConnectionID connId, int uid, uint16_t* options, uint16_t* key, CGSModifierFlags* modifierFlags)
+{
+	CGKeyCode code = 0;
+	CGEventFlags flags = 0;
+
+	if (![_CGSConnectionForID(connId) getHotKeyWithUID: uid keyCode: &code flags: &flags])
+		return false;
+	if (options)
+		*options = 0;
+	if (key)
+		*key = code;
+	if (modifierFlags)
+		*modifierFlags = (CGSModifierFlags) flags;
+	return true;
+}
+
+void CGSRemoveHotKey(CGSConnectionID connId, int uid)
+{
+	[_CGSConnectionForID(connId) removeHotKeyWithUID: uid];
+}
+
+bool CGSIsHotKeyEnabled(CGSConnectionID connId, int uid)
+{
+	return [_CGSConnectionForID(connId) isHotKeyEnabledWithUID: uid];
+}
+
+void CGSSetHotKeyEnabled(CGSConnectionID connId, int uid, bool enabled)
+{
+	[_CGSConnectionForID(connId) setHotKeyWithUID: uid enabled: enabled];
+}
+
+CGError CGSGetGlobalHotKeyOperatingMode(CGSConnectionID connId, int* mode)
+{
+	CGSConnection* conn = _CGSConnectionForID(connId);
+
+	return conn ? [conn getGlobalHotKeyOperatingMode: mode] : kCGErrorInvalidConnection;
+}
+
+CGError CGSSetGlobalHotKeyOperatingMode(CGSConnectionID connId, int mode)
+{
+	CGSConnection* conn = _CGSConnectionForID(connId);
+
+	return conn ? [conn setGlobalHotKeyOperatingMode: mode] : kCGErrorInvalidConnection;
 }
 
 CGError CGSReleaseConnection(CGSConnectionID connId)
@@ -325,6 +506,33 @@ CGError CGSGetWindowTransformAtPlacement(CGSConnectionID cid, CGSWindowID wid, i
 int CGSServerOperationState(int state)
 {
 	return 0;
+}
+
+// The same window lookup and transform record as the AtPlacement calls:
+// CGSSetWindowTransform is CGSSetWindowTransformAtPlacement with the default
+// placement.
+CGError CGSSetWindowTransform(CGSConnectionID cid, CGSWindowID wid, CGAffineTransform transform)
+{
+	return CGSSetWindowTransformAtPlacement(cid, wid, 0, 0, transform);
+}
+
+// Windows are not composited, so they cannot be warped. Removing a warp (a
+// NULL mesh) leaves a window as it is and succeeds; anything else is not
+// implemented.
+CGError CGSSetWindowWarp(CGSConnectionID cid, CGSWindowID wid, int w, int h, float *mesh)
+{
+	if (!platformWindowForID(wid))
+		return kCGErrorIllegalArgument;
+	return (mesh == NULL) ? kCGSErrorSuccess : kCGErrorNotImplemented;
+}
+
+// Window contents are never captured (see CGDisplayStream), so any shape is
+// already excluded from capture.
+CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid, CGSWindowID wid, CGRegionRef shape)
+{
+	if (!platformWindowForID(wid))
+		return kCGErrorIllegalArgument;
+	return kCGSErrorSuccess;
 }
 
 CGError CGSGetWindowProperty(CGSConnectionID cid, CGSWindowID wid, CFStringRef key, CFTypeRef *outValue)
@@ -490,4 +698,96 @@ OSErr CPSStealKeyFocus(CPSProcessSerNum *psn, uint32_t options)
 OSErr CPSReleaseKeyFocus(CPSProcessSerNum *psn)
 {
 	return noErr;
+}
+
+// Hands a hot key press or release, as a system-defined event, to the procs registered for
+// such events. Called by the backends (through -postHotKeyEventForUID:...) on the main run loop.
+__attribute__((visibility("hidden")))
+void _CGSPostHotKeyEvent(CGSConnectionID connection, int uid, BOOL pressed, CGEventFlags flags, CGPoint location, uint64_t time)
+{
+	CGSEventRecord record;
+	NSMutableArray* procs = [NSMutableArray array];
+
+	memset(&record, 0, sizeof(record));
+	record.length = sizeof(record);
+	record.type = NX_SYSDEFINED;
+	record.location = location;
+	record.windowLocation = location;
+	record.time = time;
+	record.flags = flags;
+	record.window = 0;
+	record.connection = connection;
+	record.data.compound.subType = pressed ? kCGSHotKeyPressedSubtype : kCGSHotKeyReleasedSubtype;
+	record.data.compound.misc.L[0] = uid;
+
+	// The procs are called outside the lock: one may register or remove procs
+	pthread_mutex_lock(&g_cgsNotifyProcMutex);
+	for (CFIndex i = 0; g_cgsNotifyProc && i < CFArrayGetCount(g_cgsNotifyProc); i++)
+	{
+		NotifyProcEntry* e = (NotifyProcEntry*) CFArrayGetValueAtIndex(g_cgsNotifyProc, i);
+		if (e->notificationType == CGSNotificationSingleEventType(NX_SYSDEFINED) || e->notificationType == kCGSNotificationAllEvents)
+			[procs addObject: [NSData dataWithBytes: e length: sizeof(*e)]];
+	}
+	pthread_mutex_unlock(&g_cgsNotifyProcMutex);
+
+	for (NSData* entry in procs)
+	{
+		const NotifyProcEntry* e = [entry bytes];
+		e->proc(e->notificationType, &record, sizeof(record), e->private);
+	}
+}
+
+// The layout a client of the window system registered with _CGSSetProvidedKeyboardLayout, for a
+// backend that cannot read the keymap itself (Wayland hands the keymap to the keyboard-owning
+// client, which is AppKit).
+static CGSKeyboardLayout* g_providedKeyboardLayout;
+static pthread_mutex_t g_providedKeyboardLayoutMutex = PTHREAD_MUTEX_INITIALIZER;
+
+void _CGSSetProvidedKeyboardLayout(const void* uchr, uint32_t length, CFStringRef name, CFStringRef fullName)
+{
+	CGSKeyboardLayout* layout = nil;
+	if (uchr != NULL && length != 0)
+	{
+		layout = [CGSKeyboardLayout new];
+		[layout setLayout: (UCKeyboardLayout*) uchr length: length];
+		layout.name = (NSString*) name;
+		layout.fullName = (NSString*) fullName;
+	}
+
+	pthread_mutex_lock(&g_providedKeyboardLayoutMutex);
+	CGSKeyboardLayout* old = g_providedKeyboardLayout;
+	g_providedKeyboardLayout = layout;
+	pthread_mutex_unlock(&g_providedKeyboardLayoutMutex);
+	[old release];
+}
+
+// The current keyboard layout of the window-system backend: a dictionary with the 'uchr' data
+// (key "data", CFData) and the layout's "name" and "fullName" strings, or NULL when the backend has
+// no layout (no connection, or a backend that does not provide one). The caller releases it.
+// Used by the Text Input Sources API (HIToolbox).
+CFDictionaryRef _CGSCopyCurrentKeyboardLayoutInfo(void)
+{
+	CGSConnection* connection = _CGSConnectionForID(_CGSDefaultConnection());
+	CGSKeyboardLayout* layout = [connection createKeyboardLayout];
+	if (!layout)
+	{
+		pthread_mutex_lock(&g_providedKeyboardLayoutMutex);
+		layout = [g_providedKeyboardLayout retain];
+		pthread_mutex_unlock(&g_providedKeyboardLayoutMutex);
+	}
+	if (!layout || !layout.layout || layout.layoutLength == 0)
+	{
+		[layout release];
+		return NULL;
+	}
+
+	CFDataRef data = CFDataCreate(NULL, (const UInt8*) layout.layout, layout.layoutLength);
+	NSDictionary* info = @{
+		@"data": (id) data,
+		@"name": layout.name ?: @"?",
+		@"fullName": layout.fullName ?: @"?",
+	};
+	CFRelease(data);
+	[layout release];
+	return (CFDictionaryRef) [info retain];
 }

@@ -29,8 +29,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @interface NSDisplay : NSObject {
     NSMutableArray *_eventQueue;
+    NSRecursiveLock *_eventQueueLock;
     BOOL _cursorHiddenUntilMouseMoves;
     NSInteger _cursorHideCount;
+    double _mouseDeltaX, _mouseDeltaY;
     CFRunLoopSourceRef _eventSource;
 }
 
@@ -49,6 +51,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (NSTimeInterval) textCaretBlinkInterval;
 
+- (BOOL) activateProcessIdentifier: (pid_t) processIdentifier;
+
 - (void) hideCursor;
 - (void) unhideCursor;
 // Counted hide and unhide, as on macOS: -hideCursor runs on the first hide and -unhideCursor
@@ -65,12 +69,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (id) cursorWithName: (NSString *) name;
 - (void) setCursor: (id) cursor;
 
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask
                           untilDate: (NSDate *) untilDate
                              inMode: (NSRunLoopMode) mode
                             dequeue: (BOOL) dequeue;
 
-- (void) discardEventsMatchingMask: (NSEventMask) mask
+- (void) discardEventsMatchingMask: (NSUInteger) mask
                        beforeEvent: (NSEvent *) event;
 
 - (void) postEvent: (NSEvent *) event atStart: (BOOL) atStart;
@@ -84,6 +88,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (NSSet *) allFontFamilyNames;
 - (NSArray<NSFontTypeface *> *) fontTypefacesForFamilyName: (NSString *) name;
+// The installed family a font name no family lists is drawn with; nil when the display substitutes none.
+- (NSString *) substituteFamilyName: (NSString *) familyName;
 // nil when no installed family is configured for the generic family.
 - (NSString *) fontFamilyNameForGenericFamily: (NSString *) generic;
 
@@ -112,6 +118,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // bottom-left corner, y up, like screen and window frames.
 - (NSPoint) mouseLocation;
 - (NSUInteger) currentModifierFlags;
+// The buttons held down, as +[NSEvent pressedMouseButtons] reports them: bit 0
+// is the left button, bit 1 the right one and bit n the button numbered n.
+- (NSUInteger) pressedMouseButtons;
 
 - (NSArray *) orderedWindowNumbers;
 
@@ -124,8 +133,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSDictionary *) currentModeForScreen: (int) screenIndex;
 - (BOOL) setMode: (NSDictionary *) mode forScreen: (int) screenIndex;
 
-// Returned memory must be free()ed by the caller
-- (UCKeyboardLayout *) keyboardLayout: (uint32_t *) byteLength;
 // Returns an opaque number of the current keyboard layout.
 // This is because apps tend to call TISCopyCurrentKeyboardLayoutInputSource()
 // repeatedly and expect to get the same pointer if layout hasn't changed.
@@ -141,6 +148,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // nothing, so the caller does not report success. The X11 backend returns YES once the
 // request is queued: XWarpPointer is asynchronous and reports no failure.
 - (BOOL) warpMouse: (NSPoint) position;
+// YES disassociates the mouse from the cursor, as
+// CGAssociateMouseAndMouseCursorPosition(false) does: the cursor stays where it
+// is and mouse motion only produces event deltas. NO restores normal operation.
 - (void) grabMouse: (BOOL) doGrab;
+
+// Mouse motion, in points with y growing downwards, that the backend has
+// reported since the last call; each call takes what has built up. Backends
+// report motion with -accumulateMouseDeltaX:y: when they produce a motion
+// event, from any thread. CGGetLastMouseDelta() reads it.
+- (void) accumulateMouseDeltaX: (CGFloat) dx y: (CGFloat) dy;
+- (void) takeMouseDeltaX: (int32_t *) dx y: (int32_t *) dy;
 
 @end

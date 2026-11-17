@@ -289,32 +289,40 @@ static NSLock *_cacheLock = nil;
     return [self messageFontOfSize: size];
 }
 
-+ (NSFont *) systemFontOfSize: (CGFloat) size weight: (CGFloat) weight {
-    if (weight > 0.2) {
++ (NSFont *) systemFontOfSize: (CGFloat) size weight: (NSFontWeight) weight {
+    // Only the regular and bold system faces are available; semibold and
+    // heavier weights get the bold one.
+    if (weight >= NSFontWeightSemibold)
         return [self boldSystemFontOfSize: size];
-    }
     return [self systemFontOfSize: size];
 }
 
-+ (NSFont *) monospacedSystemFontOfSize: (CGFloat) size weight: (CGFloat) weight {
++ (NSFont *) monospacedSystemFontOfSize: (CGFloat) size
+                                 weight: (NSFontWeight) weight {
     CGFloat actualSize = (size == 0) ? 12.0 : size;
     NSFont *font = [self userFixedPitchFontOfSize: actualSize];
-    if (font == nil) {
+
+    if (font == nil)
         font = [self fontWithName: @"Courier" size: actualSize];
-    }
-    if (font == nil) {
+    if (font == nil)
         font = [self systemFontOfSize: actualSize];
-    }
-    if (weight > 0.2) {
-        NSFont *boldFont = [[NSFontManager sharedFontManager] convertFont: font toHaveTrait: NSBoldFontMask];
-        if (boldFont != nil) {
+
+    // As with the proportional system font, only regular and bold faces are
+    // looked for; semibold and heavier weights get the bold one.
+    if (weight >= NSFontWeightSemibold) {
+        NSFont *boldFont = [[NSFontManager sharedFontManager]
+                convertFont: font
+                toHaveTrait: NSBoldFontMask];
+        if (boldFont != nil)
             return boldFont;
-        }
     }
     return font;
 }
 
-+ (NSFont *) monospacedDigitSystemFontOfSize: (CGFloat) size weight: (CGFloat) weight {
++ (NSFont *) monospacedDigitSystemFontOfSize: (CGFloat) size
+                                      weight: (NSFontWeight) weight {
+    // No tabular-figures variant available; the proportional system font is
+    // the closest faithful stand-in. Use the fixed-pitch one as the fork did.
     return [self monospacedSystemFontOfSize: size weight: weight];
 }
 
@@ -404,42 +412,48 @@ static NSLock *_cacheLock = nil;
                 } ff;
 
                 ff.dword = NSSwapBigIntToHost(matrixBytes[i]);
-                _matrix[i] = ff.flt;
+                NS_EXTRA(NSFont, self)->_matrix[i] = ff.flt;
             }
         }
     } else {
         NSInteger version = [coder versionForClassName: @"NSFont"];
 
-        NSLog(@"NSFont version is %ld\n", (long) version);
-
         unsigned int fFlags = 0;
         bool f2;
         unsigned int fx;
         if (version >= 21) {
-            NSUnarchiver *una = (NSUnarchiver *) coder;
+            // The name is a property list; four separate byte reads follow the size.
             name = [coder decodePropertyList];
 
             float flt;
+            char byteFx = 0, byteFlags = 0, byteF2 = 0, byteF3 = 0;
             [coder decodeValuesOfObjCTypes: "f", &flt];
-            fx = [una decodeByte] != 0;
+            [coder decodeValuesOfObjCTypes: "c", &byteFx];
+            fx = byteFx != 0;
 
-            fFlags = [una decodeByte];
+            [coder decodeValuesOfObjCTypes: "c", &byteFlags];
+            fFlags = (unsigned char) byteFlags;
             fFlags <<= 13;
 
-            f2 = [una decodeByte] != 0;
-            uint8_t f3 = [una decodeByte];
+            [coder decodeValuesOfObjCTypes: "c", &byteF2];
+            f2 = byteF2 != 0;
+            [coder decodeValuesOfObjCTypes: "c", &byteF3];
 
-            fFlags |= f3 << 1;
+            fFlags |= ((unsigned char) byteF3) << 1;
 
             size = flt;
+            if (![name isKindOfClass: [NSString class]])
+                [NSException raise: NSInvalidArgumentException format: @"NSFont: the archived font has no name"];
         } else {
-            char *nameStr;
+            char *nameStr = NULL;
             float flt;
             unsigned short flags1, flags2;
 
             [coder decodeValuesOfObjCTypes: (version == 2) ? "%fss" : "*fss",
                                             &nameStr, &flt, &flags1, &flags2];
 
+            if (nameStr == NULL)
+                [NSException raise: NSInvalidArgumentException format: @"NSFont: the archived font has no name"];
             name = [NSString stringWithCString: nameStr
                                       encoding: NSASCIIStringEncoding];
             free(nameStr);
@@ -453,7 +467,6 @@ static NSLock *_cacheLock = nil;
             size = flt;
         }
 
-        NSLog(@"fFlags = 0x%x, fx = %d\n", fFlags, fx);
         if (!(fFlags & 0x2000)) {
             if (f2) {
                 // TODO: Do some transform of flt
@@ -462,15 +475,13 @@ static NSLock *_cacheLock = nil;
                 float transform[6];
                 [coder decodeArrayOfObjCType: "f" count: 6 at: transform];
                 for (int i = 0; i < 6; i++)
-                    _matrix[i] = transform[i];
+                    NS_EXTRA(NSFont, self)->_matrix[i] = transform[i];
             }
         }
 
         if (fx != 0)
             [coder decodeValuesOfObjCTypes: "i", &fx];
     }
-
-    NSLog(@"NSFont decoding done\n");
 
     [self release];
     NSFont *realFont = [[NSFont fontWithName: name size: size] retain];
@@ -489,17 +500,17 @@ static NSLock *_cacheLock = nil;
 - (void) _setName: (NSString *) name size: (CGFloat) size {
     _name = [name copy];
     _pointSize = size;
-    _matrix[0] = _pointSize;
-    _matrix[1] = 0;
-    _matrix[2] = 0;
-    _matrix[3] = _pointSize;
-    _matrix[4] = 0;
-    _matrix[5] = 0;
+    NS_EXTRA(NSFont, self)->_matrix[0] = _pointSize;
+    NS_EXTRA(NSFont, self)->_matrix[1] = 0;
+    NS_EXTRA(NSFont, self)->_matrix[2] = 0;
+    NS_EXTRA(NSFont, self)->_matrix[3] = _pointSize;
+    NS_EXTRA(NSFont, self)->_matrix[4] = 0;
+    NS_EXTRA(NSFont, self)->_matrix[5] = 0;
 
     if ([_name isEqualToString: @"Symbol"])
-        _encoding = NSSymbolStringEncoding;
+        NS_EXTRA(NSFont, self)->_encoding = NSSymbolStringEncoding;
     else
-        _encoding = NSUnicodeStringEncoding;
+        NS_EXTRA(NSFont, self)->_encoding = NSUnicodeStringEncoding;
 }
 
 // The initializer CoreText uses for the fonts it creates. They are not cached:
@@ -508,16 +519,16 @@ static NSLock *_cacheLock = nil;
     NSString *name = (NSString *) CGFontCopyPostScriptName(font);
     [self _setName: name size: size];
     [name release];
-    _cgFont = CGFontRetain(font);
+    NS_EXTRA(NSFont, self)->_cgFont = CGFontRetain(font);
     return self;
 }
 
 - initWithName: (NSString *) name size: (CGFloat) size {
     [self _setName: name size: size];
-    _cgFont = CGFontCreateWithFontName((CFStringRef) _name);
-    if (_cgFont) {
+    NS_EXTRA(NSFont, self)->_cgFont = CGFontCreateWithFontName((CFStringRef) _name);
+    if (NS_EXTRA(NSFont, self)->_cgFont) {
         [[self class] addFontToCache: self];
-        O2FontLog(@"name: %@ _cgFont: %@", name, _cgFont);
+        O2FontLog(@"name: %@ _cgFont: %@", name, NS_EXTRA(NSFont, self)->_cgFont);
     } else {
         [self release];
         self = nil;
@@ -529,7 +540,10 @@ static NSLock *_cacheLock = nil;
     [[self class] removeFontFromCache: self];
 
     [_name release];
-    CGFontRelease(_cgFont);
+    if (NS_EXTRA_ALLOCATED(NSFont, self)) {
+        CGFontRelease(NS_EXTRA(NSFont, self)->_cgFont);
+    }
+    NS_EXTRA_FREE(NSFont, self);
     [super dealloc];
 }
 
@@ -626,18 +640,18 @@ static NSLock *_cacheLock = nil;
 
 // Lets CoreText draw an NSFont passed as a CTFontRef.
 - (CGFontRef) cgFont {
-    return _cgFont;
+    return NS_EXTRA(NSFont, self)->_cgFont;
 }
 
 - (const CGFloat *) matrix {
-    return _matrix;
+    return NS_EXTRA(NSFont, self)->_matrix;
 }
 
 - (NSAffineTransform *) textTransform {
     NSAffineTransform *result = [NSAffineTransform transform];
     NSAffineTransformStruct fields = {
-            _matrix[0], _matrix[1], _matrix[2],
-            _matrix[3], _matrix[4], _matrix[5],
+            NS_EXTRA(NSFont, self)->_matrix[0], NS_EXTRA(NSFont, self)->_matrix[1], NS_EXTRA(NSFont, self)->_matrix[2],
+            NS_EXTRA(NSFont, self)->_matrix[3], NS_EXTRA(NSFont, self)->_matrix[4], NS_EXTRA(NSFont, self)->_matrix[5],
     };
 
     [result setTransformStruct: fields];
@@ -651,11 +665,11 @@ static NSLock *_cacheLock = nil;
 }
 
 - (NSCharacterSet *) coveredCharacterSet {
-    return O2FontGetCoveredCharacterSet((O2FontRef)_cgFont);
+    return O2FontGetCoveredCharacterSet((O2FontRef)NS_EXTRA(NSFont, self)->_cgFont);
 }
 
 - (NSStringEncoding) mostCompatibleStringEncoding {
-    return _encoding;
+    return NS_EXTRA(NSFont, self)->_encoding;
 }
 
 - (NSString *) familyName {
@@ -668,7 +682,7 @@ static NSLock *_cacheLock = nil;
         while ([nameComponents count] > 1 && familyName == nil) {
             [nameComponents removeLastObject];
             familyName = [[NSFontFamily
-                    fontFamilyWithName:
+                    installedFontFamilyWithName:
                             [nameComponents componentsJoinedByString: blank]]
                     name];
         }
@@ -683,7 +697,8 @@ static NSLock *_cacheLock = nil;
 
 - (NSString *) displayName {
     NSFontTypeface *typeFace = [NSFontFamily fontTypefaceWithName: _name];
-    return [typeFace displayName];
+    // A name no family lists (the system font is "San Francisco") has no typeface; nil is not an option for callers.
+    return [typeFace displayName] ?: _name;
 }
 
 - (NSDictionary *) _fontTraitsAsDictionary {
@@ -737,8 +752,8 @@ static NSLock *_cacheLock = nil;
 }
 
 - (NSFont *) printerFont {
-    NSUnimplementedMethod();
-    return nil;
+    // Quartz fonts have no separate printer variant.
+    return self;
 }
 
 - (NSFont *) screenFont {
@@ -748,6 +763,11 @@ static NSLock *_cacheLock = nil;
 - (NSFont *) screenFontWithRenderingMode: (NSFontRenderingMode) mode {
     NSUnimplementedMethod();
     return [[self copy] autorelease];
+}
+
+// The CTFont behind this font, for CoreText functions given an NSFont.
+- (CTFontRef) _coreTextFont {
+    return (CTFontRef) self;
 }
 
 - (NSRect) boundingRectForFont {
@@ -831,6 +851,11 @@ static NSLock *_cacheLock = nil;
 }
 
 - (BOOL) isFixedPitch {
+    // A font that declares itself fixed-pitch is, even if it has glyphs,
+    // such as combining marks, with other advances.
+    if (CTFontGetSymbolicTraits((CTFontRef) self) & kCTFontTraitMonoSpace)
+        return YES;
+
     CGSize current;
     NSInteger glyph, glyphCount = CTFontGetGlyphCount((CTFontRef) self);
     CGGlyph glyphs[glyphCount];
@@ -866,7 +891,7 @@ static NSLock *_cacheLock = nil;
 - (void) setInContext: (NSGraphicsContext *) context {
     CGContextRef cgContext = [context graphicsPort];
 
-    CGContextSetFont(cgContext, _cgFont);
+    CGContextSetFont(cgContext, NS_EXTRA(NSFont, self)->_cgFont);
     CGContextSetFontSize(cgContext, _pointSize);
 
     CGAffineTransform textMatrix;
@@ -962,23 +987,6 @@ static NSLock *_cacheLock = nil;
 - (id) _metaType {
     NSUnimplementedMethod();
     return nil;
-}
-
-NSInteger NSConvertGlyphsToPackedGlyphs(NSGlyph *glyphs, NSInteger length,
-                                        NSMultibyteGlyphPacking packing,
-                                        char *outputX)
-{
-    NSInteger i, result = 0;
-    CGGlyph *output = (CGGlyph *) outputX;
-
-    for (i = 0; i < length; i++) {
-        NSGlyph check = glyphs[i];
-
-        if (check != NSNullGlyph && check != NSControlGlyph)
-            output[result++] = check;
-    }
-
-    return result * 2;
 }
 
 @end

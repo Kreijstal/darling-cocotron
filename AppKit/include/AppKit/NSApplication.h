@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/AppKitExport.h>
 #import <AppKit/NSGraphics.h>
 #import <AppKit/NSResponder.h>
@@ -28,7 +29,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <Foundation/NSNotification.h>
 #import <Foundation/NSRunLoop.h>
 
-@class NSWindow, NSImage, NSMenu, NSMenuItem, NSPasteboard, NSDisplay, NSDockTile;
+@class NSWindow, NSImage, NSMenu, NSMenuItem, NSPasteboard, NSDisplay, NSDockTile,
+        NSAppearance;
 @protocol NSApplicationDelegate;
 
 APPKIT_EXPORT const NSRunLoopMode NSModalPanelRunLoopMode;
@@ -61,43 +63,48 @@ APPKIT_EXPORT const NSNotificationName NSApplicationWillTerminateNotification;
 APPKIT_EXPORT const NSNotificationName
         NSApplicationDidChangeScreenParametersNotification;
 
+APPKIT_EXPORT NSNotificationName
+        NSApplicationShouldBeginSuppressingHighDynamicRangeContentNotification;
+APPKIT_EXPORT NSNotificationName
+        NSApplicationShouldEndSuppressingHighDynamicRangeContentNotification;
+
 APPKIT_EXPORT NSString *const NSApplicationLaunchIsDefaultLaunchKey;
 APPKIT_EXPORT NSString *const NSApplicationLaunchUserNotificationKey;
 
-typedef double NSAppKitVersion;
+typedef double NSAppKitVersion NS_TYPED_EXTENSIBLE_ENUM;
 APPKIT_EXPORT const NSAppKitVersion NSAppKitVersionNumber;
 
 typedef id NSModalSession;
 
 enum {
-    NSRunStoppedResponse = -1000,
-    NSRunAbortedResponse = -1001,
-    NSRunContinuesResponse = -1002
+    NSRunStoppedResponse = NSModalResponseStop,
+    NSRunAbortedResponse = NSModalResponseAbort,
+    NSRunContinuesResponse = NSModalResponseContinue
 };
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSApplicationTerminateReply) {
     NSTerminateCancel,
     NSTerminateNow,
     NSTerminateLater,
-} NSApplicationTerminateReply;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSRequestUserAttentionType) {
     NSCriticalRequest,
     NSInformationalRequest,
-} NSRequestUserAttentionType;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSApplicationDelegateReply) {
     NSApplicationDelegateReplySuccess,
     NSApplicationDelegateReplyCancel,
     NSApplicationDelegateReplyFailure,
-} NSApplicationDelegateReply;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSApplicationPrintReply) {
     NSPrintingCancelled,
     NSPrintingSuccess,
     NSPrintingReplyLater,
     NSPrintingFailure,
-} NSApplicationPrintReply;
+};
 
 typedef NS_OPTIONS(NSUInteger, NSApplicationPresentationOptions) {
     NSApplicationPresentationDefault = 0,
@@ -120,44 +127,73 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
     NSWindowListOrderedFrontToBack = (1 << 0),
 };
 
+typedef NS_OPTIONS(NSUInteger, NSApplicationOcclusionState) {
+    NSApplicationOcclusionStateVisible = 1UL << 1,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSRemoteNotificationType) {
+    NSRemoteNotificationTypeNone = 0,
+    NSRemoteNotificationTypeBadge = 1 << 0,
+    NSRemoteNotificationTypeSound = 1 << 1,
+    NSRemoteNotificationTypeAlert = 1 << 2,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x4c, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSApplication : NSResponder {
 @public
-    id _eventDelegate;
-    NSDisplay *_display;
-    NSAppearance *_appearance;
-    id _delegate;
+    NSEvent *_currentEvent;
     NSMutableArray *_windows;
     NSWindow *_keyWindow;
     NSWindow *_mainWindow;
+    id _delegate;
+    NS_LEGACY_IVAR_PAD(_NSApplicationReserved1, 22)
+    // QUIRK: the instance variable is named _running so that
+    // valueForKey:@"_running" and setValue:forKey:@"_running" work through
+    // direct instance variable access, without accessor methods. Not
+    // documented. Evidence: black-box observation on macOS 27 (tier 2): the
+    // key reads as NSNumber 0 before -run, NSApplication has no _running or
+    // set_running: methods, and accessInstanceVariablesDirectly is YES.
+    // Test: appkit-application-running-key.m (quirk test). It stays a real
+    // ivar (at Apple's offset) on the legacy ABI for the same reason.
+    BOOL _running;
+    NS_LEGACY_IVAR_PAD(_NSApplicationReserved2, 5)
     NSMenu *_mainMenu;
-    NSMenu *_windowsMenu;
-    NSMenu *_servicesMenu;
-    NSMenu *_helpMenu;
-    NSMenu *_dockMenu;
+    NS_LEGACY_IVAR_PAD(_NSApplicationReserved3, 4)
+    NSAppearance *_appearance;
+    NS_LEGACY_IVAR_PAD(_NSApplicationReserved4, 4)
+    NS_EXTRA_IVARS_BEGIN(NSApplication)
+        id _eventDelegate;
+        NSDisplay *_display;
+        NSMenu *_windowsMenu;
+        NSMenu *_servicesMenu;
+        NSMenu *_helpMenu;
+        NSMenu *_dockMenu;
 
-    NSImage *_applicationIconImage;
+        NSImage *_applicationIconImage;
 
-    BOOL _isRunning;
-    BOOL _isActive;
-    BOOL _isHidden;
-    BOOL _windowsNeedUpdate;
-    NSEvent *_currentEvent;
-    NSDockTile *_dockTile;
+        BOOL _isActive;
+        BOOL _isHidden;
+        BOOL _windowsNeedUpdate;
+        NSDockTile *_dockTile;
 
-    NSMutableArray *_modalStack;
-    void *_lock;
-    NSMutableArray *_orderedWindows; // get rid of
-    NSTimer *_attentionTimer;
-    NSApplicationPresentationOptions _presentationOptions;
-    BOOL _automaticCustomizeTouchBarMenuItemEnabled;
-    BOOL _defaultHelpBookSearchEnabled;
+        NSMutableArray *_modalStack;
+        void *_lock;
+        NSMutableArray *_orderedWindows; // get rid of
+        NSTimer *_attentionTimer;
+        NSApplicationPresentationOptions _presentationOptions;
+        BOOL _finishedLaunching;
+        BOOL _windowClosedSinceTerminateCheck;
+        BOOL _automaticCustomizeTouchBarMenuItemEnabled;
+        BOOL _defaultHelpBookSearchEnabled;
+    NS_EXTRA_IVARS_END(NSApplication)
 }
 
 @property(readonly) NSUserInterfaceLayoutDirection userInterfaceLayoutDirection;
 
-// The window server connection id, as passed to CGS* calls. Terminal's menu
-// tracking asks the application for it.
-- (NSInteger) contextID;
+// The window server connection id, as passed to CGS* calls.
+- (unsigned int) contextID;
 
 @property(strong) NSMenu *helpMenu;
 @property(readonly) NSApplicationPresentationOptions currentSystemPresentationOptions;
@@ -169,7 +205,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 // Private AppKit flag for the help-viewer's find bar.
 @property(getter=isDefaultHelpBookSearchEnabled) BOOL defaultHelpBookSearchEnabled;
 
-@property (class, readonly, retain) NSApplication *sharedApplication;
+@property (class, readonly, retain, nonnull) NSApplication *sharedApplication;
 
 + (void) detachDrawingThread: (SEL) selector
                     toTarget: target
@@ -180,34 +216,32 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (NSGraphicsContext *) context;
 
 @property(assign) id<NSApplicationDelegate> delegate;
-- (NSArray *) windows;
+@property(nonatomic, readonly) NSArray *windows;
 - (NSWindow *) windowWithWindowNumber: (NSInteger) number;
 
-- (NSMenu *) mainMenu;
+@property(nonatomic, retain) NSMenu *mainMenu;
 - (NSMenu *) dockMenu;
 - (void) setDockMenu: (NSMenu *) menu;
-- (NSMenu *) windowsMenu;
-- (NSWindow *) mainWindow;
-- (NSWindow *) keyWindow;
-- (NSImage *) applicationIconImage;
-- (BOOL) isActive;
+@property(nonatomic, retain) NSMenu *windowsMenu;
+@property(nonatomic, readonly) NSWindow *mainWindow;
+@property(nonatomic, readonly) NSWindow *keyWindow;
+@property(nonatomic, retain) NSImage *applicationIconImage;
+@property(nonatomic, getter=isActive, readonly) BOOL active;
 @property (readonly) BOOL isHidden;
-- (BOOL) isRunning;
+@property(nonatomic, getter=isRunning, readonly) BOOL running;
+@property(nonatomic, getter=isFullKeyboardAccessEnabled, readonly) BOOL fullKeyboardAccessEnabled;
 
 - (NSWindow *) makeWindowsPerform: (SEL) selector inOrder: (BOOL) inOrder;
 - (void) miniaturizeAll: sender;
 
-- (NSArray *) orderedDocuments;
-- (NSArray *) orderedWindows;
+@property(nonatomic, readonly) NSArray *orderedDocuments;
+@property(nonatomic, readonly) NSArray *orderedWindows;
 - (void) preventWindowOrdering;
 
-- (void) setMainMenu: (NSMenu *) menu;
-- (void) setApplicationIconImage: (NSImage *) image;
 
 - (NSApplicationActivationPolicy) activationPolicy;
 - (BOOL) setActivationPolicy: (NSApplicationActivationPolicy) activationPolicy;
 
-- (void) setWindowsMenu: (NSMenu *) menu;
 - (void) addWindowsItem: (NSWindow *) window
                   title: (NSString *) title
                filename: (BOOL) filename;
@@ -225,12 +259,12 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (BOOL) _handleKeyEquivalent: (NSEvent *) event;
 - (BOOL) _handleKeyEquivalent: (NSEvent *) event;
 
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask
                           untilDate: (NSDate *) untilDate
                              inMode: (NSRunLoopMode) mode
                             dequeue: (BOOL) dequeue;
-- (NSEvent *) currentEvent;
-- (void) discardEventsMatchingMask: (NSEventMask) mask
+@property(nonatomic, readonly) NSEvent *currentEvent;
+- (void) discardEventsMatchingMask: (NSUInteger) mask
                        beforeEvent: (NSEvent *) event;
 - (void) postEvent: (NSEvent *) event atStart: (BOOL) atStart;
 
@@ -245,8 +279,10 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) activateIgnoringOtherApps: (BOOL) flag;
 - (void) activate;
 - (void) deactivate;
+- (void) yieldActivationToApplication: (NSRunningApplication *) application;
+- (void) yieldActivationToApplicationWithBundleIdentifier: (NSString *) bundleIdentifier;
 
-- (NSWindow *) modalWindow;
+@property(nonatomic, readonly) NSWindow *modalWindow;
 - (NSModalSession) beginModalSessionForWindow: (NSWindow *) window;
 - (NSModalResponse) runModalSession: (NSModalSession) session;
 - (void) endModalSession: (NSModalSession) session;
@@ -288,8 +324,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) arrangeInFront: sender;
 - (BOOL) validateMenuItem: (NSMenuItem *) item;
 
-- (NSMenu *) servicesMenu;
-- (void) setServicesMenu: (NSMenu *) menu;
+@property(nonatomic, retain) NSMenu *servicesMenu;
 - servicesProvider;
 - (void) setServicesProvider: provider;
 - (void) registerServicesMenuSendTypes: (NSArray *) sendTypes
@@ -302,7 +337,7 @@ typedef NS_OPTIONS(NSInteger, NSWindowListOptions) {
 - (void) activateContextHelpMode: sender;
 - (void) showHelp: sender;
 
-- (NSDockTile *) dockTile;
+@property(nonatomic, readonly) NSDockTile *dockTile;
 
 - (void) disableRelaunchOnLogin;
 - (void) enableRelaunchOnLogin;
@@ -330,6 +365,8 @@ APPKIT_EXPORT __kindof NSApplication *NSApp;
 - (BOOL) application: (NSApplication *) theApplication
             openFile: (NSString *) filename;
 - (void) application: (NSApplication *) sender openFiles: (NSArray *) filenames;
+- (void) application: (NSApplication *) application
+            openURLs: (NSArray<NSURL *> *) urls;
 - (BOOL) application: (id) sender openFileWithoutUI: (NSString *) filename;
 - (BOOL) application: (NSApplication *) theApplication
         openTempFile: (NSString *) filename;
@@ -368,7 +405,7 @@ APPKIT_EXPORT __kindof NSApplication *NSApp;
 
 @end
 
-APPKIT_EXPORT int NSApplicationMain(int argc, const char *argv[]);
+APPKIT_EXPORT int NSApplicationMain(int argc, const char *_Nonnull argv[_Nonnull]);
 APPKIT_EXPORT BOOL NSApplicationLoad(void);
 
 APPKIT_EXPORT void NSUpdateDynamicServices(void);
@@ -379,3 +416,20 @@ APPKIT_EXPORT BOOL NSPerformService(NSString *itemName,
 - (void) enumerateWindowsWithOptions: (NSWindowListOptions) options
                                 usingBlock: (void (^)(NSWindow *window, BOOL *stop)) block;
 @end
+
+// Performance-test hooks; they do nothing here.
+@interface NSApplication (NSApplicationPerformanceTesting)
+- (void) startedTest: (NSString *) name;
+- (void) finishedTest: (NSString *) name;
+- (void) failedTest: (NSString *) name withFailure: (NSString *) failureReason;
+@end
+
+typedef NSString *NSAboutPanelOptionKey NS_TYPED_ENUM;
+
+APPKIT_EXPORT NSAboutPanelOptionKey const NSAboutPanelOptionCredits;
+APPKIT_EXPORT NSAboutPanelOptionKey const NSAboutPanelOptionApplicationName;
+APPKIT_EXPORT NSAboutPanelOptionKey const NSAboutPanelOptionApplicationIcon;
+APPKIT_EXPORT NSAboutPanelOptionKey const NSAboutPanelOptionVersion;
+APPKIT_EXPORT NSAboutPanelOptionKey const NSAboutPanelOptionApplicationVersion;
+APPKIT_EXPORT NSString * const NSApplicationLaunchRemoteNotificationKey;
+APPKIT_EXPORT NSNotificationName const NSApplicationDidChangeOcclusionStateNotification;

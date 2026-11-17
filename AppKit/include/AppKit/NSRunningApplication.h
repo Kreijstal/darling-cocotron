@@ -18,38 +18,43 @@
 */
 
 #import <Foundation/NSObject.h>
+#import <AppKit/AppKitIvarLayout.h>
 #include <sys/types.h>
 
-typedef enum {
+@class NSString;
+
+typedef NS_ENUM(NSInteger, NSApplicationActivationPolicy) {
     NSApplicationActivationPolicyRegular,
     NSApplicationActivationPolicyAccessory,
     NSApplicationActivationPolicyProhibited
-} NSApplicationActivationPolicy;
+};
 
 typedef NS_OPTIONS(NSUInteger, NSApplicationActivationOptions) {
     NSApplicationActivateAllWindows = 1 << 0,
-    NSApplicationActivateIgnoringOtherApps = 1 << 1
+    NSApplicationActivateIgnoringOtherApps = 1 << 1,
 };
 
 @interface NSRunningApplication : NSObject {
     pid_t _processIdentifier;
+    NS_LEGACY_IVAR_PAD(_NSRunningApplicationReserved, 72)
 }
 
 + (NSArray<NSRunningApplication *> *) runningApplicationsWithBundleIdentifier: (NSString *) bundleIdentifier;
-
-// Only the current process is known: there is no registry of other
-// applications, so any other identifier gives nil.
-+ (instancetype) currentApplication;
 + (instancetype) runningApplicationWithProcessIdentifier: (pid_t) pid;
++ (NSRunningApplication *) currentApplication;
 
 @property(readonly) pid_t processIdentifier;
 @property(readonly, copy) NSString *bundleIdentifier;
 @property(readonly, copy) NSString *localizedName;
-@property(readonly, getter=isActive) BOOL active;
-@property(readonly, getter=isHidden) BOOL hidden;
 @property(readonly, getter=isTerminated) BOOL terminated;
 
 - (BOOL) activateWithOptions: (NSApplicationActivationOptions) options;
+- (BOOL) activateFromApplication: (NSRunningApplication *) application
+                         options: (NSApplicationActivationOptions) options;
+
+@property(readonly, getter=isActive) BOOL active;
+@property(readonly, getter=isHidden) BOOL hidden;
+
 - (BOOL) hide;
 - (BOOL) unhide;
 - (BOOL) terminate;

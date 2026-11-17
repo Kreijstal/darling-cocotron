@@ -1,9 +1,10 @@
 #import <AppKit/AppKitExport.h>
 #import <Foundation/NSObject.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSArray, NSMutableArray, NSMutableDictionary, NSViewController;
 
-enum {
+typedef NS_OPTIONS(NSInteger, NSPrintPanelOptions) {
 
     NSPrintPanelShowsCopies = 1 << 0,
     NSPrintPanelShowsPageRange = 1 << 1,
@@ -15,12 +16,16 @@ enum {
     NSPrintPanelShowsPreview = 1 << 17
 };
 
-typedef NSInteger NSPrintPanelOptions;
+typedef NS_ENUM(NSInteger, NSPrintPanelResult) {
+    NSPrintPanelResultCancelled = 0,
+    NSPrintPanelResultPrinted,
+};
 
 @interface NSPrintPanel : NSObject {
     NSMutableDictionary *_attributes;
     NSInteger _options;
     NSMutableArray *_accessoryControllers;
+    NS_LEGACY_IVAR_PAD(_NSPrintPanelReserved, 232)
 }
 
 + (NSPrintPanel *) printPanel;

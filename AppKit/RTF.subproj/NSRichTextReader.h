@@ -21,6 +21,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 @interface NSRichTextReader : NSString {
     NSString *_imageDirectory;
+    NSDictionary *_attachmentWrappers;
     NSData *_data;
     const unsigned char *_bytes;
     NSUInteger _length;
@@ -52,14 +53,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     // more complete parser
     NSMutableArray *_states;
 
-    // Offset of the placeholder byte after the last attachment group
-    NSUInteger _attachmentPlaceholder;
+    // Bytes after the last attachment group, up to the enclosing group's end,
+    // which are not document text
+    NSRange _attachmentTail;
 }
 
 - initWithData: (NSData *) data;
 - initWithContentsOfFile: (NSString *) path;
 
 + (NSAttributedString *) attributedStringWithData: (NSData *) data;
+// RTF whose attachments are taken from the given file wrappers, by file name (the children
+// of an RTFD directory wrapper).
++ (NSAttributedString *) attributedStringWithData: (NSData *) data
+                           attachmentFileWrappers: (NSDictionary *) wrappers;
 + (NSAttributedString *) attributedStringWithContentsOfFile: (NSString *) path;
 
 - (NSAttributedString *) parseAttributedString;

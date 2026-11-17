@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/Foundation.h>
 
 @class NSLayoutManager, NSFont;
@@ -30,6 +31,9 @@ enum {
 APPKIT_EXPORT NSString *const NSTextStorageWillProcessEditingNotification;
 APPKIT_EXPORT NSString *const NSTextStorageDidProcessEditingNotification;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x1c, Apple's; the ivars
+// before the extras sit in the same words on every ABI. Add new state to the
+// extra struct, never as an ivar.
 @interface NSTextStorage : NSMutableAttributedString <NSCoding> {
 @public
     id _delegate;
@@ -37,14 +41,10 @@ APPKIT_EXPORT NSString *const NSTextStorageDidProcessEditingNotification;
     NSInteger _changeInLength;
     NSInteger _editedDelta;
     unsigned _editedMask;
-    NSRange _editedRange;
     int _beginEditing;
-    struct {
-        unsigned int _isUnarchiving:1;
-        unsigned int _wrappedBySuper:1;
-        unsigned int _reserved:30;
-    } _flags;
-    void *_sideData;
+    NS_EXTRA_IVARS_BEGIN(NSTextStorage)
+        NSRange _editedRange;
+    NS_EXTRA_IVARS_END(NSTextStorage)
 }
 
 - delegate;

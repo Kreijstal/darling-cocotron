@@ -122,30 +122,13 @@ public:
 // texture
 //
 
-static size_t findSharedMemory(const VkMemoryRequirements& reqs, std::shared_ptr<Indium::PrivateDevice> device, bool framebufferOnly) {
-	size_t targetIndex = SIZE_MAX;
-
-	for (size_t i = 0; i < device->memoryProperties().memoryTypeCount; ++i) {
-		const auto& type = device->memoryProperties().memoryTypes[i];
-
-		if ((reqs.memoryTypeBits & (1 << i)) == 0) {
-			continue;
-		}
-
-		if (!framebufferOnly && (type.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) {
-			continue;
-		}
-
-		if (!framebufferOnly && (type.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) {
-			continue;
-		}
-
-		// okay, this is good enough
-		targetIndex = i;
-		break;
-	}
-
-	return targetIndex;
+// The memory type Indium would use for a resource of the given storage mode, so
+// the drawable's images are placed like the textures Metal creates itself:
+// GPU-only images in device memory, and images the CPU may access in host
+// visible, coherent memory.
+static size_t findImageMemory(const VkMemoryRequirements& reqs, std::shared_ptr<Indium::PrivateDevice> device, Indium::StorageMode storageMode) {
+	auto index = device->memoryTypeIndex(reqs.memoryTypeBits, storageMode);
+	return index ? *index : SIZE_MAX;
 };
 
 CAMetalDrawableTexture::CAMetalDrawableTexture(CGSize size, Indium::PixelFormat pixelFormat, bool framebufferOnly, std::shared_ptr<Indium::PrivateDevice> privateDevice):
@@ -205,7 +188,9 @@ CAMetalDrawableTexture::CAMetalDrawableTexture(CGSize size, Indium::PixelFormat 
 
 	DynamicVK::vkGetImageMemoryRequirements(_device->device(), _image, &reqs);
 
-	size_t targetIndex = findSharedMemory(reqs, _device, _framebufferOnly);
+	// Without framebufferOnly, the texture may be used like any other Metal
+	// texture, so its memory stays CPU-accessible.
+	size_t targetIndex = findImageMemory(reqs, _device, _framebufferOnly ? Indium::StorageMode::Private : Indium::StorageMode::Shared);
 
 	if (targetIndex == SIZE_MAX) {
 		throw std::runtime_error("No suitable memory region found for image");
@@ -230,7 +215,7 @@ CAMetalDrawableTexture::CAMetalDrawableTexture(CGSize size, Indium::PixelFormat 
 
 	// The presentation image is read on the CPU even for framebuffer-only
 	// public textures, so it always needs host-visible, coherent memory.
-	targetIndex = findSharedMemory(reqs, _device, false);
+	targetIndex = findImageMemory(reqs, _device, Indium::StorageMode::Shared);
 
 	if (targetIndex == SIZE_MAX) {
 		throw std::runtime_error("No suitable memory region found for internal image");
@@ -464,7 +449,7 @@ void CAMetalDrawableTexture::synchronizeRender(GLuint texture, std::shared_ptr<I
 		return;
 	}
 
-	// The memory is HOST_COHERENT (findSharedMemory only picks such a type), so
+	// The memory is HOST_COHERENT (findImageMemory with the Shared storage mode only picks such a type), so
 	// the host sees the blit without an explicit invalidate.
 
 	const size_t rowPitch = layout.rowPitch;

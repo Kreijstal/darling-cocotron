@@ -27,15 +27,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSRaise.h>
 #import <Foundation/NSKeyedArchiver.h>
 
+NSNotificationName NSPopUpButtonCellWillPopUpNotification =
+        @"NSPopUpButtonCellWillPopUpNotification";
+
 @implementation NSPopUpButtonCell
 
 - init {
     self = [super init];
-    _pullsDown = NO;
+    NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown = NO;
     _menu = [[NSMenu alloc] init];
     _selectedIndex = -1;
-    _arrowPosition = NSPopUpArrowAtCenter;
-    _preferredEdge = NSMaxYEdge;
+    NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition = NSPopUpArrowAtCenter;
+    NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge = NSMaxYEdge;
     return self;
 }
 
@@ -46,20 +49,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - initWithCoder: (NSCoder *) coder {
     self = [super initWithCoder: coder];
     if ([coder allowsKeyedCoding]) {
-        _pullsDown = [coder decodeBoolForKey: @"NSPullDown"];
+        NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown = [coder decodeBoolForKey: @"NSPullDown"];
         _menu = [[coder decodeObjectForKey: @"NSMenu"] retain];
         _selectedIndex = [coder decodeIntForKey: @"NSSelectedIndex"];
-        _arrowPosition = [coder decodeIntForKey: @"NSArrowPosition"];
-        _preferredEdge = [coder decodeIntForKey: @"NSPreferredEdge"];
-        _usesItemFromMenu = [coder decodeBoolForKey: @"NSUsesItemFromMenu"];
+        NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition = [coder decodeIntForKey: @"NSArrowPosition"];
+        NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge = [coder decodeIntForKey: @"NSPreferredEdge"];
+        NS_EXTRA(NSPopUpButtonCell, self)->_usesItemFromMenu = [coder decodeBoolForKey: @"NSUsesItemFromMenu"];
 
         [self synchronizeTitleAndSelectedItem];
     } else {
-        int flags; // TODO: Handle flags
-        [coder decodeValuesOfObjCTypes:"i@i", &flags, &_menu, &_selectedIndex];
+        int flags, selectedIndex;
+        [coder decodeValuesOfObjCTypes: "i@i", &flags, &_menu, &selectedIndex];
+        _selectedIndex = selectedIndex;
+
+        // The flag word, in Mac archives: bit 31 pulls down, bits 28-29 the preferred edge,
+        // bit 27 uses the item from the menu, bit 26 alters the state of the selected
+        // item (not supported here) and bits 24-25 the arrow position.
+        NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown = (flags >> 31) & 1;
+        NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge = (flags >> 28) & 3;
+        NS_EXTRA(NSPopUpButtonCell, self)->_usesItemFromMenu = (flags >> 27) & 1;
+        NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition = (flags >> 24) & 3;
 
         // We can't call synchronizeTitleAndSelectedItem, as the _menu may not be finished decoding and we can't access the items
-        _syncTitleNeeded = YES;
+        NS_EXTRA(NSPopUpButtonCell, self)->_syncTitleNeeded = YES;
     }
     return self;
 }
@@ -67,6 +79,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - copyWithZone: (NSZone *) zone {
     NSPopUpButtonCell *copy = [super copyWithZone: zone];
 
+    NS_EXTRA_COPY(NSPopUpButtonCell, copy, self);
     copy->_menu = [_menu copy];
 
     return copy;
@@ -76,14 +89,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     self = [super initTextCell: string];
     _menu = [[NSMenu alloc] initWithTitle: string];
     [_menu addItemWithTitle: string action: [self action] keyEquivalent: @""];
-    _arrowPosition = NSPopUpArrowAtCenter;
-    _preferredEdge = NSMaxYEdge;
-    _pullsDown = pullDown;
+    NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition = NSPopUpArrowAtCenter;
+    NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge = NSMaxYEdge;
+    NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown = pullDown;
     return self;
 }
 
 - (void) dealloc {
     [_menu release];
+    NS_EXTRA_FREE(NSPopUpButtonCell, self);
     [super dealloc];
 }
 
@@ -92,31 +106,31 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (BOOL) pullsDown {
-    return _pullsDown;
-}
-
-- (BOOL) usesItemFromMenu {
-    return _usesItemFromMenu;
-}
-
-- (void) setUsesItemFromMenu: (BOOL) value {
-    _usesItemFromMenu = value;
+    return NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown;
 }
 
 - (NSMenu *) menu {
     return _menu;
 }
 
+- (BOOL) usesItemFromMenu {
+    return NS_EXTRA(NSPopUpButtonCell, self)->_usesItemFromMenu;
+}
+
+- (void) setUsesItemFromMenu: (BOOL) flag {
+    NS_EXTRA(NSPopUpButtonCell, self)->_usesItemFromMenu = flag;
+}
+
 - (BOOL) autoenablesItems {
-    return _autoenablesItems;
+    return NS_EXTRA(NSPopUpButtonCell, self)->_autoenablesItems;
 }
 
 - (NSPopUpArrowPosition) arrowPosition {
-    return _arrowPosition;
+    return NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition;
 }
 
 - (NSRectEdge) preferredEdge {
-    return _preferredEdge;
+    return NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge;
 }
 
 - (NSArray *) itemArray {
@@ -182,7 +196,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) setPullsDown: (BOOL) flag {
-    _pullsDown = flag;
+    NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown = flag;
 }
 
 - (void) setMenu: (NSMenu *) menu {
@@ -199,15 +213,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 }
 
 - (void) setAutoenablesItems: (BOOL) value {
-    _autoenablesItems = value ? YES : NO;
+    NS_EXTRA(NSPopUpButtonCell, self)->_autoenablesItems = value ? YES : NO;
 }
 
 - (void) setArrowPosition: (NSPopUpArrowPosition) position {
-    _arrowPosition = position;
+    NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition = position;
 }
 
 - (void) setPreferredEdge: (NSRectEdge) edge {
-    edge = _preferredEdge;
+    edge = NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge;
 }
 
 - (void) _addItemWithTitle: (NSString *) title {
@@ -332,21 +346,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     NSArray *itemArray = [_menu itemArray];
     NSMenuItem *item = nil;
 
-    if (_selectedIndex < 0 || _pullsDown) {
+    if (_selectedIndex < 0 || NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown) {
         if ([itemArray count] > 0)
             item = [itemArray objectAtIndex: 0];
     } else if (_selectedIndex < [itemArray count]) {
         item = [itemArray objectAtIndex: _selectedIndex];
     }
-    if (item != nil) {
-        [super setTitle: [item title]];
-    }
+    // With no items the title is the empty string rather than nil.
+    NSString *oldTitle = [[self title] retain];
+
+    [super setTitle: item != nil ? [item title] : @""];
+    // The size of a pop-up button follows the title it shows.
+    if (![oldTitle isEqual: [self title]])
+        [[self controlView] invalidateIntrinsicContentSize];
+    [oldTitle release];
     // For a redraw of the control
     [(NSControl *) [self controlView] updateCell: self];
 }
 
 - (NSImage *) arrowImage {
-    if (_pullsDown)
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown)
         return [NSImage imageNamed: @"NSPopUpButtonCellPullDown"];
     else
         return [NSImage imageNamed: @"NSPopUpButtonCellPopUp"];
@@ -361,9 +380,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     result.size.width = 0;
     result.size.height = frame.size.height;
 
-    if (_arrowPosition != NSPopUpNoArrow) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition != NSPopUpNoArrow) {
         NSImage *arrowImage =
-                (_arrowPosition != NSPopUpNoArrow) ? [self arrowImage] : NULL;
+                (NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition != NSPopUpNoArrow) ? [self arrowImage] : NULL;
 
         if (arrowImage != nil) {
 
@@ -399,7 +418,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (NSRect) titleRectForBounds: (NSRect) rect {
     rect = [super titleRectForBounds: rect];
-    if (_arrowPosition != NSPopUpNoArrow) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition != NSPopUpNoArrow) {
         // Don't use the room used by the arrow, with some margin
         NSRect arrowRect = [self _arrowRectForRect: rect];
         rect.size.width = NSMinX(arrowRect) - NSMinX(rect) - 5.;
@@ -412,9 +431,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [super drawBezelWithFrame: frame inView: controlView];
 
     // Now draw the arrow
-    if (_arrowPosition != NSPopUpNoArrow) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition != NSPopUpNoArrow) {
         NSImage *arrowImage =
-                (_arrowPosition != NSPopUpNoArrow) ? [self arrowImage] : NULL;
+                (NS_EXTRA(NSPopUpButtonCell, self)->_arrowPosition != NSPopUpNoArrow) ? [self arrowImage] : NULL;
 
         if (arrowImage == NULL)
             return;
@@ -451,7 +470,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 - (void) setTitle: (NSString *) title {
 
-    if (_pullsDown) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown) {
         // Doc.s for pulls down behavior are not correct, it just sets the title
         // to the argument and doesn't affect the selection
         [super setTitle: title];
@@ -476,7 +495,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 - (NSImage *) image {
     NSArray *itemArray = [_menu itemArray];
     NSMenuItem *item = nil;
-    if (_selectedIndex < 0 || _pullsDown) {
+    if (_selectedIndex < 0 || NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown) {
         if ([itemArray count] > 0)
             item = [itemArray objectAtIndex: 0];
     } else {
@@ -506,7 +525,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #if 0
    // Note: the min options don't mean much unless we don't have room for the menu, so either way we just pop
    // up over the button itself. However, maxX and maxY *do* have special meanings
-   switch( _preferredEdge )
+   switch( NS_EXTRA(NSPopUpButtonCell, self)->_preferredEdge )
    {
       case NSMinXEdge:
       case NSMinYEdge:
@@ -527,7 +546,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [[_menu delegate] menuNeedsUpdate: _menu];
     //	[[_menu delegate] menuWillOpen: _menu];
     NSMenu *menu = _menu;
-    if (_pullsDown && [_menu numberOfItems]) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown && [_menu numberOfItems]) {
         // Don't display the first item for pullDowns controls
         menu = [[_menu copy] autorelease];
         [menu removeItemAtIndex: 0];
@@ -537,19 +556,19 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     NSPopUpWindow *window = [[NSPopUpWindow alloc]
             initWithFrame: NSMakeRect(origin.x, origin.y, cellFrame.size.width,
                                       cellFrame.size.height)];
-    [window setPullsDown: _pullsDown];
+    [window setPullsDown: NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown];
     [window setMenu: menu];
     if ([self font] != nil)
         [window setFont: [self font]];
 
-    if (_pullsDown)
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown)
         [window selectItemAtIndex: -1]; // No initial selection for pullsDown
     else
         [window selectItemAtIndex: _selectedIndex];
 
     NSInteger itemIndex = [window runTrackingWithEvent: event];
     if (itemIndex != NSNotFound) {
-        if (_pullsDown) {
+        if (NS_EXTRA(NSPopUpButtonCell, self)->_pullsDown) {
             // remember that thing we did with the first menu item?
             itemIndex++;
         }
@@ -593,9 +612,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [super setControlView: view];
 
     // Is this hacky? We need to a way to sync the title after _menu is fully initialized
-    if (_syncTitleNeeded) {
+    if (NS_EXTRA(NSPopUpButtonCell, self)->_syncTitleNeeded) {
         [self synchronizeTitleAndSelectedItem];
-        _syncTitleNeeded = NO;
+        NS_EXTRA(NSPopUpButtonCell, self)->_syncTitleNeeded = NO;
 
     }
 }

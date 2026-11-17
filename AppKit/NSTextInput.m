@@ -4,6 +4,19 @@
 #import <objc/runtime.h>
 #include <AppKit/NSTextInput.h>
 #include <AppKit/NSTextInput_Internal.h>
+#import <AppKit/NSApplication.h>
+#import <AppKit/NSEvent.h>
+#import <AppKit/NSWindow.h>
+#import <AppKit/NSKeyboardBinding.h>
+#import <AppKit/NSKeyboardBindingManager.h>
+#import <AppKit/NSTextInputClient.h>
+
+// The NSTextInputClient methods a context sends.
+@interface NSObject (NSTextInputContextClient)
+- (void) insertText: (id) string replacementRange: (NSRange) range;
+- (void) doCommandBySelector: (SEL) selector;
+- (void) unmarkText;
+@end
 
 NSString *const NSTextInputContextKeyboardSelectionDidChangeNotification = @"NSTextInputContextKeyboardSelectionDidChangeNotification";
 
@@ -11,119 +24,125 @@ NSString *const NSTextInputReplacementRangeAttributeName = @"NSTextInputReplacem
 
 @implementation NSTextInputContext
 
-+ (NSTextInputContext *)currentInputContext {
-    static NSTextInputContext *current = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        current = [[NSTextInputContext alloc] init];
-    });
-    return current;
++ (NSTextInputContext *) currentInputContext {
+    NSResponder *responder = [[NSApp keyWindow] firstResponder];
+
+    if ([responder respondsToSelector: @selector(inputContext)])
+        return [(id) responder inputContext];
+    return nil;
 }
 
-- (instancetype)initWithClient:(id)client {
-    self = [super init];
-    if (self) {
+// The client is not retained: it owns its context.
+- (instancetype) initWithClient: (id<NSTextInputClient>) client {
+    if ((self = [super init]) != nil)
         _client = client;
-    }
     return self;
 }
 
-- (id)client {
+- (id<NSTextInputClient>) client {
     return _client;
 }
 
-- (BOOL)handleEvent:(NSEvent *)event {
-    if (event == nil || _client == nil)
+- (void) activate {
+}
+
+- (void) deactivate {
+}
+
+- (void) invalidateCharacterCoordinates {
+}
+
+// Without an input method, the only marked text is the client's own.
+- (void) discardMarkedText {
+    if ([_client respondsToSelector: @selector(unmarkText)])
+        [_client unmarkText];
+}
+
+static BOOL isInsertableText(NSString *text) {
+    NSUInteger length = [text length];
+
+    if (length == 0)
+        return NO;
+    for (NSUInteger i = 0; i < length; i++) {
+        unichar c = [text characterAtIndex: i];
+
+        // Control characters and the function key range are not text.
+        if (c < 0x20 || c == 0x7f || (c >= 0xf700 && c <= 0xf8ff))
+            return NO;
+    }
+    return YES;
+}
+
+// FLTK's FLView keeps its own key handling behind a need_handle flag: events
+// that are not plain text (shortcuts, editing and navigation keys) are left to
+// it, which the flag asks for. Returns YES when the client is such a view.
+static BOOL leaveKeyToFLTKClient(id client, NSEvent *event) {
+    Ivar ivar = class_getInstanceVariable([client class], "need_handle");
+    if (ivar == NULL)
         return NO;
 
-    if ([event type] == NSKeyDown) {
-        NSEventModifierFlags mods = [event modifierFlags];
-        BOOL hasCmdOrCtrl = (mods & (NSCommandKeyMask | NSControlKeyMask)) != 0;
-
-        // Shortcuts involving Command or Control (e.g. Cmd+A, Cmd+C, Cmd+V, Cmd+X, Cmd+Z)
-        if (hasCmdOrCtrl) {
-            Ivar ivar = class_getInstanceVariable([_client class], "need_handle");
-            if (ivar != NULL) {
-                *(char *)((char *)_client + ivar_getOffset(ivar)) = 1;
-            }
-            return NO;
-        }
-
+    BOOL needHandle = ([event modifierFlags] & (NSCommandKeyMask | NSControlKeyMask)) != 0;
+    if (!needHandle) {
         NSString *characters = [event characters];
-        if (characters == nil || [characters length] == 0) {
+        if ([characters length] == 0)
             characters = [event charactersIgnoringModifiers];
-        }
-        if (characters != nil && [characters length] > 0) {
-            unichar c = [characters characterAtIndex:0];
-
-            // Functional, editing and navigation control keys:
-            // Backspace, Delete, Enter, Tab, Escape, Home, End, Arrows, PageUp/Down
-            BOOL isFunctionOrControlKey = NO;
-            if (c == 0x08 || c == 0x7F || c == '\r' || c == '\n' || c == '\t' || c == 0x1B) {
-                isFunctionOrControlKey = YES;
-            } else if (c >= 0xF700 && c <= 0xF8FF) {
-                isFunctionOrControlKey = YES;
-            }
-
-            if (isFunctionOrControlKey) {
-                Ivar ivar = class_getInstanceVariable([_client class], "need_handle");
-                if (ivar != NULL) {
-                    *(char *)((char *)_client + ivar_getOffset(ivar)) = 1;
-                }
-                return NO;
-            }
-
-            // Standard printable text characters
-            if (c >= 0x20) {
-                SEL selRange = sel_registerName("insertText:replacementRange:");
-                if ([_client respondsToSelector:selRange]) {
-                    typedef void (*InsertTextRangeFn)(id, SEL, id, NSRange);
-                    InsertTextRangeFn fn = (InsertTextRangeFn)[_client methodForSelector:selRange];
-                    if (fn) {
-                        fn(_client, selRange, characters, NSMakeRange(NSNotFound, 0));
-                        return YES;
-                    }
-                } else {
-                    SEL sel = sel_registerName("insertText:");
-                    if ([_client respondsToSelector:sel]) {
-                        typedef void (*InsertTextFn)(id, SEL, id);
-                        InsertTextFn fn = (InsertTextFn)[_client methodForSelector:sel];
-                        if (fn) {
-                            fn(_client, sel, characters);
-                            return YES;
-                        }
-                    }
-                }
-            }
+        if ([characters length] > 0) {
+            unichar c = [characters characterAtIndex: 0];
+            needHandle = (c == 0x08 || c == 0x7F || c == '\r' || c == '\n' || c == '\t' || c == 0x1B ||
+                          (c >= 0xF700 && c <= 0xF8FF));
         }
     }
-    return NO;
+    if (needHandle)
+        *(char *) ((char *) client + ivar_getOffset(ivar)) = 1;
+    return needHandle;
 }
 
-- (void)activate {
+- (BOOL) handleEvent: (NSEvent *) event {
+    if (event == nil || _client == nil)
+        return NO;
+    if ([event type] == NSKeyDown && leaveKeyToFLTKClient(_client, event))
+        return NO;
+
+    // Command key equivalents are not text input.
+    if ([event type] != NSKeyDown ||
+        ([event modifierFlags] & NSCommandKeyMask))
+        return NO;
+
+    NSKeyboardBinding *binding = [[NSKeyboardBindingManager
+            defaultKeyBindingManager]
+            keyBindingWithString: [event charactersIgnoringModifiers]
+                   modifierFlags: [event modifierFlags]];
+    NSArray *selectorNames = [binding selectorNames];
+
+    if (selectorNames != nil) {
+        if (![_client respondsToSelector: @selector(doCommandBySelector:)])
+            return NO;
+        for (NSString *name in selectorNames)
+            [_client doCommandBySelector: NSSelectorFromString(name)];
+        return YES;
+    }
+
+    NSString *text = [event characters];
+    if (([event modifierFlags] & NSControlKeyMask) || !isInsertableText(text))
+        return NO;
+    if (![_client respondsToSelector: @selector(insertText:replacementRange:)])
+        return NO;
+    [_client insertText: text replacementRange: NSMakeRange(NSNotFound, 0)];
+    return YES;
 }
 
-- (void)deactivate {
-}
-
-- (void)discardMarkedText {
-}
-
-- (void)invalidateCharacterCoordinates {
-}
-
-+ (NSString *)localizedNameForInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier {
++ (NSString *) localizedNameForInputSource: (NSTextInputSourceIdentifier) inputSourceIdentifier {
     return @"U.S.";
 }
 
-- (NSTextInputSourceIdentifier)selectedKeyboardInputSource {
+- (NSTextInputSourceIdentifier) selectedKeyboardInputSource {
     return @"com.apple.keylayout.US";
 }
 
-- (void)setSelectedKeyboardInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier {
+- (void) setSelectedKeyboardInputSource: (NSTextInputSourceIdentifier) inputSourceIdentifier {
 }
 
-- (NSArray *)keyboardInputSources {
+- (NSArray *) keyboardInputSources {
     return [NSArray arrayWithObject: @"com.apple.keylayout.US"];
 }
 

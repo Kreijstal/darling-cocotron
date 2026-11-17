@@ -23,8 +23,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 // CoreGraphics module to re-enter Foundation. The CoreGraphics umbrella header
 // deliberately does not include this file.
 
-#ifndef CGWINDOWPRIVATE_H
-#define CGWINDOWPRIVATE_H
+#ifndef COREGRAPHICS_CGWINDOWPRIVATE_H
+#define COREGRAPHICS_CGWINDOWPRIVATE_H
 
 #include <CoreGraphics/CGWindow.h>
 #import <CoreGraphics/CGSubWindow.h>
@@ -79,8 +79,14 @@ typedef enum {
 - (void) showWindowWithoutActivation;
 
 + windowWithWindowNumber: (NSInteger) windowNumber;
+// The number of this process's window whose platform window is the given
+// one, or 0.
++ (NSInteger) windowNumberForPlatformWindowID: (unsigned long) platformWindowID;
 
 - (NSInteger) windowNumber;
+// The window system's identifier of the window (an X11 Window, for example),
+// or 0 if it has none.
+- (unsigned long) platformWindowID;
 
 - (void) placeAboveWindow: (NSInteger) otherNumber;
 - (void) placeBelowWindow: (NSInteger) otherNumber;
@@ -125,6 +131,11 @@ typedef enum {
 
 - (void) platformWindow: (CGWindow *) window needsDisplayInRect: (NSRect) rect;
 - (void) platformWindowStyleChanged: (CGWindow *) window;
+
+// The window's backing scale factor (its device pixels per point) changed, for
+// instance because it moved to an output with another scale. The window already
+// reports the new value from -backingScaleFactor.
+- (void) platformWindow: (CGWindow *) window didChangeBackingScaleFrom: (CGFloat) oldScale;
 - (void) platformWindowWillClose: (CGWindow *) window;
 
 - (void) platformWindowWillMove: (CGWindow *) window;
@@ -146,6 +157,10 @@ typedef enum {
 - (void) platformWindowDidInvalidateCGContext: (CGWindow *) window;
 
 - (void) platformWindowShouldZoom: (CGWindow *) window;
+
+// The window system confirms that the window is now (YES) or no longer (NO)
+// shown fullscreen. Sent when the state it reports changes, whoever asked for it.
+- (void) platformWindow: (CGWindow *) window didChangeFullScreen: (BOOL) fullScreen;
 
 @end
 #endif

@@ -26,7 +26,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSScrollView.h>
 #import <AppKit/NSTextField.h>
 #import <AppKit/NSView.h>
+#import <AppKit/NSOpenPanel.h>
 #import <AppKit/NSWorkspace.h>
+#import "_NSFileSystemDataSource.h"
 
 // UTType; Darling's UTType may not implement it.
 @interface NSObject (NSSavePanelContentTypes)
@@ -134,6 +136,7 @@ static NSSavePanel *_newPanel = nil;
     [_accessoryView release];
     [_nameField release];
     [_sheetCompletionHandler release];
+    [_modelessCompletionHandler release];
     [super dealloc];
 }
 
@@ -227,30 +230,47 @@ static NSSavePanel *_newPanel = nil;
     return [name stringByAppendingPathExtension: [types objectAtIndex: 0]];
 }
 
+// The paths of the rows selected in the file browser, in row order.
+- (NSArray *) _selectedPaths {
+    NSMutableArray *paths = [NSMutableArray array];
+    NSIndexSet *rows = [_outlineView selectedRowIndexes];
+    for (NSUInteger row = [rows firstIndex]; row != NSNotFound;
+         row = [rows indexGreaterThanIndex: row]) {
+        id item = [_outlineView itemAtRow: row];
+        if ([item isKindOfClass: [NSURL class]] && [[item path] length] > 0)
+            [paths addObject: [item path]];
+    }
+    return paths;
+}
+
+// What a panel without a name field accepts: the selected rows. Empty when
+// there is nothing to accept, and the panel then stays up.
+- (NSArray *) _acceptablePaths {
+    return [self _selectedPaths];
+}
+
+- (void) _setAcceptedPaths: (NSArray *) paths {
+    [self _setFilename: [paths firstObject]];
+}
+
 - (IBAction) _selectFile: (id) sender {
     [self endEditingFor: nil];
     [self makeFirstResponder: nil];
 
     if (_nameField == nil) {
         NSInteger row = [_outlineView selectedRow];
-        if (row < 0) {
-            NSBeep();
-            return;
-        }
-        NSURL *url = [_outlineView itemAtRow: row];
-        if (url == nil || [url path] == nil) {
-            NSBeep();
-            return;
-        }
-        BOOL isDir = NO;
-        if ([[NSFileManager defaultManager] fileExistsAtPath: [url path] isDirectory: &isDir] && isDir) {
-            BOOL isPackage = !_treatsFilePackagesAsDirectories &&
-                [[NSWorkspace sharedWorkspace] isFilePackageAtPath: [url path]];
-            BOOL canChooseDirs = [self isKindOfClass: [NSOpenPanel class]] && [(NSOpenPanel *)self canChooseDirectories];
-            if (!isPackage && !canChooseDirs) {
-                if ([sender isKindOfClass: [NSButton class]]) {
-                    canChooseDirs = YES;
-                } else {
+        // Activating (double-clicking) a plain folder opens or closes it
+        // rather than accepting it, unless the panel may choose directories.
+        if (row >= 0 && ![sender isKindOfClass: [NSButton class]]) {
+            NSURL *url = [_outlineView itemAtRow: row];
+            BOOL isDir = NO;
+            if ([url isKindOfClass: [NSURL class]] && [url path] != nil &&
+                [[NSFileManager defaultManager] fileExistsAtPath: [url path] isDirectory: &isDir] && isDir) {
+                BOOL isPackage = !_treatsFilePackagesAsDirectories &&
+                    [[NSWorkspace sharedWorkspace] isFilePackageAtPath: [url path]];
+                BOOL canChooseDirs = [self isKindOfClass: [NSOpenPanel class]] &&
+                    [(NSOpenPanel *)self canChooseDirectories];
+                if (!isPackage && !canChooseDirs) {
                     if ([_outlineView isItemExpanded: url])
                         [_outlineView collapseItem: url];
                     else
@@ -259,7 +279,12 @@ static NSSavePanel *_newPanel = nil;
                 }
             }
         }
-        [self _setFilename: [url path]];
+        NSArray *paths = [self _acceptablePaths];
+        if ([paths count] == 0) {
+            NSBeep();
+            return;
+        }
+        [self _setAcceptedPaths: paths];
     } else {
         NSString *name = [self nameFieldStringValue];
         if ([name length] == 0) {
@@ -292,6 +317,15 @@ static NSSavePanel *_newPanel = nil;
 - (void) _endWithCode: (NSModalResponse) code {
     if (_runsAsSheet) {
         [NSApp endSheet: self returnCode: code];
+    } else if (_runsModeless) {
+        void (^handler)(NSModalResponse) = _modelessCompletionHandler;
+        _modelessCompletionHandler = nil;
+        _runsModeless = NO;
+        [self orderOut: nil];
+        if (handler != nil) {
+            handler(code);
+            [handler release];
+        }
     } else {
         if ([NSApp modalWindow] == self)
             [NSApp stopModalWithCode: code];
@@ -299,17 +333,27 @@ static NSSavePanel *_newPanel = nil;
     }
 }
 
-// DARLING NOTE: if a key window is active, presents as an asynchronous sheet.
-// Otherwise, runs modally to satisfy dialog callers awaiting synchronous results.
+// Presents the panel as a modeless window and returns at once; the handler
+// gets the button the user pressed once the panel is dismissed. A display
+// with its own panels has no modeless form, so it runs them modally.
 - (void) beginWithCompletionHandler: (void (^)(NSModalResponse result)) handler {
-    NSWindow *keyWindow = [NSApp keyWindow];
-    if (keyWindow != nil && keyWindow != self) {
-        [self beginSheetModalForWindow: keyWindow completionHandler: handler];
-    } else {
+    if (_runsAsSheet || _runsModeless)
+        [NSException raise: NSInternalInconsistencyException
+                    format: @"-[%@ %@]: the panel is already running",
+                            [self class], NSStringFromSelector(_cmd)];
+    if ([[NSDisplay currentDisplay]
+                implementsCustomPanelForClass: [self class]]) {
         NSModalResponse result = [self runModal];
-        if (handler)
+        if (handler != nil)
             handler(result);
+        return;
     }
+
+    _modelessCompletionHandler = [handler copy];
+    _runsModeless = YES;
+    [self center];
+    [_nameField selectText: self];
+    [self makeKeyAndOrderFront: nil];
 }
 
 - (void) setNameFieldLabel: (NSString *) label {
@@ -351,9 +395,9 @@ static NSSavePanel *_newPanel = nil;
 - (void) beginSheetModalForWindow: (NSWindow *) window
                 completionHandler: (void (^)(NSModalResponse result)) handler
 {
-    if (_runsAsSheet)
+    if (_runsAsSheet || _runsModeless)
         [NSException raise: NSInternalInconsistencyException
-                    format: @"-[%@ %@]: the panel is already a sheet",
+                    format: @"-[%@ %@]: the panel is already running",
                             [self class], NSStringFromSelector(_cmd)];
     if (window == nil) {
         NSModalResponse result = [self runModal];
@@ -439,10 +483,25 @@ static NSSavePanel *_newPanel = nil;
     _dialogTitle = title;
 }
 
+// The file browser lists the panel's directory, as documented for
+// directoryURL; without one it lists "/".
+- (void) _showDirectory {
+    id dataSource = [_outlineView dataSource];
+    if (![dataSource respondsToSelector: @selector(setRootURL:)])
+        return;
+    NSURL *root = nil;
+    if ([_directory length] > 0)
+        root = [NSURL fileURLWithPath: _directory isDirectory: YES];
+    [dataSource setRootURL: root];
+    [_outlineView deselectAll: nil];
+    [_outlineView reloadData];
+}
+
 - (void) setDirectory: (NSString *) directory {
     directory = [directory copy];
     [_directory release];
     _directory = directory;
+    [self _showDirectory];
 }
 
 - (void) setDirectoryURL: (NSURL *) url {

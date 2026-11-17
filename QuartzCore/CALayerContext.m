@@ -1,17 +1,19 @@
+#import <Foundation/NSArray.h>
 #import <Foundation/NSString.h>
 #import <QuartzCore/CALayer.h>
 #import <QuartzCore/CALayerContext.h>
+#import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/CARenderer.h>
+#import <QuartzCore/CAOpenGLLayer.h>
 #import "CALayerInternal.h"
 #import <OpenGL/CGLInternal.h>
 #include <math.h>
 
-#import <QuartzCore/CAMetalLayer.h>
-#import <QuartzCore/CAOpenGLLayer.h>
-
+// The methods of CAMetalLayer used here. They are implemented for every
+// CAMetalLayer, including subclasses, in QuartzCore's Objective-C++ code.
 @interface CAMetalLayer (ContextPrivate)
-- (void)prepareRender;
-- (BOOL)hasQueuedDrawables;
+- (BOOL) hasQueuedDrawables;
+- (void) prepareRender;
 @end
 
 @implementation CALayerContext
@@ -46,6 +48,8 @@
     }
 
     _frame = rect;
+    _deleteTextureIds = [[NSMutableArray alloc] init];
+    _swapInterval = -1;
 
     _renderer = [[CARenderer rendererWithCGLContext: _glContext
                                             options: nil] retain];
@@ -62,10 +66,14 @@
     if ([_layer _context] == self)
         [_layer _setContext: nil];
     [_renderer release];
+    [_deleteTextureIds release];
     CGLReleaseContext(_glContext);
     CGLReleasePixelFormat(_pixelFormat);
-    if (_cglWindow != NULL)
+    if (_cglWindow != NULL && _ownsCglWindow)
         CGLDestroyWindow(_cglWindow);
+    // The subwindow can outlive the context (it may still be in an
+    // autorelease pool); it must not keep covering the window meanwhile.
+    [_subwindow hide];
     [_subwindow release];
     [_layer release];
     [super dealloc];
@@ -74,6 +82,10 @@
 - (void) setFrame: (CGRect) rect {
     _frame = rect;
     [_subwindow setFrame: _frame];
+
+    // The tree may have been set up before there was anything to draw it on.
+    if (_layer != nil && _cglWindow != NULL)
+        [self startTimerIfNeeded];
 }
 
 - (void) setLayer: (CALayer *) layer {
@@ -87,6 +99,17 @@
 
     [_layer _setContext: self];
     [_renderer setLayer: layer];
+    // Show the new tree even if nothing in it changes afterwards.
+    if (_layer != nil)
+        [self startTimerIfNeeded];
+}
+
+// A transparent or hidden root layer still has a native child window.
+- (void) setHidden: (BOOL) hidden {
+    if (hidden)
+        [_subwindow hide];
+    else
+        [_subwindow show];
 }
 
 // A transparent or hidden root layer still has a native child window.
@@ -101,7 +124,7 @@
 {
     CGSubWindow* oldSubwindow = _subwindow;
 
-    if (_cglWindow) {
+    if (_cglWindow && _ownsCglWindow) {
         // EGL defers destruction of a current surface. Unbind before releasing
         // its native window so Mesa cannot retain a dangling wl_egl_window.
         if (CGLGetCurrentContext() == _glContext && CGLSetCurrentContext(NULL) != kCGLNoError)
@@ -112,9 +135,14 @@
     [oldSubwindow hide];
     _subwindow = [subwindow retain];
     _cglWindow = CGLGetWindowForContext(_glContext, [_subwindow nativeWindow]);
+    _ownsCglWindow = _cglWindow != NULL;
+    _swapInterval = -1;
 
     [_subwindow show];
 
+    // As in -dealloc: a replaced subwindow is no longer drawn into.
+    if (oldSubwindow != _subwindow)
+        [oldSubwindow hide];
     [oldSubwindow release];
 
     [_subwindow setFrame: _frame];
@@ -146,7 +174,7 @@
 // with whatever _setContext: allocated, whose contents glTextureStorage2D leaves
 // undefined, which the self-draw hook then composited verbatim.
 //
-// Only a CAMetalLayerInternal needs this, and for one with an empty queue
+// Only a CAMetalLayer needs this, and for one with an empty queue
 // -prepareRender is a lock and an @synchronized, no GL work. The drawable pool
 // and its fd export live in -recreateDrawables, which only the property setters
 // call, so walking the tree cannot repeat that per frame.
@@ -159,6 +187,83 @@
 
     for (CALayer *child in layer.sublayers)
         [self prepareMetalLayersInLayerTree: child];
+}
+
+static GLint metalLayerSwapInterval(CALayer *layer);
+
+// A tree with Metal layers that covers a borderless window may present in the
+// window's own drawable (see -[CGSubWindow sharedCGLWindow]); switch to it, or
+// back to the subwindow's, as that changes.
+- (void) updateDrawable {
+    if (_subwindow == nil)
+        return;
+
+    GLint interval = _layer != nil ? metalLayerSwapInterval(_layer) : -1;
+    [_subwindow setAllowsParentDrawable: interval >= 0];
+    [_subwindow setSyncsToDisplay: interval != 0];
+    void *shared = [_subwindow sharedCGLWindow];
+
+    if (shared != NULL ? (_cglWindow == shared && !_ownsCglWindow)
+                       : (_cglWindow != NULL && _ownsCglWindow))
+        return;
+
+    // Detach from the old drawable before it can be destroyed.
+    if (CGLGetCurrentContext() == _glContext)
+        CGLSetCurrentContext(NULL);
+    if (_cglWindow != NULL && _ownsCglWindow)
+        CGLDestroyWindow(_cglWindow);
+
+    if (shared != NULL) {
+        _cglWindow = shared;
+        _ownsCglWindow = NO;
+    } else {
+        _cglWindow = CGLGetWindowForContext(_glContext, [_subwindow nativeWindow]);
+        _ownsCglWindow = _cglWindow != NULL;
+    }
+    // The swap interval belongs to the drawable.
+    _swapInterval = -1;
+}
+
+// The largest drawable dimension, in pixels, that the layer context renders.
+#define MAX_DRAWABLE_DIMENSION 16384
+
+// Sizes a drawable of the given size in points: the whole-point size used for
+// the projection, and the size in pixels for the viewport. The pixel size is the
+// one the subwindow reports for its allocation when it reports one, since
+// repeating the multiplication by the scale here could round differently and
+// leave an edge of the drawable stale; otherwise it follows from the
+// subwindow's backing scale. Returns NO when the size or scale is unusable.
+static BOOL drawableSizes(CGSubWindow *subwindow, CGSize size, GLint *width,
+                          GLint *height, GLsizei *pixelWidth, GLsizei *pixelHeight)
+{
+    if (!isfinite(size.width) || !isfinite(size.height) || size.width <= 0 ||
+        size.height <= 0 || size.width > MAX_DRAWABLE_DIMENSION ||
+        size.height > MAX_DRAWABLE_DIMENSION)
+        return NO;
+
+    CGSize pixels = [subwindow drawablePixelSize];
+    if (CGSizeEqualToSize(pixels, CGSizeZero)) {
+        CGFloat scale = [subwindow backingScaleFactor];
+        if (!isfinite(scale) || scale <= 0 ||
+            ceil(size.width) * scale > MAX_DRAWABLE_DIMENSION ||
+            ceil(size.height) * scale > MAX_DRAWABLE_DIMENSION)
+            return NO;
+        pixels = CGSizeMake(floor(ceil(size.width) * scale),
+                            floor(ceil(size.height) * scale));
+    } else if (!isfinite(pixels.width) || !isfinite(pixels.height) ||
+               pixels.width < 1 || pixels.height < 1 ||
+               pixels.width > MAX_DRAWABLE_DIMENSION ||
+               pixels.height > MAX_DRAWABLE_DIMENSION ||
+               floor(pixels.width) != pixels.width ||
+               floor(pixels.height) != pixels.height) {
+        return NO;
+    }
+
+    *width = ceil(size.width);
+    *height = ceil(size.height);
+    *pixelWidth = pixels.width;
+    *pixelHeight = pixels.height;
+    return YES;
 }
 
 // A pass runs app code (presented handlers, layout, delegates). If that code asks
@@ -179,49 +284,89 @@
 
 - (void) renderLayerTree: (CALayer *) layer {
     _rendered = NO;
-    if (_cglWindow == NULL && [_subwindow nativeWindow] != NULL) {
-        _cglWindow = CGLGetWindowForContext(_glContext, [_subwindow nativeWindow]);
-    }
-    if (_cglWindow == NULL)
-        return;
+
+    // A backend that presents on its own thread cannot be rendered into from
+    // another one.
     if ([_subwindow respondsToSelector: @selector(requiresMainThreadPresentation)] &&
         [_subwindow requiresMainThreadPresentation] && ![NSThread isMainThread]) {
         NSLog(@"This window backend requires OpenGL rendering on the main thread");
         return;
     }
-    CGLError error = CGLContextMakeCurrentAndAttachToWindow(_glContext, _cglWindow);
-    if (error != kCGLNoError) {
-        NSLog(@"Layer drawable attachment failed with CGL error %d", error);
+
+    if (_cglWindow == NULL)
+        return;
+
+    GLint width, height;
+    GLsizei pixelWidth, pixelHeight;
+    if (!drawableSizes(_subwindow, _frame.size, &width, &height, &pixelWidth,
+                       &pixelHeight))
+        return;
+
+    // The application's own context is current on this thread when a view
+    // displays; give it back afterwards, also when nothing was current or the
+    // tree's drawing raises.
+    CGLContextObj previous = CGLGetCurrentContext();
+
+    CGLError attachError = CGLContextMakeCurrentAndAttachToWindow(_glContext, _cglWindow);
+    if (attachError != kCGLNoError) {
+        NSLog(@"Layer drawable attachment failed with CGL error %d", attachError);
         return;
     }
 
+    @try {
+        // A context's draw and read buffers start out as NONE when it is first
+        // made current without a window surface, and a Metal layer does that to
+        // create its drawables. Attaching the window later does not change them,
+        // so select the window's back buffer, which the flush swaps.
+        glDrawBuffer(GL_BACK);
+        glReadBuffer(GL_BACK);
+
+        [self _drawLayerTree: layer
+                       width: width
+                      height: height
+                 pixelsWidth: pixelWidth
+                pixelsHeight: pixelHeight
+                 topRowFirst: NO];
+    } @finally {
+        if (previous != _glContext)
+            CGLSetCurrentContext(previous);
+    }
+}
+
+- (void) _drawLayerTree: (CALayer *) layer
+                  width: (GLint) width
+                 height: (GLint) height
+            topRowFirst: (BOOL) topRowFirst
+{
+    [self _drawLayerTree: layer
+                   width: width
+                  height: height
+             pixelsWidth: width
+            pixelsHeight: height
+             topRowFirst: topRowFirst];
+}
+
+// The projection covers width x height points and the viewport the given number
+// of pixels, which differs from it on a scaled drawable.
+- (void) _drawLayerTree: (CALayer *) layer
+                  width: (GLint) width
+                 height: (GLint) height
+            pixelsWidth: (GLsizei) pixelsWidth
+           pixelsHeight: (GLsizei) pixelsHeight
+            topRowFirst: (BOOL) topRowFirst
+{
     glEnable(GL_DEPTH_TEST);
     glShadeModel(GL_SMOOTH);
 
-    CGFloat width = _frame.size.width;
-    CGFloat height = _frame.size.height;
-    if (!isfinite(width) || !isfinite(height) || width <= 0 || height <= 0 ||
-        width > 16384 || height > 16384) return;
-
-    // A fractional-scale backend rounds its drawable allocation once. Repeating
-    // width*scale here can truncate to a different size and leave an edge stale.
-    CGSize pixels = [_subwindow respondsToSelector: @selector(drawablePixelSize)]
-        ? [_subwindow drawablePixelSize] : CGSizeZero;
-    if (CGSizeEqualToSize(pixels, CGSizeZero)) {
-        // Preserve the original API for older/native backends.
-        CGFloat scale = [_subwindow respondsToSelector: @selector(backingScaleFactor)]
-            ? [_subwindow backingScaleFactor] : 1.0;
-        if (!isfinite(scale) || scale <= 0 ||
-            ceil(width) * scale > 16384 || ceil(height) * scale > 16384) return;
-        pixels = CGSizeMake(floor(ceil(width) * scale), floor(ceil(height) * scale));
-    } else if (!isfinite(pixels.width) || !isfinite(pixels.height) ||
-        pixels.width < 1 || pixels.height < 1 ||
-        pixels.width > 16384 || pixels.height > 16384 ||
-        floor(pixels.width) != pixels.width || floor(pixels.height) != pixels.height) return;
-    glViewport(0, 0, (GLsizei)pixels.width, (GLsizei)pixels.height);
+    glViewport(0, 0, pixelsWidth, pixelsHeight);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrtho(0, width, 0, height, -1, 1);
+    // Framebuffer row 0 is the bottom of the picture on a window. Pixels read
+    // back into memory whose first row is the top are drawn upside down.
+    if (topRowFirst)
+        glOrtho(0, width, height, 0, -1, 1);
+    else
+        glOrtho(0, width, 0, height, -1, 1);
 
     GLsizei i = 0;
     GLuint deleteIds[[_deleteTextureIds count]];
@@ -243,6 +388,11 @@
 }
 
 - (void) render {
+    [self updateDrawable];
+    // Without a window surface, attaching would leave the context without a
+    // drawable and the tree would be drawn into nothing.
+    if (_layer == nil || _cglWindow == NULL)
+        return;
     [self renderLayer: _layer];
 }
 
@@ -256,7 +406,10 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
     if ([layer isKindOfClass: [CAMetalLayer class]] &&
         [(CAMetalLayer*)layer hasQueuedDrawables])
         return YES;
-    if ([layer isKindOfClass: [CAOpenGLLayer class]])
+    // An asynchronous OpenGL layer is asked for a new frame every tick; a
+    // synchronous one only draws after -setNeedsDisplay, which starts the timer.
+    if ([layer isKindOfClass: [CAOpenGLLayer class]] &&
+        [(CAOpenGLLayer *) layer isAsynchronous])
         return YES;
     for (CALayer *child in layer.sublayers)
         if (layerTreeNeedsAnotherFrame(child))
@@ -303,7 +456,8 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
         [self performSelectorOnMainThread: @selector(startTimerIfNeeded)
                                withObject: nil
                             waitUntilDone: NO
-                                    modes: [NSArray arrayWithObjects: NSDefaultRunLoopMode, NSRunLoopCommonModes, @"NSModalPanelRunLoopMode", nil]];
+                                    modes: [NSArray arrayWithObjects: NSDefaultRunLoopMode, NSRunLoopCommonModes,
+                                             @"NSModalPanelRunLoopMode", nil]];
         return;
     }
     _renderRequested = YES;
@@ -318,15 +472,36 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
         // and default mode keeps frames flowing during normal event processing.
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode: NSDefaultRunLoopMode];
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode: NSRunLoopCommonModes];
+        // The AppKit constant NSModalPanelRunLoopMode is not available to
+        // QuartzCore, which sits below AppKit, so its value is spelled out.
+        // Frames keep flowing while a modal panel runs its own loop.
         [[NSRunLoop mainRunLoop] addTimer: _timer forMode: @"NSModalPanelRunLoopMode"];
     }
 }
 
 - (void) deleteTextureId: (NSNumber *) textureId {
-    [_deleteTextureIds addObject: textureId];
+    if (textureId != nil)
+        [_deleteTextureIds addObject: textureId];
+}
+
+// The swap interval the Metal layers in a tree ask for: 1 if any of them has
+// displaySyncEnabled set, 0 if none has, and -1 for a tree without Metal layers.
+static GLint metalLayerSwapInterval(CALayer *layer) {
+    GLint interval = -1;
+    if ([layer isKindOfClass: [CAMetalLayer class]])
+        interval = [(CAMetalLayer *) layer displaySyncEnabled] ? 1 : 0;
+    for (CALayer *child in layer.sublayers) {
+        GLint childInterval = metalLayerSwapInterval(child);
+        if (childInterval > interval)
+            interval = childInterval;
+    }
+    return interval;
 }
 
 - (void) flush {
+    if (_cglWindow == NULL)
+        return;
+
     // Wayland geometry, EGL swap and parent commit must be one UI-thread
     // transaction. Do not swap first then dispatch only presentation to main.
     if ([_subwindow respondsToSelector: @selector(requiresMainThreadPresentation)] &&
@@ -336,15 +511,38 @@ static BOOL layerTreeNeedsAnotherFrame(CALayer *layer) {
             NSLog(@"This window backend requires OpenGL presentation on the main thread");
         return;
     }
-    if (!_rendered) return;
+
+    // Nothing was drawn since the last swap.
+    if (!_rendered)
+        return;
     _rendered = NO;
-    // Older subwindow implementations lack refreshMillihertz.
+
+    // The swap applies to the current context's surface. Code run during the
+    // frame, such as a Metal layer's present, may have made another context
+    // current, so make this one current on its window first.
+    CGLContextObj previous = CGLGetCurrentContext();
+    if (CGLContextMakeCurrentAndAttachToWindow(_glContext, _cglWindow) != kCGLNoError)
+        return;
+
+    // A Metal layer's frames are synchronized with the display refresh unless
+    // its displaySyncEnabled is NO, and they reach the screen through this
+    // swap. Other trees keep the context's own setting.
+    GLint interval = metalLayerSwapInterval(_layer);
+    if (interval >= 0 && interval != _swapInterval &&
+        CGLSetParameter(_glContext, kCGLCPSwapInterval, &interval) == kCGLNoError)
+        _swapInterval = interval;
+
+    // The swap and whatever the backend does to present it happen together on
+    // the thread the backend requires. First pace it to the refresh rate of the
+    // output the window is on; 0 means unknown.
     CGLSetDrawableRefreshRate(_glContext,
         [_subwindow respondsToSelector: @selector(refreshMillihertz)]
         ? [_subwindow refreshMillihertz] : 0);
     if (CGLFlushDrawable(_glContext) == kCGLNoError &&
         [_subwindow respondsToSelector: @selector(flush)])
         [_subwindow flush];
+    if (previous != _glContext)
+        CGLSetCurrentContext(previous);
 }
 
 @end

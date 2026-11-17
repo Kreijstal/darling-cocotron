@@ -191,12 +191,24 @@ CATransform3D CATransform3DMakeAffineTransform(CGAffineTransform m) {
 }
 
 - (CATransform3D) CATransform3DValue {
+    // QUIRK: a value that does not hold a CATransform3D reads back as the
+    // identity transform; no exception is raised and no bytes are reinterpreted.
+    // Not documented. Evidence: black-box observation on macOS 26.7.3 (tier 2),
+    // vd-upstream mac-probes/v315-caspring-validation.m (NSValue holding a point
+    // and an NSNumber both gave the identity).
+    // Test: tests/quartzcore-nsvalue-catransform3d.m (quirk_other_type_reads_identity)
     if (strcmp([self objCType], @encode(CATransform3D)) != 0)
-        [NSException raise: NSInvalidArgumentException
-                    format: @"NSValue of type %s does not hold a CATransform3D", [self objCType]];
+        return CATransform3DIdentity;
     CATransform3D t;
     [self getValue: &t];
     return t;
 }
 
 @end
+
+// The 2D part of the matrix: m11, m12, m21, m22, m41, m42. The other elements
+// are ignored. Observed on macOS 26.7.3 for a matrix with non-zero m13 and m33
+// and for one with m14 set.
+CGAffineTransform CATransform3DGetAffineTransform(CATransform3D t) {
+    return CGAffineTransformMake(t.m11, t.m12, t.m21, t.m22, t.m41, t.m42);
+}

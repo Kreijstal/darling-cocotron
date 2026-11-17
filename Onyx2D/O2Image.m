@@ -36,8 +36,11 @@
 
 @implementation O2Image
 
+ONYX2D_STATIC_INLINE const void *scanlineAtY(O2Image *self, int y);
+
 ONYX2D_STATIC O2argb8u *O2ImageRead_G1_to_argb8u(O2Image *self, NSInteger x, NSInteger y, O2argb8u *span) {
-    const uint8_t *src = (const uint8_t *)self->_directBytes + (y * self->_bytesPerRow) + (x / 8);
+    // scanlineAtY loads the pixel bytes on first use
+    const uint8_t *src = (const uint8_t *)scanlineAtY(self, (int)y) + (x / 8);
     for (NSInteger i = 0; i < (NSInteger)self->_width - x; ++i) {
         NSInteger bitIndex = (x + i) % 8;
         uint8_t byte = src[(x + i) / 8 - (x / 8)];
@@ -51,7 +54,8 @@ ONYX2D_STATIC O2argb8u *O2ImageRead_G1_to_argb8u(O2Image *self, NSInteger x, NSI
 }
 
 ONYX2D_STATIC uint8_t *O2ImageRead_G1_to_A8(O2Image *self, NSInteger x, NSInteger y, uint8_t *alpha) {
-    const uint8_t *src = (const uint8_t *)self->_directBytes + (y * self->_bytesPerRow) + (x / 8);
+    // scanlineAtY loads the pixel bytes on first use
+    const uint8_t *src = (const uint8_t *)scanlineAtY(self, (int)y) + (x / 8);
     for (NSInteger i = 0; i < (NSInteger)self->_width - x; ++i) {
         NSInteger bitIndex = (x + i) % 8;
         uint8_t byte = src[(x + i) / 8 - (x / 8)];
@@ -78,6 +82,11 @@ ONYX2D_STATIC BOOL initFunctionsForMonochrome(O2Image *self,
         case 8:
             self->_read_a8u = O2ImageRead_G8_to_A8;
             self->_read_argb8u = O2ImageRead_G8_to_argb8u;
+            return YES;
+
+        case 16:
+            // Gray and alpha bytes (gray first), as a bitmap context makes them.
+            self->_read_argb8u = O2ImageRead_GA88_to_argb8u;
             return YES;
         }
         break;
@@ -125,8 +134,16 @@ ONYX2D_STATIC BOOL initFunctionsForRGBColorSpace(O2Image *self,
             return YES;
 
         case 24:
-            self->_read_argb8u = O2ImageRead_RGB888_to_argb8u;
-            return YES;
+            switch (bitmapInfo & kO2BitmapAlphaInfoMask) {
+            case kO2ImageAlphaNone:
+                // Three bytes per pixel are R, G, B in memory whatever the byte
+                // order flag says (it describes 16- and 32-bit words): reading
+                // them as 4-byte pixels skewed every image with 24-bit samples,
+                // like DeviceRGB images in PDFs.
+                self->_read_argb8u = O2ImageRead_RGB888_to_argb8u;
+                return YES;
+            }
+            break;
 
         case 32:
             switch (bitmapInfo & kO2BitmapAlphaInfoMask) {
@@ -324,6 +341,18 @@ ONYX2D_STATIC BOOL initFunctionsForParameters(O2Image *self,
             bitmapInfo |= kO2BitmapByteOrder32Big;
             break;
 
+        case kO2ImageAlphaFirst:
+        case kO2ImageAlphaPremultipliedFirst:
+        case kO2ImageAlphaNoneSkipFirst:
+            // 8-bit components with the alpha first: A, R, G, B in memory, as
+            // for a bitmap context with the same flags. Callers that hold
+            // BGRA data say so with the little-endian byte order.
+            if (bitsPerComponent == 8 && bitsPerPixel == 32) {
+                bitmapInfo |= kO2BitmapByteOrder32Big;
+                break;
+            }
+            // fall through
+
         default:
 #ifdef __LITTLE_ENDIAN__
             bitmapInfo |= kO2BitmapByteOrder32Little;
@@ -383,6 +412,7 @@ ONYX2D_STATIC BOOL initFunctionsForParameters(O2Image *self,
     _isMask = NO;
     _renderingIntent = renderingIntent;
     _mask = nil;
+    _contentHeadroom = 0;
 
     _directBytes = NULL;
     _directLength = 0;
@@ -653,6 +683,36 @@ O2ImageRef O2ImageCreateWithImageInRect(O2ImageRef self, O2Rect rect) {
             self->_decode, self->_interpolate, self->_renderingIntent);
 
     O2DataProviderRelease(provider);
+
+    if (result != NULL)
+        result->_contentHeadroom = self->_contentHeadroom;
+
+    return result;
+}
+
+float O2ImageGetContentHeadroom(O2ImageRef self) {
+    if (self == NULL)
+        return 0;
+
+    return self->_contentHeadroom;
+}
+
+O2ImageRef O2ImageCreateCopyWithContentHeadroom(O2ImageRef self,
+                                                float headroom)
+{
+    if (self == NULL)
+        return NULL;
+
+    O2ImageRef result = O2ImageCreate(
+            self->_width, self->_height, self->_bitsPerComponent,
+            self->_bitsPerPixel, self->_bytesPerRow, self->_colorSpace,
+            self->_bitmapInfo, self->_provider, self->_decode,
+            self->_interpolate, self->_renderingIntent);
+
+    if (result != NULL) {
+        result->_contentHeadroom = headroom;
+        [result setMask: self->_mask];
+    }
 
     return result;
 }
@@ -989,6 +1049,13 @@ O2argb8u *O2ImageRead_GA88_to_argb8u(O2Image *self, int x, int y,
     return NULL;
 }
 
+// The alpha byte of a NoneSkip pixel is padding, not coverage: such pixels are opaque.
+static inline BOOL imageSkipsAlpha(O2Image *self) {
+    O2BitmapInfo alpha = self->_bitmapInfo & kO2BitmapAlphaInfoMask;
+    return alpha == kO2ImageAlphaNoneSkipLast ||
+           alpha == kO2ImageAlphaNoneSkipFirst;
+}
+
 O2argb8u *O2ImageRead_RGBA8888_to_argb8u(O2Image *self, int x, int y,
                                          O2argb8u *span, int length)
 {
@@ -1005,7 +1072,7 @@ O2argb8u *O2ImageRead_RGBA8888_to_argb8u(O2Image *self, int x, int y,
         result.r = scanline[0];
         result.g = scanline[1];
         result.b = scanline[2];
-        result.a = scanline[3];
+        result.a = imageSkipsAlpha(self) ? 255 : scanline[3];
         if ((self->_bitmapInfo & kO2BitmapAlphaInfoMask) == kO2ImageAlphaLast) {
             result.r = (result.r * result.a + 127) / 255;
             result.g = (result.g * result.a + 127) / 255;
@@ -1031,6 +1098,8 @@ O2argb8u *O2ImageRead_ABGR8888_to_argb8u(O2Image *self, int x, int y,
         O2argb8u result;
 
         result.a = *scanline++;
+        if (imageSkipsAlpha(self))
+            result.a = 255;
         result.b = *scanline++;
         result.g = *scanline++;
         result.r = *scanline++;
@@ -1132,6 +1201,8 @@ O2argb8u *O2ImageRead_XRGB8888_to_argb8u(O2Image *self, int x, int y,
         O2argb8u result;
 
         result.a = *scanline++;
+        if (imageSkipsAlpha(self))
+            result.a = 255;
         result.r = *scanline++;
         result.g = *scanline++;
         result.b = *scanline++;

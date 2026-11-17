@@ -8,6 +8,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 #import <CoreText/CTFont.h>
 #import <CoreText/CTFontTraits.h>
+#import <CoreText/CTGlyphInfo.h>
 #import <CoreText/CTParagraphStyle.h>
 #import <CoreText/CTTextTab.h>
 #import <CoreText/SFNTLayoutTypes.h>
@@ -15,6 +16,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #import <CoreText/CTStringAttributes.h>
 #import <CoreText/CTFontCollection.h>
 #import <CoreText/CTGlyphInfo.h>
+#import <CoreText/CTFontDescriptor.h>
 #import <CoreText/CTFontManager.h>
 #import <CoreText/CTFrame.h>
 #import <CoreText/CTFrameSetter.h>

@@ -19,6 +19,7 @@
 #endif
 
 #define O2FONT_GLYPH_CACHE_LIMIT 512
+#define O2FONT_GLYPH_CACHE_BYTES_LIMIT (4 * 1024 * 1024)
 
 @class O2FreeTypeCachedGlyph;
 
@@ -29,6 +30,7 @@
     O2Encoding *_macExpertEncoding;
     O2Encoding *_winAnsiEncoding;
     NSMutableDictionary *_glyphCache;
+    NSUInteger _glyphCacheBytes;
 }
 
 - (instancetype) initWithFace: (FT_Face) face;
@@ -42,6 +44,38 @@ FT_Library O2FontSharedFreeTypeLibrary();
 FcConfig *O2FontSharedFontConfig();
 // Adds a font file (or a directory of them) at a guest path to the fonts names resolve to.
 BOOL O2FontRegisterFontFile(NSString *path);
+
+// Returns an owned font covering all supplied Unicode scalar values, or nil.
+O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,
+                                           size_t count, FT_Face baseFace,
+                                           const char *language);
+
+- (O2FreeTypeCachedGlyph *) rasterizeGlyph: (O2Glyph) glyph
+                                  pointSize: (O2Float) pointSize;
+
+@end
+
+@interface O2FreeTypeCachedGlyph : NSObject {
+@public
+    FT_Bitmap bitmap;
+    NSInteger left;
+    NSInteger top;
+    FT_Pos advance;
+}
+
+- (instancetype) initWithBitmap: (const FT_Bitmap *) bitmap
+                            left: (NSInteger) left
+                             top: (NSInteger) top
+                         advance: (FT_Pos) advance;
+
+/* Lists the installed faces whose properties equal all of the non-nil
+ * arguments; no substitution takes place. Each element is a dictionary
+ * with the NSString keys @"family", @"postScriptName", @"style",
+ * @"fullName" and @"path" (any of them may be missing). The path is the
+ * font file as guest code sees it, not fontconfig's host path. The caller
+ * owns the returned array. */
+NSArray *O2FontCopyInstalledFaces(NSString *family, NSString *postScriptName,
+                                  NSString *style, NSString *fullName);
 
 // Returns an owned font covering all supplied Unicode scalar values, or nil.
 O2FontRef O2FontCreateWithCodePointCoverage(const uint32_t *codePoints,

@@ -29,6 +29,13 @@ NSString *const NSWorkspaceWillPowerOffNotification =
 
 NSString *const NSWorkspaceRecycleOperation = @"NSWorkspaceRecycleOperation";
 NSString *const NSWorkspaceDuplicateOperation = @"NSWorkspaceDuplicateOperation";
+NSString *const NSWorkspaceMoveOperation = @"move";
+
+// Not declared in a public header.
+APPKIT_EXPORT const NSNotificationName
+        NSWorkspaceAccessibilityFocusedElementDidChangeNotification;
+const NSNotificationName NSWorkspaceAccessibilityFocusedElementDidChangeNotification =
+        @"NSWorkspaceAccessibilityFocusedElementDidChangeNotification";
 
 NSString *const NSWorkspaceLaunchConfigurationAppleEvent =
         @"NSWorkspaceLaunchConfigurationAppleEvent";
@@ -92,8 +99,9 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 - (BOOL) accessibilityDisplayShouldInvertColors { return NO; }
 - (BOOL) accessibilityDisplayShouldReduceMotion { return NO; }
 
-// No assistive-technology client exists on this platform, so VoiceOver is never running.
+// No assistive-technology client exists on this platform, so VoiceOver and Switch Control are never running.
 - (BOOL) isVoiceOverEnabled { return NO; }
+- (BOOL) isSwitchControlEnabled { return NO; }
 
 - (NSImage *) iconForFile: (NSString *) path {
     NSInvalidAbstractInvocation();
@@ -250,6 +258,16 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
     completionHandler: (void (^)(NSRunningApplication *app, NSError *error)) completionHandler
 {
     NSInvalidAbstractInvocation();
+}
+
+- (BOOL) openURLs: (NSArray<NSURL *> *) urls
+           withAppBundleIdentifier: (NSString *) bundleIdentifier
+                           options: (NSWorkspaceLaunchOptions) options
+    additionalEventParamDescriptor: (NSAppleEventDescriptor *) descriptor
+                 launchIdentifiers: (NSArray **) identifiers
+{
+    NSInvalidAbstractInvocation();
+    return NO;
 }
 
 - (BOOL) selectFile: (NSString *) path
@@ -543,3 +561,12 @@ NSNotificationName NSWorkspaceWillUnmountNotification = @"NSWorkspaceWillUnmount
 }
 
 @end
+
+NSNotificationName const NSWorkspaceDidHideApplicationNotification = @"NSWorkspaceDidHideApplicationNotification";
+NSNotificationName const NSWorkspaceDidUnhideApplicationNotification = @"NSWorkspaceDidUnhideApplicationNotification";
+NSString * const NSWorkspaceVolumeLocalizedNameKey = @"NSWorkspaceVolumeLocalizedNameKey";
+NSString * const NSWorkspaceVolumeURLKey = @"NSWorkspaceVolumeURLKey";
+NSString * const NSWorkspaceVolumeOldLocalizedNameKey = @"NSWorkspaceVolumeOldLocalizedNameKey";
+NSString * const NSWorkspaceVolumeOldURLKey = @"NSWorkspaceVolumeOldURLKey";
+NSNotificationName const NSWorkspaceDidRenameVolumeNotification = @"NSWorkspaceDidRenameVolumeNotification";
+NSNotificationName const NSWorkspaceDidChangeFileLabelsNotification = @"NSWorkspaceDidChangeFileLabelsNotification";

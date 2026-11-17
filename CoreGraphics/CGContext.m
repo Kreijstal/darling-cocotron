@@ -27,6 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <CoreGraphics/CGShading.h>
 #import <CoreGraphics/CoreGraphicsPrivate.h>
 #import <Onyx2D/O2Context.h>
+#import <Onyx2D/O2GraphicsState.h>
 #import <Onyx2D/O2MutablePath.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -51,6 +52,14 @@ void CGContextBeginTransparencyLayer(CGContextRef context,
                                      CFDictionaryRef unused)
 {
     O2ContextBeginTransparencyLayer((O2ContextRef)context, (NSDictionary *) unused);
+}
+
+// The rectangle only bounds the layer, a hint to the renderer, so the layer's
+// contents do not depend on it; it is not used to clip.
+void CGContextBeginTransparencyLayerWithRect(CGContextRef context, CGRect rect,
+                                             CFDictionaryRef auxiliaryInfo)
+{
+    CGContextBeginTransparencyLayer(context, auxiliaryInfo);
 }
 
 void CGContextEndTransparencyLayer(CGContextRef context) {
@@ -403,6 +412,71 @@ void CGContextSetLineDash(CGContextRef context, CGFloat phase,
     O2ContextSetLineDash((O2ContextRef)context, phase, lengths, count);
 }
 
+// Private. Number of dash lengths in the current dash pattern, 0 for none.
+size_t CGContextGetLineDashCount(CGContextRef context) {
+    if (context == NULL)
+        return 0;
+    O2GState *state = O2ContextCurrentGState((O2ContextRef)context);
+    return state->_dashLengths != NULL ? state->_dashLengthsCount : 0;
+}
+
+// Private. Writes the dash phase to *phase and up to `capacity` dash lengths
+// to `lengths`.
+// QUIRK: the dash phase is written even when capacity is 0, and a context with
+// no dash gets phase 0 and no lengths. The macOS function also returns a value
+// whose meaning is unknown (not the count), so none is declared here.
+// Evidence: black-box calls on macOS 26.7.3 with capacities 0, 1, 2, 3 and 10
+// against a phase 2, lengths {3,5,7} dash (tier 2).
+// Test: coregraphics-private-context-functions.c
+void CGContextGetLineDashPattern(CGContextRef context, CGFloat *phase,
+                                 CGFloat *lengths, size_t capacity)
+{
+    if (context == NULL)
+        return;
+    O2GState *state = O2ContextCurrentGState((O2ContextRef)context);
+    if (phase != NULL)
+        *phase = state->_dashLengths != NULL ? state->_dashPhase : 0;
+    if (lengths != NULL && state->_dashLengths != NULL) {
+        size_t count = state->_dashLengthsCount;
+        for (size_t i = 0; i < count && i < capacity; i++)
+            lengths[i] = state->_dashLengths[i];
+    }
+}
+
+// Private. The "composite operation" is the context's blend mode seen through
+// a renumbering: operation 2 is the default (normal), 13..27 are the blend modes
+// Multiply..Luminosity (CGBlendMode 1..15) and 0, 1 and 3..12 are Clear, Copy,
+// SourceIn ... PlusLighter (CGBlendMode 16..27).
+// QUIRK: the numbering is undocumented. Evidence: black-box calls on macOS 26.7.3
+// (tier 2): the getter's value after CGContextSetBlendMode(m) for every public
+// mode m, and the pixel drawn after the setter for every operation 0..27.
+// On the Mac the getter reports 2 for a blend mode outside the public range. The
+// setter's result for an operation outside 0..27 is undefined (it crashed in
+// some observations); here such operations are ignored.
+// Test: coregraphics-private-context-functions.c
+static const int8_t compositeOperationForBlendMode[28] = {
+    2, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+    0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+};
+
+int CGContextGetCompositeOperation(CGContextRef context) {
+    if (context == NULL)
+        return 2;
+    unsigned mode = (unsigned)O2GStateBlendMode(O2ContextCurrentGState((O2ContextRef)context));
+    return mode < 28 ? compositeOperationForBlendMode[mode] : 2;
+}
+
+void CGContextSetCompositeOperation(CGContextRef context, int operation) {
+    if (context == NULL)
+        return;
+    for (int mode = 0; mode < 28; mode++) {
+        if (compositeOperationForBlendMode[mode] == operation) {
+            CGContextSetBlendMode(context, (CGBlendMode)mode);
+            return;
+        }
+    }
+}
+
 void CGContextSetRenderingIntent(CGContextRef context,
                                  CGColorRenderingIntent renderingIntent)
 {
@@ -718,38 +792,22 @@ void CGContextDrawTiledImage(CGContextRef c, CGRect rect, CGImageRef image)
     printf("STUB %s\n", __PRETTY_FUNCTION__);
 }
 
-void CGContextShowGlyphsAtPositions(CGContextRef context,
-                                    const CGGlyph *glyphs,
-                                    const CGPoint *positions, size_t count)
+void CGContextShowGlyphsAtPositions(CGContextRef c,
+                                    const CGGlyph *glyphs, const CGPoint *positions,
+                                    size_t count)
 {
-    if (context == NULL || glyphs == NULL || positions == NULL || count == 0 ||
-        count > UINT_MAX || count > SIZE_MAX / sizeof(CGSize))
+    if (c == NULL || glyphs == NULL || positions == NULL)
         return;
-
-    CGSize *advances = malloc(count * sizeof(*advances));
-    if (advances == NULL)
-        return;
-    size_t i;
-
-    for (i = 0; i + 1 < count; i++) {
-        advances[i].width = positions[i + 1].x - positions[i].x;
-        advances[i].height = positions[i + 1].y - positions[i].y;
+    // Each position is in text space: the text matrix is applied to it to
+    // find where the glyph origin lands (a shear or translation in the text
+    // matrix moves the glyph). The text matrix and text position are left as
+    // they were.
+    CGAffineTransform matrix = CGContextGetTextMatrix(c);
+    CGPoint saved = CGContextGetTextPosition(c);
+    for (size_t i = 0; i < count; i++) {
+        CGPoint origin = CGPointApplyAffineTransform(positions[i], matrix);
+        CGContextShowGlyphsAtPoint(c, origin.x, origin.y, glyphs + i, 1);
     }
-
-    // Deliberate approximation: positions do not carry the last glyph's own
-    // advance, so the text position ends at positions[count - 1], not past it.
-    advances[count - 1] = CGSizeMake(0, 0);
-
-    // positions[0] shifts the whole run, so it cannot become an advance. It is
-    // in text space like the advances, hence the text matrix.
-    CGPoint origin = CGContextGetTextPosition(context);
-    CGSize offset = CGSizeApplyAffineTransform(
-            CGSizeMake(positions[0].x, positions[0].y),
-            CGContextGetTextMatrix(context));
-
-    CGContextSetTextPosition(context, origin.x + offset.width,
-                             origin.y + offset.height);
-    CGContextShowGlyphsWithAdvances(context, glyphs, advances,
-                                    (unsigned) count);
-    free(advances);
+    CGContextSetTextMatrix(c, matrix);
+    CGContextSetTextPosition(c, saved.x, saved.y);
 }

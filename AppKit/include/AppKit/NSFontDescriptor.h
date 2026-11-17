@@ -18,11 +18,12 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
 @class NSDictionary, NSAffineTransform, NSArray, NSSet, NSFontDescriptor;
 
-typedef NSString *NSFontDescriptorAttributeName;
+typedef NSString *NSFontDescriptorAttributeName NS_STRING_ENUM;
 
 APPKIT_EXPORT NSFontDescriptorAttributeName NSFontFamilyAttribute;
 APPKIT_EXPORT NSFontDescriptorAttributeName NSFontNameAttribute;
@@ -37,12 +38,39 @@ APPKIT_EXPORT NSFontDescriptorAttributeName NSFontTraitsAttribute;
 APPKIT_EXPORT NSFontDescriptorAttributeName NSFontFixedAdvanceAttribute;
 APPKIT_EXPORT NSFontDescriptorAttributeName NSFontFeatureSettingsAttribute;
 
-typedef NSString *NSFontDescriptorFeatureKey;
+typedef NSString *NSFontDescriptorFeatureKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSFontDescriptorFeatureKey NSFontFeatureTypeIdentifierKey;
 APPKIT_EXPORT NSFontDescriptorFeatureKey NSFontFeatureSelectorIdentifierKey;
 
-typedef unsigned NSFontSymbolicTraits;
+typedef NS_OPTIONS(uint32_t, NSFontDescriptorSymbolicTraits) {
+    NSFontDescriptorTraitItalic = 1u << 0,
+    NSFontDescriptorTraitBold = 1u << 1,
+    NSFontDescriptorTraitExpanded = 1u << 5,
+    NSFontDescriptorTraitCondensed = 1u << 6,
+    NSFontDescriptorTraitMonoSpace = 1u << 10,
+    NSFontDescriptorTraitVertical = 1u << 11,
+    NSFontDescriptorTraitUIOptimized = 1u << 12,
+    NSFontDescriptorTraitTightLeading = 1u << 15,
+    NSFontDescriptorTraitLooseLeading = 1u << 16,
+
+    NSFontDescriptorClassMask = 0xF0000000,
+
+    NSFontDescriptorClassUnknown = 0u << 28,
+    NSFontDescriptorClassOldStyleSerifs = 1u << 28,
+    NSFontDescriptorClassTransitionalSerifs = 2u << 28,
+    NSFontDescriptorClassModernSerifs = 3u << 28,
+    NSFontDescriptorClassClarendonSerifs = 4u << 28,
+    NSFontDescriptorClassSlabSerifs = 5u << 28,
+    NSFontDescriptorClassFreeformSerifs = 7u << 28,
+    NSFontDescriptorClassSansSerif = 8u << 28,
+    NSFontDescriptorClassOrnamentals = 9u << 28,
+    NSFontDescriptorClassScripts = 10u << 28,
+    NSFontDescriptorClassSymbolic = 12u << 28,
+};
+
+// The older name of the same type.
+typedef NSFontDescriptorSymbolicTraits NSFontSymbolicTraits;
 
 enum {
     NSFontUnknownClass = 0 << 28,
@@ -69,14 +97,14 @@ enum {
     NSFontUIOptimizedTrait = (1 << 12)
 };
 
-typedef NSString *NSFontDescriptorTraitKey;
+typedef NSString *NSFontDescriptorTraitKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSFontDescriptorTraitKey NSFontSymbolicTrait;
 APPKIT_EXPORT NSFontDescriptorTraitKey NSFontWeightTrait;
 APPKIT_EXPORT NSFontDescriptorTraitKey NSFontWidthTrait;
 APPKIT_EXPORT NSFontDescriptorTraitKey NSFontSlantTrait;
 
-typedef CGFloat NSFontWeight;
+typedef CGFloat NSFontWeight NS_TYPED_EXTENSIBLE_ENUM;
 
 APPKIT_EXPORT const NSFontWeight NSFontWeightThin;
 APPKIT_EXPORT const NSFontWeight NSFontWeightLight;
@@ -98,6 +126,7 @@ APPKIT_EXPORT NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignRou
 
 @interface NSFontDescriptor : NSObject <NSCopying> {
     NSDictionary *_attributes;
+    NS_LEGACY_IVAR_PAD(_NSFontDescriptorReserved, 20)
 }
 
 - initWithFontAttributes: (NSDictionary *) attributes;
@@ -130,3 +159,17 @@ APPKIT_EXPORT NSFontDescriptorSystemDesign const NSFontDescriptorSystemDesignRou
 - (NSFontDescriptor *) matchingFontDescriptorWithMandatoryKeys: (NSSet *) keys;
 
 @end
+
+typedef NSString *NSFontTextStyle NS_TYPED_ENUM;
+
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleLargeTitle;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleTitle1;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleTitle2;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleTitle3;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleHeadline;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleSubheadline;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleBody;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleCallout;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleFootnote;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleCaption1;
+APPKIT_EXPORT NSFontTextStyle const NSFontTextStyleCaption2;

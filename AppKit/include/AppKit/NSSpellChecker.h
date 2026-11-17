@@ -18,6 +18,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSGeometry.h>
 #import <Foundation/NSObject.h>
 #import <Foundation/NSTextCheckingResult.h>
@@ -39,14 +40,13 @@ APPKIT_EXPORT NSString *const NSTextCheckingDocumentURLKey;
 APPKIT_EXPORT NSString *const NSTextCheckingDocumentTitleKey;
 APPKIT_EXPORT NSString *const NSTextCheckingDocumentAuthorKey;
 
-enum {
+typedef NS_ENUM(NSInteger, NSCorrectionIndicatorType) {
     NSCorrectionIndicatorTypeDefault = 0,
     NSCorrectionIndicatorTypeReversion,
     NSCorrectionIndicatorTypeGuesses,
 };
-typedef NSInteger NSCorrectionIndicatorType;
 
-enum {
+typedef NS_ENUM(NSInteger, NSCorrectionResponse) {
     NSCorrectionResponseNone,
     NSCorrectionResponseAccepted,
     NSCorrectionResponseRejected,
@@ -54,7 +54,6 @@ enum {
     NSCorrectionResponseEdited,
     NSCorrectionResponseReverted,
 };
-typedef NSInteger NSCorrectionResponse;
 
 @interface NSSpellChecker : NSObject {
     NSPanel *_spellingPanel;
@@ -65,12 +64,13 @@ typedef NSInteger NSCorrectionResponse;
     NSMutableSet *_learnedWords;
     NSString *_language;
     BOOL _automaticallyIdentifiesLanguages;
+    NS_LEGACY_IVAR_PAD(_NSSpellCheckerReserved, 48)
 }
 
 #pragma mark -
 #pragma mark Getting the Spell Checker
 
-+ (NSSpellChecker *) sharedSpellChecker;
+@property(class, readonly, retain, nonnull) NSSpellChecker *sharedSpellChecker;
 + (BOOL) sharedSpellCheckerExists;
 
 #pragma mark -
@@ -124,7 +124,7 @@ typedef NSInteger NSCorrectionResponse;
                    orthography: (NSOrthography **) orthography
                      wordCount: (NSInteger *) wordCount;
 
-#ifdef NS_BLOCKS
+#if defined(NS_BLOCKS) || defined(__BLOCKS__)
 - (NSInteger) requestCheckingOfString: (NSString *) stringToCheck
                                 range: (NSRange) range
                                 types: (NSTextCheckingTypes) checkingTypes
@@ -181,7 +181,7 @@ typedef NSInteger NSCorrectionResponse;
                inSpellDocumentWithTag: (NSInteger) tag;
 + (BOOL) isAutomaticSpellingCorrectionEnabled;
 
-#ifdef NS_BLOCKS
+#if defined(NS_BLOCKS) || defined(__BLOCKS__)
 - (void) showCorrectionIndicatorOfType: (NSCorrectionIndicatorType) type
                          primaryString: (NSString *) primaryString
                     alternativeStrings: (NSArray *) alternativeStrings
@@ -207,7 +207,7 @@ typedef NSInteger NSCorrectionResponse;
 #pragma mark Automatic Substitution Settings
 
 // The user's settings (NSGlobalDomain keys such as
-// NSAutomaticQuoteSubstitutionEnabled); YES when unset.
+// NSAutomaticQuoteSubstitutionEnabled); NO when unset.
 + (BOOL) isAutomaticQuoteSubstitutionEnabled;
 + (BOOL) isAutomaticDashSubstitutionEnabled;
 + (BOOL) isAutomaticCapitalizationEnabled;

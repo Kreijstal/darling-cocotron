@@ -18,9 +18,10 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSObject.h>
 
-typedef NSString *NSSharingServiceName;
+typedef NSString *NSSharingServiceName NS_EXTENSIBLE_STRING_ENUM;
 
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNameAddToIPhoto;
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNameAddToSafariReadingList;
@@ -30,6 +31,8 @@ APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNameComposeMessage;
 /* Deprecated */
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnFacebook;
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnLinkedIn;
+APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNameSendViaAirDrop;
+APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNameCloudSharing;
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnSinaWeibo;
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnTencentWeibo;
 APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnTwitter;
@@ -37,12 +40,21 @@ APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnTwitter;
 @class NSImage, NSArray, NSMenu, NSView;
 @protocol NSSharingServiceDelegate, NSSharingServicePickerDelegate;
 
+typedef NS_ENUM(NSInteger, NSSharingContentScope) {
+    NSSharingContentScopeItem,
+    NSSharingContentScopePartial,
+    NSSharingContentScopeFull,
+};
+
 @interface NSSharingService : NSObject {
+    NS_EXTRA_IVARS_BEGIN(NSSharingService)
     NSString *_title;
     NSImage *_image;
     NSImage *_alternateImage;
     NSString *_menuItemTitle;
     id <NSSharingServiceDelegate> _delegate;
+    void (^_handler)(void);
+    NS_EXTRA_IVARS_END(NSSharingService)
 }
 
 @property (readonly, copy) NSString *title;
@@ -61,8 +73,10 @@ APPKIT_EXPORT NSSharingServiceName const NSSharingServiceNamePostOnTwitter;
 @end
 
 @interface NSSharingServicePicker : NSObject {
+    NS_EXTRA_IVARS_BEGIN(NSSharingServicePicker)
     NSArray *_items;
     id <NSSharingServicePickerDelegate> _delegate;
+    NS_EXTRA_IVARS_END(NSSharingServicePicker)
 }
 
 @property (assign) id <NSSharingServicePickerDelegate> delegate;

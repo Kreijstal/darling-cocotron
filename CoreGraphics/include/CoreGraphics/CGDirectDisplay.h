@@ -6,19 +6,33 @@
 #import <CoreGraphics/CGGeometry.h>
 #import <CoreGraphics/CGColorSpace.h>
 #import <CoreGraphics/CoreGraphicsExport.h>
+#import <CoreGraphics/CGColorSpace.h>
+#import <CoreGraphics/CGImage.h>
 #import <mach/boolean.h>
 
 typedef uint32_t CGDirectDisplayID;
 typedef uint32_t CGOpenGLDisplayMask;
 typedef double CGRefreshRate;
+typedef int32_t CGDisplayCoord;
 
-#define kCGDirectMainDisplay 69989856
-#define kCGDisplayBitsPerPixel 8200
+#import <CoreGraphics/CGDirectPalette.h>
+
+#define kCGDirectMainDisplay CGMainDisplayID()
 #define kCGDisplayBlendNormal 0
 #define kCGDisplayBlendSolidColor 1
-#define kCGDisplayRefreshRate 8200
-#define kCGDisplayHeight 8200
-#define kCGDisplayWidth 8200
+
+// Keys of the display mode dictionaries of CGDisplayAvailableModes,
+// CGDisplayCurrentMode and CGDisplayBestModeForParameters.
+#define kCGDisplayWidth CFSTR("Width")
+#define kCGDisplayHeight CFSTR("Height")
+#define kCGDisplayMode CFSTR("Mode")
+#define kCGDisplayBitsPerPixel CFSTR("BitsPerPixel")
+#define kCGDisplayBitsPerSample CFSTR("BitsPerSample")
+#define kCGDisplaySamplesPerPixel CFSTR("SamplesPerPixel")
+#define kCGDisplayRefreshRate CFSTR("RefreshRate")
+#define kCGDisplayModeUsableForDesktopGUI CFSTR("UsableForDesktopGUI")
+#define kCGDisplayIOFlags CFSTR("IOFlags")
+#define kCGDisplayBytesPerRow CFSTR("kCGDisplayBytesPerRow")
 #define kCGMaxDisplayReservationInterval 15
 #define kCGNullDirectDisplay 0
 
@@ -46,6 +60,9 @@ COREGRAPHICS_EXPORT CGError CGGetDisplaysWithOpenGLDisplayMask(
 COREGRAPHICS_EXPORT CGDirectDisplayID
 CGOpenGLDisplayMaskToDisplayID(CGOpenGLDisplayMask mask);
 
+COREGRAPHICS_EXPORT CGOpenGLDisplayMask
+CGDisplayIDToOpenGLDisplayMask(CGDirectDisplayID display);
+
 COREGRAPHICS_EXPORT CGError CGGetDisplaysWithPoint(
         CGPoint point, uint32_t maxDisplays, CGDirectDisplayID *displays,
         uint32_t *matchingDisplayCount);
@@ -64,6 +81,22 @@ COREGRAPHICS_EXPORT boolean_t CGDisplayUsesOpenGLAcceleration(CGDirectDisplayID 
 COREGRAPHICS_EXPORT CGDirectDisplayID
 CGDisplayMirrorsDisplay(CGDirectDisplayID display);
 
+COREGRAPHICS_EXPORT CFDictionaryRef
+CGDisplayBestModeForParameters(CGDirectDisplayID display, size_t bitsPerPixel,
+                               size_t width, size_t height,
+                               boolean_t *exactMatch);
+COREGRAPHICS_EXPORT void *CGDisplayBaseAddress(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT void *CGDisplayAddressForPosition(CGDirectDisplayID display,
+                                                      CGDisplayCoord x,
+                                                      CGDisplayCoord y);
+COREGRAPHICS_EXPORT size_t CGDisplayBytesPerRow(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT size_t CGDisplayBitsPerPixel(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT size_t CGDisplayBitsPerSample(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT size_t CGDisplaySamplesPerPixel(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT uint32_t CGDisplayBeamPosition(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT boolean_t CGDisplayCanSetPalette(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplaySetPalette(CGDirectDisplayID display,
+                                                const CGDirectPaletteRef palette);
 COREGRAPHICS_EXPORT CFDictionaryRef
 CGDisplayBestModeForParametersAndRefreshRate(CGDirectDisplayID display,
                                              size_t bitsPerPixel, size_t width,
@@ -94,8 +127,25 @@ COREGRAPHICS_EXPORT CGDirectDisplayID CGDisplayGetDisplayIDFromUUID(CFUUIDRef uu
 COREGRAPHICS_EXPORT boolean_t CGDisplayIsActive(CGDirectDisplayID display);
 COREGRAPHICS_EXPORT boolean_t CGDisplayIsBuiltin(CGDirectDisplayID display);
 COREGRAPHICS_EXPORT boolean_t CGDisplayIsAsleep(CGDirectDisplayID display);
-COREGRAPHICS_EXPORT int32_t CGDisplayRotation(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT double CGDisplayRotation(CGDirectDisplayID display);
 COREGRAPHICS_EXPORT CGColorSpaceRef CGDisplayCopyColorSpace(CGDirectDisplayID display);
-
+COREGRAPHICS_EXPORT CGImageRef CGDisplayCreateImage(CGDirectDisplayID displayID);
+COREGRAPHICS_EXPORT bool CGDisplayUsesForceToGray(void);
+COREGRAPHICS_EXPORT bool CGPreflightScreenCaptureAccess(void);
+COREGRAPHICS_EXPORT bool CGRequestScreenCaptureAccess(void);
+#ifdef __OBJC__
+// Returns a retained id<MTLDevice>.
+COREGRAPHICS_EXPORT id CGDirectDisplayCopyCurrentMetalDevice(CGDirectDisplayID display);
+#endif
+COREGRAPHICS_EXPORT CGRect CGDisplayBounds(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplayCapture(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplayRelease(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplayMoveCursorToPoint(CGDirectDisplayID display, CGPoint point);
+COREGRAPHICS_EXPORT CGError CGDisplayHideCursor(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplayShowCursor(CGDirectDisplayID display);
+COREGRAPHICS_EXPORT CGError CGDisplaySetDisplayMode(CGDirectDisplayID display,
+                                                    CGDisplayModeRef mode,
+                                                    CFDictionaryRef options);
 
 #endif /* CGDIRECTDISPLAY_H */
+

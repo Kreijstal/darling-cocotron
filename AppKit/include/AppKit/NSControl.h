@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSCell.h>
 #import <AppKit/NSText.h>
 #import <AppKit/NSView.h>
@@ -27,13 +28,18 @@ APPKIT_EXPORT const NSNotificationName NSControlTextDidBeginEditingNotification;
 APPKIT_EXPORT const NSNotificationName NSControlTextDidChangeNotification;
 APPKIT_EXPORT const NSNotificationName NSControlTextDidEndEditingNotification;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x5c, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSControl : NSView {
     NSControlAuxiliary *_aux;
     id _cell;
-    NSText *_currentEditor;
-    BOOL _allowsExpansionToolTips;
-    BOOL _setsMaxLayoutWidthAtFirstLayout;
-    BOOL _allowsLogicalLayoutDirection;
+    NS_EXTRA_IVARS_BEGIN(NSControl)
+        NSText *_currentEditor;
+        BOOL _allowsExpansionToolTips;
+        BOOL _setsMaxLayoutWidthAtFirstLayout;
+        BOOL _allowsLogicalLayoutDirection;
+    NS_EXTRA_IVARS_END(NSControl)
 }
 
 @property BOOL allowsExpansionToolTips;
@@ -42,65 +48,43 @@ APPKIT_EXPORT const NSNotificationName NSControlTextDidEndEditingNotification;
 + (Class) cellClass;
 + (void) setCellClass: (Class) aClass;
 
-- (id) cell;
+@property(nonatomic, retain) id cell;
 
 @property (assign, nullable) id target;
-- (SEL) action;
-- (NSInteger) tag;
+@property(nonatomic) SEL action;
+@property(nonatomic) NSInteger tag;
 @property (retain) NSFont *font;
-- (NSImage *) image;
-- (NSTextAlignment) alignment;
-- (BOOL) isEnabled;
-- (BOOL) isEditable;
-- (BOOL) isSelectable;
-- (BOOL) isScrollable;
-- (BOOL) isBordered;
-- (BOOL) isBezeled;
-- (BOOL) isContinuous;
-- (BOOL) refusesFirstResponder;
-- (id) formatter;
+@property(nonatomic, retain) NSImage *image;
+@property(nonatomic) NSTextAlignment alignment;
+@property(nonatomic, getter=isEnabled) BOOL enabled;
+@property(nonatomic, getter=isEditable) BOOL editable;
+@property(nonatomic, getter=isSelectable) BOOL selectable;
+@property(nonatomic, getter=isScrollable) BOOL scrollable;
+@property(nonatomic, getter=isBordered) BOOL bordered;
+@property(nonatomic, getter=isBezeled) BOOL bezeled;
+@property(nonatomic, getter=isContinuous) BOOL continuous;
+@property(nonatomic) BOOL refusesFirstResponder;
+@property(nonatomic, retain) id formatter;
 @property NSLineBreakMode lineBreakMode;
-- (BOOL) usesSingleLineMode;
+@property(nonatomic) BOOL usesSingleLineMode;
 // The cell's control size.
-@property NSControlSize controlSize;
+@property(nonatomic) NSControlSize controlSize;
 
-- (id) objectValue;
-- (NSString *) stringValue;
-- (NSAttributedString *) attributedStringValue;
-- (int) intValue;
-- (float) floatValue;
+@property(nonatomic, retain) id objectValue;
+@property(nonatomic, copy) NSString *stringValue;
+@property(nonatomic, copy) NSAttributedString *attributedStringValue;
+@property(nonatomic) int intValue;
+@property(nonatomic) float floatValue;
 @property double doubleValue;
-- (NSInteger) integerValue;
+@property(nonatomic) NSInteger integerValue;
 
-- (id) selectedCell;
-- (NSInteger) selectedTag;
+@property(nonatomic, readonly) id selectedCell;
+@property(nonatomic, readonly) NSInteger selectedTag;
 
-- (void) setCell: (NSCell *) cell;
-- (void) setAction: (SEL) action;
-- (void) setTag: (NSInteger) tag;
-- (void) setImage: (NSImage *) image;
-- (void) setAlignment: (NSTextAlignment) alignment;
 - (void) setFloatingPointFormat: (BOOL) fpp
                            left: (NSUInteger) left
                           right: (NSUInteger) right;
-- (void) setEnabled: (BOOL) flag;
-- (void) setEditable: (BOOL) flag;
-- (void) setSelectable: (BOOL) flag;
-- (void) setScrollable: (BOOL) flag;
-- (void) setBordered: (BOOL) flag;
-- (void) setBezeled: (BOOL) flag;
-- (void) setContinuous: (BOOL) flag;
-- (void) setRefusesFirstResponder: (BOOL) flag;
-- (void) setFormatter: (NSFormatter *) formatter;
-- (void) setUsesSingleLineMode: (BOOL) flag;
 
-- (void) setObjectValue: (id<NSCopying>) value;
-- (void) setStringValue: (NSString *) value;
-- (void) setIntValue: (int) value;
-- (void) setIntegerValue: (NSInteger) value;
-- (void) setFloatValue: (float) value;
-- (void) setIntegerValue: (NSInteger) anInteger;
-- (void) setAttributedStringValue: (NSAttributedString *) value;
 
 - (void) takeObjectValueFrom: (id) sender;
 - (void) takeStringValueFrom: (id) sender;

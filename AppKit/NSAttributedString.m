@@ -28,104 +28,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSStringDrawer.h>
 #import <AppKit/NSTextAttachment.h>
 
-// Font, paragraph style and superscript use the key strings archived attributed strings carry, as CoreText's
-// kCTFontAttributeName and kCTParagraphStyleAttributeName do.
-NSAttributedStringKey NSFontAttributeName = @"NSFont";
-NSAttributedStringKey NSParagraphStyleAttributeName = @"NSParagraphStyle";
-NSAttributedStringKey NSForegroundColorAttributeName = @"NSForegroundColorAttributeName";
-NSAttributedStringKey NSBackgroundColorAttributeName = @"NSBackgroundColorAttributeName";
-NSAttributedStringKey NSUnderlineStyleAttributeName = @"NSUnderlineStyleAttributeName";
-NSAttributedStringKey NSUnderlineColorAttributeName = @"NSUnderlineColorAttributeName";
-NSAttributedStringKey NSAttachmentAttributeName = @"NSAttachmentAttributeName";
-NSAttributedStringKey NSKernAttributeName = @"NSKernAttributeName";
-NSAttributedStringKey NSLigatureAttributeName = @"NSLigatureAttributeName";
-NSAttributedStringKey NSStrikethroughStyleAttributeName = @"NSStrikethroughStyleAttributeName";
-NSAttributedStringKey NSStrikethroughColorAttributeName = @"NSStrikethroughColorAttributeName";
-NSAttributedStringKey NSObliquenessAttributeName = @"NSObliquenessAttributeName";
-NSAttributedStringKey NSStrokeWidthAttributeName = @"NSStrokeWidthAttributeName";
-NSAttributedStringKey NSStrokeColorAttributeName = @"NSStrokeColorAttributeName";
-NSAttributedStringKey NSBaselineOffsetAttributeName = @"NSBaselineOffsetAttributeName";
-NSAttributedStringKey NSSuperscriptAttributeName = @"NSSuperScript";
-NSAttributedStringKey NSLinkAttributeName = @"NSLinkAttributeName";
-NSAttributedStringKey NSShadowAttributeName = @"NSShadowAttributeName";
-NSAttributedStringKey NSExpansionAttributeName = @"NSExpansionAttributeName";
-NSAttributedStringKey NSCursorAttributeName = @"NSCursorAttributeName";
-NSAttributedStringKey NSMarkedClauseSegmentAttributeName = @"NSMarkedClauseSegment";
-NSAttributedStringKey NSToolTipAttributeName = @"NSToolTipAttributeName";
-NSAttributedStringKey NSGlyphInfoAttributeName = @"NSGlyphInfo";
-NSAttributedStringKey NSVerticalGlyphFormAttributeName = @"NSVerticalGlyphForm";
-NSAttributedStringKey NSTextAlternativesAttributeName = @"NSTextAlternatives";
-NSAttributedStringKey NSSpellingStateAttributeName = @"NSSpellingStateAttributeName"; // temporary attribute
-
-NSAttributedStringDocumentAttributeKey NSDocumentTypeDocumentAttribute = @"DocumentType";
-NSAttributedStringDocumentAttributeKey NSConvertedDocumentAttribute = @"Converted";
-NSAttributedStringDocumentAttributeKey NSFileTypeDocumentAttribute = @"UTI";
-NSAttributedStringDocumentAttributeKey NSTitleDocumentAttribute = @"NSTitleDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCompanyDocumentAttribute = @"NSCompanyDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCopyrightDocumentAttribute = @"NSCopyrightDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSSubjectDocumentAttribute = @"NSSubjectDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSAuthorDocumentAttribute = @"NSAuthorDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSKeywordsDocumentAttribute = @"NSKeywordsDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCommentDocumentAttribute = @"NSCommentDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSEditorDocumentAttribute = @"NSEditorDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCreationTimeDocumentAttribute = @"NSCreationTimeDocumentAttribute";
-NSAttributedStringKey NSModificationTimeDocumentAttribute = @"NSModificationTimeDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSManagerDocumentAttribute = @"NSManagerDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCategoryDocumentAttribute = @"NSCategoryDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSAppearanceDocumentAttribute = @"NSAppearanceDocumentAttribute";
-NSAttributedStringDocumentAttributeKey NSCharacterEncodingDocumentAttribute = @"CharacterEncoding";
-NSAttributedStringDocumentAttributeKey NSDefaultAttributesDocumentAttribute = @"DefaultAttributes";
-NSAttributedStringDocumentAttributeKey NSPaperSizeDocumentAttribute = @"PaperSize";
-NSAttributedStringDocumentAttributeKey NSLeftMarginDocumentAttribute = @"LeftMargin";
-NSAttributedStringDocumentAttributeKey NSRightMarginDocumentAttribute = @"RightMargin";
-NSAttributedStringDocumentAttributeKey NSTopMarginDocumentAttribute = @"TopMargin";
-NSAttributedStringDocumentAttributeKey NSBottomMarginDocumentAttribute = @"BottomMargin";
-NSAttributedStringDocumentAttributeKey NSViewSizeDocumentAttribute = @"ViewSize";
-NSAttributedStringDocumentAttributeKey NSViewZoomDocumentAttribute = @"ViewZoom";
-NSAttributedStringDocumentAttributeKey NSViewModeDocumentAttribute = @"ViewMode";
-NSAttributedStringDocumentAttributeKey NSReadOnlyDocumentAttribute = @"ReadOnly";
-NSAttributedStringDocumentAttributeKey NSBackgroundColorDocumentAttribute = @"BackgroundColor";
-NSAttributedStringDocumentAttributeKey NSHyphenationFactorDocumentAttribute = @"HyphenationFactor";
-NSAttributedStringDocumentAttributeKey NSDefaultTabIntervalDocumentAttribute = @"DefaultTabInterval";
-NSAttributedStringDocumentAttributeKey NSTextLayoutSectionsAttribute = @"NSTextLayoutSectionsAttribute";
-NSAttributedStringDocumentAttributeKey NSExcludedElementsDocumentAttribute = @"ExcludedElements";
-NSAttributedStringDocumentAttributeKey NSTextEncodingNameDocumentAttribute = @"TextEncodingName";
-NSAttributedStringDocumentAttributeKey NSPrefixSpacesDocumentAttribute = @"PrefixSpaces";
-NSAttributedStringDocumentAttributeKey NSCocoaVersionDocumentAttribute = @"NSCocoaVersionDocumentAttribute";
-
-NSAttributedStringDocumentReadingOptionKey NSDocumentTypeDocumentOption = @"DocumentType";
-NSAttributedStringDocumentReadingOptionKey NSDefaultAttributesDocumentOption = @"DefaultAttributes";
-NSAttributedStringDocumentReadingOptionKey NSCharacterEncodingDocumentOption = @"CharacterEncoding";
-NSAttributedStringDocumentReadingOptionKey NSTextEncodingNameDocumentOption = @"TextEncodingName";
-NSAttributedStringDocumentReadingOptionKey NSBaseURLDocumentOption = @"BaseURL";
-NSAttributedStringDocumentReadingOptionKey NSTimeoutDocumentOption = @"Timeout";
-NSAttributedStringDocumentReadingOptionKey NSWebPreferencesDocumentOption = @"WebPreferences";
-NSAttributedStringDocumentReadingOptionKey NSWebResourceLoadDelegateDocumentOption = @"WebResourceLoadDelegate";
-NSAttributedStringDocumentReadingOptionKey NSTextSizeMultiplierDocumentOption = @"TextSizeMultiplier";
-NSAttributedStringDocumentReadingOptionKey NSFileTypeDocumentOption = @"UTI";
-
-NSAttributedStringDocumentType NSPlainTextDocumentType = @"NSPlainText";
-NSAttributedStringDocumentType NSRTFTextDocumentType = @"NSRTF";
-NSAttributedStringDocumentType NSRTFDTextDocumentType = @"NSRTFD";
-NSAttributedStringDocumentType NSHTMLTextDocumentType = @"NSHTML";
-NSAttributedStringDocumentType NSMacSimpleTextDocumentType = @"NSMacSimpleText";
-NSAttributedStringDocumentType NSDocFormatTextDocumentType = @"NSDocFormat";
-NSAttributedStringDocumentType NSWordMLTextDocumentType = @"NSWordML";
-NSAttributedStringDocumentType NSWebArchiveTextDocumentType = @"NSWebArchive";
-NSAttributedStringDocumentType NSOfficeOpenXMLTextDocumentType = @"NSOfficeOpenXML";
-NSAttributedStringDocumentType NSOpenDocumentTextDocumentType = @"NSOpenDocument";
-
-NSTextLayoutSectionKey NSTextLayoutSectionOrientation = @"NSTextLayoutSectionOrientation";
-NSTextLayoutSectionKey NSTextLayoutSectionRange = @"NSTextLayoutSectionRange";
-
-NSAttributedStringKey NSCharacterShapeAttributeName = @"NSCharacterShape";
+// Exported by AppKit; UIFoundation defines the other attribute and document
+// keys.
 NSAttributedStringKey NSUsesScreenFontsDocumentAttribute = @"UsesScreenFonts";
-
-const NSAttributedStringKey NSTextEffectAttributeName = @"NSTextEffect";
-NSAttributedStringKey NSWritingDirectionAttributeName = @"NSWritingDirectionAttribute";
-
-NSUInteger NSUnderlineStrikethroughMask = 0x4000;
-NSUInteger NSUnderlineByWordMask = 0x8000;
 
 @implementation NSAttributedString (NSAttributedString_AppKit)
 
@@ -329,18 +234,44 @@ NSUInteger NSUnderlineByWordMask = 0x8000;
     return [self initWithAttributedString: string];
 }
 
+// RTFD data is a serialized file wrapper (see -[NSFileWrapper serializedRepresentation]);
+// plain RTF is not accepted.
 - initWithRTFD: (NSData *) rtfd
         documentAttributes: (NSDictionary **) attributes
 {
-    NSUnimplementedMethod();
-    return nil;
+    NSFileWrapper *wrapper = [[NSFileWrapper alloc] initWithSerializedRepresentation: rtfd];
+
+    if (wrapper == nil) {
+        [self release];
+        return nil;
+    }
+    self = [self initWithRTFDFileWrapper: wrapper documentAttributes: attributes];
+    [wrapper release];
+    if (self != nil && attributes != NULL)
+        *attributes = [NSDictionary dictionaryWithObject: NSRTFDTextDocumentType
+                                                  forKey: NSDocumentTypeDocumentAttribute];
+    return self;
 }
 
+// The wrapper must be a directory holding the text as TXT.rtf; the other files in it are
+// the attachments.
 - initWithRTFDFileWrapper: (NSFileWrapper *) wrapper
         documentAttributes: (NSDictionary **) attributes
 {
-    NSUnimplementedMethod();
-    return nil;
+    NSDictionary *children = [wrapper isDirectory] ? [wrapper fileWrappers] : nil;
+    NSFileWrapper *text = [children objectForKey: @"TXT.rtf"];
+    NSData *rtf = [text isRegularFile] ? [text regularFileContents] : nil;
+    NSAttributedString *string = nil;
+
+    if (rtf != nil)
+        string = [NSRichTextReader attributedStringWithData: rtf attachmentFileWrappers: children];
+    if (string == nil) {
+        [self release];
+        return nil;
+    }
+    if (attributes)
+        *attributes = [NSDictionary dictionary];
+    return [self initWithAttributedString: string];
 }
 
 - initWithURL: (NSURL *) url documentAttributes: (NSDictionary **) attributes {
@@ -557,10 +488,11 @@ NSUInteger NSUnderlineByWordMask = 0x8000;
     return [self fileWrapperFromRange: range documentAttributes: rtfd error: NULL];
 }
 
+// RTFD data is the serialized form of the RTFD file wrapper.
 - (NSData *) RTFDFromRange: (NSRange) range
         documentAttributes: (NSDictionary *) attributes
 {
-    return [NSRichTextWriter dataWithAttributedString: self range: range];
+    return [[self RTFDFileWrapperFromRange: range documentAttributes: attributes] serializedRepresentation];
 }
 
 - (NSData *) RTFFromRange: (NSRange) range
@@ -569,7 +501,7 @@ NSUInteger NSUnderlineByWordMask = 0x8000;
     return [NSRichTextWriter dataWithAttributedString: self range: range];
 }
 
-// RTF, RTFD (the RTF data, without attachments) and plain text, by the
+// RTF, RTFD (the serialized RTFD wrapper) and plain text, by the
 // NSDocumentTypeDocumentAttribute; plain text uses NSCharacterEncodingDocumentAttribute
 // or UTF-8. Other types fail with an error.
 - (NSData *) dataFromRange: (NSRange) range
@@ -728,36 +660,3 @@ NSUInteger NSUnderlineByWordMask = 0x8000;
 }
 
 @end
-
-#pragma mark -
-#pragma mark Private
-
-NSFont *NSFontAttributeInDictionary(NSDictionary *dictionary) {
-    NSFont *font = [dictionary objectForKey: NSFontAttributeName];
-
-    if (font == nil)
-        font = [NSFont fontWithName: @"Arial" size: 12.0];
-
-    return font;
-}
-
-NSColor *NSForegroundColorAttributeInDictionary(NSDictionary *dictionary) {
-    NSColor *color = [dictionary objectForKey: NSForegroundColorAttributeName];
-
-    if (color == nil)
-        color = [NSColor blackColor];
-
-    return color;
-}
-
-NSParagraphStyle *
-NSParagraphStyleAttributeInDictionary(NSDictionary *dictionary)
-{
-    NSParagraphStyle *style =
-            [dictionary objectForKey: NSParagraphStyleAttributeName];
-
-    if (style == nil)
-        style = [NSParagraphStyle defaultParagraphStyle];
-
-    return style;
-}

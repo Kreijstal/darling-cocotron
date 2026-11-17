@@ -1,19 +1,38 @@
 #import <AppKit/NSResponder.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 
 @class NSView, NSStoryboard;
 
+typedef NS_OPTIONS(NSUInteger, NSViewControllerTransitionOptions) {
+    NSViewControllerTransitionNone = 0x0,
+    NSViewControllerTransitionCrossfade = 0x1,
+    NSViewControllerTransitionSlideUp = 0x10,
+    NSViewControllerTransitionSlideDown = 0x20,
+    NSViewControllerTransitionSlideLeft = 0x40,
+    NSViewControllerTransitionSlideRight = 0x80,
+    NSViewControllerTransitionSlideForward = 0x140,
+    NSViewControllerTransitionSlideBackward = 0x180,
+    NSViewControllerTransitionAllowUserInteraction = 0x1000,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x34, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSViewController : NSResponder <NSUserInterfaceItemIdentification> {
     NSString *_nibName;
     NSBundle *_nibBundle;
     id _representedObject;
     NSString *_title;
     NSView *_view;
-    NSUserInterfaceItemIdentifier _identifier;
-    NSMutableArray *_childViewControllers;
-    NSViewController *_parentViewController;
-    NSStoryboard *_storyboard;
-    NSSize _preferredContentSize;
+    NS_LEGACY_IVAR_PAD(_NSViewControllerReserved1, 20)
+    NS_EXTRA_IVARS_BEGIN(NSViewController)
+        NSUserInterfaceItemIdentifier _identifier;
+        NSMutableArray *_childViewControllers;
+        NSViewController *_parentViewController;
+        NSStoryboard *_storyboard;
+        NSSize _preferredContentSize;
+    NS_EXTRA_IVARS_END(NSViewController)
 }
 
 - initWithNibName: (NSString *) name bundle: (NSBundle *) bundle;
@@ -22,8 +41,6 @@
 - (NSBundle *) nibBundle;
 
 @property (retain, nonnull) NSView *view;
-@property(readonly, strong) NSStoryboard *storyboard;
-@property NSSize preferredContentSize;
 @property(copy) NSArray<__kindof NSViewController *> *childViewControllers;
 @property(readonly) NSViewController *parentViewController;
 
@@ -34,19 +51,22 @@
                            atIndex: (NSInteger) index;
 - (void) removeChildViewControllerAtIndex: (NSInteger) index;
 - (void) removeFromParentViewController;
-- (NSString *) title;
+
+@property(readonly, strong) NSStoryboard *storyboard;
+// Stored for the controller's presenter; NSZeroSize until set.
+@property NSSize preferredContentSize;
+@property(nonatomic, copy) NSString *title;
 - representedObject;
 
 - (void) setRepresentedObject: object;
 
-- (void) setTitle: (NSString *) value;
 
 
 - (void) loadView;
+@property(readonly, getter=isViewLoaded) BOOL viewLoaded; // 10.10
 - (void) loadViewIfNeeded;
 // Called once -view has loaded the view with -loadView; does nothing by default.
 - (void) viewDidLoad;
-@property(readonly, getter=isViewLoaded) BOOL viewLoaded;
 
 - (void) discardEditing;
 

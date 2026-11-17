@@ -29,7 +29,23 @@ static NSString *const NSStoryboardInitialIdentifierKey = @"NSStoryboardDesignat
 static NSString *const NSStoryboardNibNamesKey = @"NSViewControllerIdentifiersToNibNames";
 static NSString *const NSStoryboardMainMenuKey = @"NSStoryboardMainMenu";
 
-static __thread NSStoryboard *instantiatingStoryboard;
+// The storyboard whose nib is being instantiated on this thread. Kept in the
+// thread dictionary: thread-local variables are not available to 32-bit
+// Mach-O objects.
+static NSString *const NSStoryboardInstantiatingKey = @"_NSStoryboardInstantiating";
+
+static NSStoryboard *currentInstantiatingStoryboard(void) {
+    return [[[NSThread currentThread] threadDictionary] objectForKey: NSStoryboardInstantiatingKey];
+}
+
+static void setCurrentInstantiatingStoryboard(NSStoryboard *storyboard) {
+    NSMutableDictionary *dictionary = [[NSThread currentThread] threadDictionary];
+
+    if (storyboard != nil)
+        [dictionary setObject: storyboard forKey: NSStoryboardInstantiatingKey];
+    else
+        [dictionary removeObjectForKey: NSStoryboardInstantiatingKey];
+}
 
 @interface NSStoryboardControllerPlaceholder : NSObject
 @end
@@ -63,23 +79,24 @@ static __thread NSStoryboard *instantiatingStoryboard;
                     format: @"Could not find a storyboard named '%@' in bundle %@", name, bundle];
 
     NSStoryboard *storyboard = [[[self alloc] init] autorelease];
-    storyboard->_path = [path copy];
-    storyboard->_info = [info retain];
+    NS_EXTRA(NSStoryboard, storyboard)->_path = [path copy];
+    NS_EXTRA(NSStoryboard, storyboard)->_info = [info retain];
     return storyboard;
 }
 
 + (NSStoryboard *) _instantiatingStoryboard {
-    return instantiatingStoryboard;
+    return currentInstantiatingStoryboard();
 }
 
 - (void) dealloc {
-    [_path release];
-    [_info release];
+    [NS_EXTRA(NSStoryboard, self)->_path release];
+    [NS_EXTRA(NSStoryboard, self)->_info release];
+    NS_EXTRA_FREE(NSStoryboard, self);
     [super dealloc];
 }
 
 - (NSString *) _pathForNibNamed: (NSString *) name {
-    NSString *path = [[_path stringByAppendingPathComponent: name] stringByAppendingPathExtension: @"nib"];
+    NSString *path = [[NS_EXTRA(NSStoryboard, self)->_path stringByAppendingPathComponent: name] stringByAppendingPathExtension: @"nib"];
     return [[NSFileManager defaultManager] fileExistsAtPath: path] ? path : nil;
 }
 
@@ -89,20 +106,20 @@ static __thread NSStoryboard *instantiatingStoryboard;
     NSMutableArray *topLevelObjects = [NSMutableArray array];
     NSMutableDictionary *nameTable = [NSMutableDictionary dictionaryWithObjectsAndKeys:
             topLevelObjects, NSNibTopLevelObjects, self, NSStoryboardSceneExternalObjectKey, nil];
-    NSStoryboard *outer = instantiatingStoryboard;
+    NSStoryboard *outer = [[currentInstantiatingStoryboard() retain] autorelease];
     BOOL loaded;
 
     if (owner != nil)
         [nameTable setObject: owner forKey: NSNibOwner];
-    instantiatingStoryboard = self;
+    setCurrentInstantiatingStoryboard(self);
     @try {
         loaded = [nib instantiateNibWithExternalNameTable: nameTable];
     } @finally {
-        instantiatingStoryboard = outer;
+        setCurrentInstantiatingStoryboard(outer);
     }
     if (!loaded)
         [NSException raise: NSInternalInconsistencyException
-                    format: @"Unable to load nib %@ of storyboard %@", name, _path];
+                    format: @"Unable to load nib %@ of storyboard %@", name, NS_EXTRA(NSStoryboard, self)->_path];
     // The nib load retains top-level objects for its caller; this array keeps them instead.
     [topLevelObjects makeObjectsPerformSelector: @selector(autorelease)];
     return topLevelObjects;
@@ -111,7 +128,7 @@ static __thread NSStoryboard *instantiatingStoryboard;
 // NSApplicationMain's counterpart of loading NSMainNibFile: the storyboard's main menu, then its
 // initial window controller, shown and kept for the life of the app.
 - (void) _instantiateAsMainStoryboard {
-    NSString *menuName = [_info objectForKey: NSStoryboardMainMenuKey];
+    NSString *menuName = [NS_EXTRA(NSStoryboard, self)->_info objectForKey: NSStoryboardMainMenuKey];
     if (menuName != nil)
         [self _instantiateNibNamed: menuName owner: NSApp];
 
@@ -120,37 +137,59 @@ static __thread NSStoryboard *instantiatingStoryboard;
         return;
     if (![controller isKindOfClass: [NSWindowController class]])
         [NSException raise: NSInternalInconsistencyException
-                    format: @"Initial controller %@ of main storyboard %@ is not a window controller", controller, _path];
+                    format: @"Initial controller %@ of main storyboard %@ is not a window controller", controller, NS_EXTRA(NSStoryboard, self)->_path];
     [controller retain];
     [controller showWindow: nil];
 }
 
 - (id) instantiateInitialController {
-    NSString *identifier = [_info objectForKey: NSStoryboardInitialIdentifierKey];
+    NSString *identifier = [NS_EXTRA(NSStoryboard, self)->_info objectForKey: NSStoryboardInitialIdentifierKey];
     return identifier == nil ? nil : [self instantiateControllerWithIdentifier: identifier];
 }
 
 - (id) instantiateControllerWithIdentifier: (NSStoryboardSceneIdentifier) identifier {
-    NSString *nibName = [[_info objectForKey: NSStoryboardNibNamesKey] objectForKey: identifier];
+    NSString *nibName = [[NS_EXTRA(NSStoryboard, self)->_info objectForKey: NSStoryboardNibNamesKey] objectForKey: identifier];
     if (nibName == nil)
         [NSException raise: NSInvalidArgumentException
-                    format: @"Storyboard %@ doesn't contain a controller with identifier '%@'", _path, identifier];
+                    format: @"Storyboard %@ doesn't contain a controller with identifier '%@'", NS_EXTRA(NSStoryboard, self)->_path, identifier];
 
+    // A scene nib may hold several controllers. The scene's own one is the object
+    // its File's Owner reaches through the sceneController outlet; the rest are
+    // reachable only through connections of that controller.
+    NSStoryboardSceneOwner *owner = [[[NSStoryboardSceneOwner alloc] init] autorelease];
     id controller = nil;
-    for (id object in [self _instantiateNibNamed: nibName owner: nil]) {
+    for (id object in [self _instantiateNibNamed: nibName owner: owner]) {
+        // Scenes without the outlet: take the first window controller, else the
+        // first view controller.
         if ([object isKindOfClass: [NSWindowController class]]) {
-            // A window controller is what instantiateInitialController's caller is
-            // looking for, so prefer it and stop looking.
-            controller = object;
-            break;
-        }
-        if (controller == nil && [object isKindOfClass: [NSViewController class]])
+            if (controller == nil || ![controller isKindOfClass: [NSWindowController class]])
+                controller = object;
+        } else if (controller == nil && [object isKindOfClass: [NSViewController class]])
             controller = object;
     }
+    if (owner->_sceneController != nil)
+        controller = owner->_sceneController;
     if (controller == nil)
         [NSException raise: NSInternalInconsistencyException
                     format: @"Storyboard scene %@ has no top-level controller", nibName];
     return controller;
+}
+
+@end
+
+// File's Owner of a scene nib. Compiled scenes connect its sceneController outlet to the controller
+// the scene stands for.
+@implementation NSStoryboardSceneOwner
+
+- (void) setSceneController: (id) controller {
+    controller = [controller retain];
+    [_sceneController release];
+    _sceneController = controller;
+}
+
+- (void) dealloc {
+    [_sceneController release];
+    [super dealloc];
 }
 
 @end

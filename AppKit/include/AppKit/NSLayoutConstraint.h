@@ -18,12 +18,14 @@
 */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <Foundation/NSObject.h>
+#import <Foundation/NSArray.h>
+@class NSDictionary;
 #import <Foundation/NSString.h>
 #import <Foundation/NSArray.h>
 #import <Foundation/NSLayoutConstraint.h>
-
-@class NSDictionary;
 
 // Foundation's NSLayoutConstraint.h, imported above, declares these under the
 // same guards: Swift nests them only into a class of their own module.
@@ -36,12 +38,6 @@ static const NSLayoutPriority NSLayoutPriorityDefaultHigh NS_SWIFT_NAME(defaultH
 static const NSLayoutPriority NSLayoutPriorityDefaultLow NS_SWIFT_NAME(defaultLow) = 250;
 static const NSLayoutPriority NSLayoutPriorityFittingSizeCompression NS_SWIFT_NAME(fittingSizeCompression) = 50;
 #endif
-
-typedef NS_ENUM(NSInteger, NSLayoutRelation) {
-	NSLayoutRelationLessThanOrEqual = -1,
-	NSLayoutRelationEqual = 0,
-	NSLayoutRelationGreaterThanOrEqual = 1,
-};
 
 typedef NS_ENUM(NSInteger, NSLayoutAttribute) {
 	NSLayoutAttributeNotAnAttribute = 0,
@@ -58,6 +54,20 @@ typedef NS_ENUM(NSInteger, NSLayoutAttribute) {
 	NSLayoutAttributeLastBaseline,
 	NSLayoutAttributeBaseline = NSLayoutAttributeLastBaseline,
 	NSLayoutAttributeFirstBaseline,
+};
+
+#if !__NSLAYOUT_ORIENTATION_SHARED_SECTION__
+#define __NSLAYOUT_ORIENTATION_SHARED_SECTION__ 1
+typedef NS_ENUM(NSInteger, NSLayoutConstraintOrientation) {
+	NSLayoutConstraintOrientationHorizontal = 0,
+	NSLayoutConstraintOrientationVertical = 1,
+} NS_SWIFT_NAME(NSLayoutConstraint.Orientation);
+#endif
+
+typedef NS_ENUM(NSInteger, NSLayoutRelation) {
+	NSLayoutRelationLessThanOrEqual = -1,
+	NSLayoutRelationEqual = 0,
+	NSLayoutRelationGreaterThanOrEqual = 1,
 };
 
 typedef NS_OPTIONS(NSUInteger, NSLayoutFormatOptions) {
@@ -79,8 +89,26 @@ typedef NS_OPTIONS(NSUInteger, NSLayoutFormatOptions) {
 	NSLayoutFormatDirectionMask = 0x3 << 16,
 };
 
-// Darling stores and archives constraints but does not solve them.
-@interface NSLayoutConstraint (NSLayoutConstraintAPI)
+@interface NSLayoutConstraint : NSObject
+{
+    NS_LEGACY_IVAR_PAD(_NSLayoutConstraintReserved, 44)
+    NS_EXTRA_IVARS_BEGIN(NSLayoutConstraint)
+    id _firstItem;
+    NSInteger _firstAttribute;
+    NSInteger _relation;
+    id _secondItem;
+    NSInteger _secondAttribute;
+    double _multiplier;
+    double _constant;
+    float _priority;
+    NSString *_identifier;
+    NSString *_symbolicConstant;
+    BOOL _active;
+    BOOL _shouldBeArchived;
+    id _owner;
+    NS_EXTRA_IVARS_END(NSLayoutConstraint)
+}
+
 + (instancetype) constraintWithItem: (id) view1
                           attribute: (NSLayoutAttribute) attr1
                           relatedBy: (NSLayoutRelation) relation
@@ -88,8 +116,9 @@ typedef NS_OPTIONS(NSUInteger, NSLayoutFormatOptions) {
                           attribute: (NSLayoutAttribute) attr2
                          multiplier: (CGFloat) multiplier
                            constant: (CGFloat) c;
-+ (void) activateConstraints: (NSArray *) constraints;
-+ (void) deactivateConstraints: (NSArray *) constraints;
++ (void) activateConstraints: (NSArray<NSLayoutConstraint *> *) constraints;
++ (void) deactivateConstraints: (NSArray<NSLayoutConstraint *> *) constraints;
+
 @property(readonly, assign) id firstItem;
 @property(readonly, assign) id secondItem;
 @property(readonly) NSLayoutAttribute firstAttribute;
@@ -99,26 +128,27 @@ typedef NS_OPTIONS(NSUInteger, NSLayoutFormatOptions) {
 @property CGFloat constant;
 @property NSLayoutPriority priority;
 @property(copy) NSString *identifier;
+// Setting it to YES installs the constraint on the closest common ancestor of
+// its items (raising NSInvalidArgumentException when they share none); NO
+// removes it from the view that holds it.
 @property(getter=isActive) BOOL active;
 @property BOOL shouldBeArchived;
+
 @end
 
 @interface NSLayoutConstraint (NSVisualFormat)
 // Parses the visual format language; raises NSInvalidArgumentException on a
 // malformed format or an unknown view or metric name.
-+ (NSArray *) constraintsWithVisualFormat: (NSString *) format
++ (NSArray<NSLayoutConstraint *> *) constraintsWithVisualFormat: (NSString *) format
                                   options: (NSLayoutFormatOptions) options
                                   metrics: (NSDictionary *) metrics
                                     views: (NSDictionary *) views;
 @end
 
-#if !__NSLAYOUT_ORIENTATION_SHARED_SECTION__
-#define __NSLAYOUT_ORIENTATION_SHARED_SECTION__ 1
-typedef NS_ENUM(NSInteger, NSLayoutConstraintOrientation) {
-    NSLayoutConstraintOrientationHorizontal = 0,
-    NSLayoutConstraintOrientationVertical = 1,
-} NS_SWIFT_NAME(NSLayoutConstraint.Orientation);
-#endif
+// Builds the dictionary of names to values that visual format strings refer to:
+// NSDictionaryOfVariableBindings(a, b) maps @"a" to a and @"b" to b.
+APPKIT_EXPORT NSDictionary *_NSDictionaryOfVariableBindings(NSString *commaSeparatedKeysString, id firstValue, ...);
+#define NSDictionaryOfVariableBindings(...) _NSDictionaryOfVariableBindings(@#__VA_ARGS__, __VA_ARGS__, nil)
 
 APPKIT_EXPORT const CGFloat NSViewNoInstrinsicMetric;
 APPKIT_EXPORT const CGFloat NSViewNoIntrinsicMetric NS_SWIFT_NAME(NSView.noIntrinsicMetric);
@@ -130,6 +160,8 @@ typedef struct NSDirectionalEdgeInsets {
 	CGFloat bottom;
 	CGFloat trailing;
 } NSDirectionalEdgeInsets;
+
+APPKIT_EXPORT const NSDirectionalEdgeInsets NSDirectionalEdgeInsetsZero;
 
 NS_INLINE NSDirectionalEdgeInsets NSDirectionalEdgeInsetsMake(CGFloat top, CGFloat leading,
                                                               CGFloat bottom, CGFloat trailing) {

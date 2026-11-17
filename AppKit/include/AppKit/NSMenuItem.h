@@ -17,48 +17,56 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSCell.h>
 #import <AppKit/NSUserInterfaceValidation.h>
 #import <Foundation/NSObject.h>
 #import <AppKit/NSUserInterfaceItemIdentification.h>
 
-@class NSMenu, NSImage, NSAttributedString, NSView;
+@class NSMenu, NSImage, NSAttributedString, NSView, NSMenuItemBadge;
 
+// Legacy ObjC ABI (i386): instance size must stay 0x40, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSMenuItem : NSObject <NSCopying, NSValidatedUserInterfaceItem, NSUserInterfaceItemIdentification> {
     NSMenu *_menu;
     NSString *_title;
-    NSAttributedString *_atitle;
-    id _target;
-    SEL _action;
-    NSString *_keyEquivalent;
-    unsigned _keyEquivalentModifierMask;
-    NSString *_mnemonic;
-    unsigned _mnemonicLocation;
-    NSMenu *_submenu;
-    NSInteger _tag;
-    NSInteger _indentationLevel;
-    BOOL _enabled;
-    BOOL _hidden;
-    NSControlStateValue _state;
-    id _representedObject;
-    NSImage *_image;
-    NSImage *_onStateImage;
-    NSImage *_offStateImage;
-    NSImage *_mixedStateImage;
-    BOOL _alternate;
-    BOOL _allowsKeyEquivalentWhenHidden;
-    NSUserInterfaceItemIdentifier _identifier;
-    NSImage *_actionImage;
-    BOOL _isSectionHeader;
-    NSString *_toolTip;
-    NSView *_view;
+    NS_LEGACY_IVAR_PAD(_NSMenuItemReserved1, 48)
+    NS_EXTRA_IVARS_BEGIN(NSMenuItem)
+        NSAttributedString *_atitle;
+        id _target;
+        SEL _action;
+        NSString *_keyEquivalent;
+        unsigned _keyEquivalentModifierMask;
+        NSString *_mnemonic;
+        unsigned _mnemonicLocation;
+        NSMenu *_submenu;
+        NSInteger _tag;
+        NSInteger _indentationLevel;
+        BOOL _enabled;
+        BOOL _hidden;
+        NSControlStateValue _state;
+        id _representedObject;
+        NSImage *_image;
+        NSImage *_onStateImage;
+        NSImage *_offStateImage;
+        NSImage *_mixedStateImage;
+        BOOL _alternate;
+        BOOL _allowsKeyEquivalentWhenHidden;
+        NSUserInterfaceItemIdentifier _identifier;
+        NSView *_view;
+        NSString *_toolTip;
+        NSMenuItemBadge *_badge;
+        BOOL _isSectionHeader;
+        NSImage *_actionImage;
+    NS_EXTRA_IVARS_END(NSMenuItem)
 }
 
-@property(retain) NSView *view;
 @property(copy) NSString *toolTip;
-
 @property(getter=isAlternate) BOOL alternate;
 @property BOOL allowsKeyEquivalentWhenHidden;
+@property(retain) NSView *view;
+@property(retain) NSMenuItemBadge *badge;
 
 + (NSMenuItem *) separatorItem;
 // macOS 14: a non-selectable item that titles the items after it.
@@ -69,53 +77,34 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
                  keyEquivalent: (NSString *) keyEquivalent;
 
 - (NSMenu *) menu;
-- (NSString *) title;
-- (NSAttributedString *) attributedTitle;
+@property(nonatomic, copy) NSString *title;
+@property(nonatomic, copy) NSAttributedString *attributedTitle;
 - (NSString *) mnemonic;
-- (unsigned) mnemonicLocation;
-- (id) target;
-- (SEL) action;
-- (NSInteger) indentationLevel;
-- (NSInteger) tag;
-- (NSControlStateValue) state;
-- (NSString *) keyEquivalent;
-- (unsigned) keyEquivalentModifierMask;
-- (NSImage *) image;
-- (NSImage *) onStateImage;
-- (NSImage *) offStateImage;
-- (NSImage *) mixedStateImage;
-- (NSView *) view;
+@property(nonatomic) unsigned mnemonicLocation;
+@property(nonatomic, assign) id target;
+@property(nonatomic) SEL action;
+@property(nonatomic) NSInteger indentationLevel;
+@property(nonatomic) NSInteger tag;
+@property(nonatomic) NSControlStateValue state;
+@property(nonatomic, copy) NSString *keyEquivalent;
+@property(nonatomic) unsigned keyEquivalentModifierMask;
+@property(nonatomic, retain) NSImage *image;
+@property(nonatomic, retain) NSImage *onStateImage;
+@property(nonatomic, retain) NSImage *offStateImage;
+@property(nonatomic, retain) NSImage *mixedStateImage;
 
 - representedObject;
 
-- (BOOL) hasSubmenu;
-- (NSMenu *) submenu;
+@property(nonatomic, readonly) BOOL hasSubmenu;
+@property(nonatomic, retain) NSMenu *submenu;
 
-- (BOOL) isSeparatorItem;
+@property(nonatomic, getter=isSeparatorItem, readonly) BOOL separatorItem;
 - (BOOL) isSectionHeader;
-- (BOOL) isEnabled;
-- (BOOL) isHidden;
+@property(nonatomic, getter=isEnabled) BOOL enabled;
+@property(nonatomic, getter=isHidden) BOOL hidden;
 
-- (void) setTitle: (NSString *) title;
-- (void) setAttributedTitle: (NSAttributedString *) title;
 - (void) setTitleWithMnemonic: (NSString *) mnemonic;
-- (void) setMnemonicLocation: (unsigned) location;
-- (void) setTarget: target;
-- (void) setAction: (SEL) action;
-- (void) setIndentationLevel: (NSInteger) indentationLevel;
-- (void) setTag: (NSInteger) tag;
-- (void) setState: (NSControlStateValue) state;
-- (void) setKeyEquivalent: (NSString *) keyEquivalent;
-- (void) setKeyEquivalentModifierMask: (unsigned) mask;
-- (void) setImage: (NSImage *) image;
-- (void) setOnStateImage: (NSImage *) image;
-- (void) setOffStateImage: (NSImage *) image;
-- (void) setMixedStateImage: (NSImage *) image;
-- (void) setView: (NSView *) view;
 - (void) setRepresentedObject: object;
-- (void) setSubmenu: (NSMenu *) submenu;
-- (void) setEnabled: (BOOL) flag;
-- (void) setHidden: (BOOL) flag;
 // YES also disables the item, as sectionHeaderWithTitle: does.
 - (void) setSectionHeader: (BOOL) flag;
 

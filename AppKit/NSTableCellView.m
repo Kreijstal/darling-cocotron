@@ -24,7 +24,7 @@
 @implementation NSTableCellView
 
 @synthesize textField = _textField;
-@synthesize secondTextField = _secondTextField;
+NS_EXTRA_SYNTHESIZE_ASSIGN(NSTableCellView, secondTextField, _secondTextField, NSTextField *, secondTextField, setSecondTextField:)
 @synthesize imageView = _imageView;
 @synthesize objectValue = _objectValue;
 @synthesize backgroundStyle = _backgroundStyle;
@@ -32,6 +32,7 @@
 
 - (void) dealloc {
     [_objectValue release];
+    NS_EXTRA_FREE(NSTableCellView, self);
     [super dealloc];
 }
 

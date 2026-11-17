@@ -18,29 +18,27 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 #import <AppKit/NSImageCell.h>
 
+// Legacy ObjC ABI (i386): instance size must stay 0x68, Apple's; these ivars
+// sit at Apple's offsets. New state needs an extra ivars struct
+// (AppKitIvarLayout.h), never a new ivar.
 @interface NSImageView : NSControl {
+    NS_LEGACY_IVAR_PAD(_NSImageViewReserved1, 4)
     id _target;
     SEL _action;
 }
 
-- (BOOL) allowsCutCopyPaste;
-- (BOOL) animates;
+@property(nonatomic) BOOL allowsCutCopyPaste;
+@property(nonatomic) BOOL animates;
 + (NSImageView *) imageViewWithImage: (NSImage *) image;
 - (instancetype) initWithImage: (NSImage *) image;
-- (NSImage *) image;
-- (NSImageAlignment) imageAlignment;
-- (NSImageFrameStyle) imageFrameStyle;
-- (NSImageScaling) imageScaling;
-- (BOOL) isEditable;
-- (void) setAllowsCutCopyPaste: (BOOL) allow;
-- (void) setAnimates: (BOOL) flag;
-- (void) setEditable: (BOOL) flag;
-- (void) setImage: (NSImage *) image;
-- (void) setImageAlignment: (NSImageAlignment) alignment;
-- (void) setImageFrameStyle: (NSImageFrameStyle) frameStyle;
-- (void) setImageScaling: (NSImageScaling) scaling;
+@property(nonatomic, retain) NSImage *image;
+@property(nonatomic) NSImageAlignment imageAlignment;
+@property(nonatomic) NSImageFrameStyle imageFrameStyle;
+@property(nonatomic) NSImageScaling imageScaling;
+@property(nonatomic, getter=isEditable) BOOL editable;
 
 @end

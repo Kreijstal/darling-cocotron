@@ -50,17 +50,17 @@ static NSPrintOperation *_currentOperation = nil;
             toData: (NSMutableData *) data
               type: (int) type
 {
-    _view = [view retain];
-    _printInfo = [printInfo copy];
+    NS_EXTRA(NSPrintOperation, self)->_view = [view retain];
+    NS_EXTRA(NSPrintOperation, self)->_printInfo = [printInfo copy];
     if (type == NSPrintOperationPDFInRect ||
         type == NSPrintOperationEPSInRect || type == NSPrintOperationFile)
-        [_printInfo setPaperSize: rect.size];
-    _printPanel = [[NSPrintPanel printPanel] retain];
-    _showsPrintPanel = YES;
-    _currentPage = 0;
-    _insideRect = rect;
-    _mutableData = [data retain];
-    _type = type;
+        [NS_EXTRA(NSPrintOperation, self)->_printInfo setPaperSize: rect.size];
+    NS_EXTRA(NSPrintOperation, self)->_printPanel = [[NSPrintPanel printPanel] retain];
+    NS_EXTRA(NSPrintOperation, self)->_showsPrintPanel = YES;
+    NS_EXTRA(NSPrintOperation, self)->_currentPage = 0;
+    NS_EXTRA(NSPrintOperation, self)->_insideRect = rect;
+    NS_EXTRA(NSPrintOperation, self)->_mutableData = [data retain];
+    NS_EXTRA(NSPrintOperation, self)->_type = type;
     return self;
 }
 
@@ -78,13 +78,14 @@ static NSPrintOperation *_currentOperation = nil;
 }
 
 - (void) dealloc {
-    [_view release];
-    [_printInfo release];
-    [_printPanel release];
-    [_path release];
-    [_context release];
-    [_mutableData release];
-    [_jobTitle release];
+    [NS_EXTRA(NSPrintOperation, self)->_view release];
+    [NS_EXTRA(NSPrintOperation, self)->_printInfo release];
+    [NS_EXTRA(NSPrintOperation, self)->_printPanel release];
+    [NS_EXTRA(NSPrintOperation, self)->_path release];
+    [NS_EXTRA(NSPrintOperation, self)->_context release];
+    [NS_EXTRA(NSPrintOperation, self)->_mutableData release];
+    [NS_EXTRA(NSPrintOperation, self)->_jobTitle release];
+    NS_EXTRA_FREE(NSPrintOperation, self);
     [super dealloc];
 }
 
@@ -132,7 +133,7 @@ static NSPrintOperation *_currentOperation = nil;
                                                   insideRect: rect
                                                       toData: [NSMutableData data]
                                                    printInfo: printInfo];
-    operation->_path = [path copy];
+    NS_EXTRA(NSPrintOperation, operation)->_path = [path copy];
     return operation;
 }
 
@@ -164,40 +165,40 @@ static NSPrintOperation *_currentOperation = nil;
 
 - (void) setAccessoryView: (NSView *) view {
     view = [view retain];
-    [_accessoryView release];
-    _accessoryView = view;
+    [NS_EXTRA(NSPrintOperation, self)->_accessoryView release];
+    NS_EXTRA(NSPrintOperation, self)->_accessoryView = view;
 }
 
 - (NSView *) view {
-    return _view;
+    return NS_EXTRA(NSPrintOperation, self)->_view;
 }
 
 - (NSPrintInfo *) printInfo {
-    return _printInfo;
+    return NS_EXTRA(NSPrintOperation, self)->_printInfo;
 }
 
 - (NSPrintPanel *) printPanel {
-    return _printPanel;
+    return NS_EXTRA(NSPrintOperation, self)->_printPanel;
 }
 
 - (BOOL) showsPrintPanel {
-    return _showsPrintPanel;
+    return NS_EXTRA(NSPrintOperation, self)->_showsPrintPanel;
 }
 
 - (void) setShowsPrintPanel: (BOOL) flag {
-    _showsPrintPanel = flag;
+    NS_EXTRA(NSPrintOperation, self)->_showsPrintPanel = flag;
 }
 
 - (int) currentPage {
-    return _currentPage;
+    return NS_EXTRA(NSPrintOperation, self)->_currentPage;
 }
 
 - (BOOL) showsProgressPanel {
-    return _showsPrintProgressPanel;
+    return NS_EXTRA(NSPrintOperation, self)->_showsPrintProgressPanel;
 }
 
 - (void) setShowsProgressPanel: (BOOL) flag {
-    _showsPrintProgressPanel = flag;
+    NS_EXTRA(NSPrintOperation, self)->_showsPrintProgressPanel = flag;
 }
 
 - (void) _autopaginatePageRange: (NSRange) pageRange
@@ -205,15 +206,15 @@ static NSPrintOperation *_currentOperation = nil;
                         context: (CGContextRef) context
 {
     NSRange result = NSMakeRange(1, 0);
-    NSRect bounds = [_view bounds];
-    NSRect imageableRect = [_printInfo imageablePageBounds];
-    BOOL isFlipped = [_view isFlipped];
+    NSRect bounds = [NS_EXTRA(NSPrintOperation, self)->_view bounds];
+    NSRect imageableRect = [NS_EXTRA(NSPrintOperation, self)->_printInfo imageablePageBounds];
+    BOOL isFlipped = [NS_EXTRA(NSPrintOperation, self)->_view isFlipped];
     CGFloat top = isFlipped ? NSMinY(bounds) : NSMaxY(bounds);
-    NSPrintingOrientation orientation = [_printInfo orientation];
+    NSPrintingOrientation orientation = [NS_EXTRA(NSPrintOperation, self)->_printInfo orientation];
 
     while (YES) {
-        CGFloat heightAdjustLimit = [_view heightAdjustLimit];
-        CGFloat widthAdjustLimit = [_view widthAdjustLimit];
+        CGFloat heightAdjustLimit = [NS_EXTRA(NSPrintOperation, self)->_view heightAdjustLimit];
+        CGFloat widthAdjustLimit = [NS_EXTRA(NSPrintOperation, self)->_view widthAdjustLimit];
         CGFloat left = NSMinX(bounds);
         CGFloat right = left + imageableRect.size.width;
         CGFloat rightLimit = left + imageableRect.size.width * widthAdjustLimit;
@@ -235,11 +236,11 @@ static NSPrintOperation *_currentOperation = nil;
                 bottom = NSMinY(bounds);
         }
 
-        [_view adjustPageWidthNew: &right
+        [NS_EXTRA(NSPrintOperation, self)->_view adjustPageWidthNew: &right
                              left: left
                             right: right
                             limit: rightLimit];
-        [_view adjustPageHeightNew: &bottom
+        [NS_EXTRA(NSPrintOperation, self)->_view adjustPageHeightNew: &bottom
                                top: top
                             bottom: bottom
                              limit: bottomLimit];
@@ -248,12 +249,12 @@ static NSPrintOperation *_currentOperation = nil;
             (pageRange.location == NSNotFound ||
              NSLocationInRange(NSMaxRange(result), pageRange))) {
             NSRect rect = NSMakeRect(left, top, right - left, bottom - top);
-            NSPoint location = [_view locationOfPrintRect: rect];
+            NSPoint location = [NS_EXTRA(NSPrintOperation, self)->_view locationOfPrintRect: rect];
 
-            [_view beginPageInRect: rect atPlacement: location];
-            [_view drawRect: rect];
-            [_view endPage];
-            _currentPage++;
+            [NS_EXTRA(NSPrintOperation, self)->_view beginPageInRect: rect atPlacement: location];
+            [NS_EXTRA(NSPrintOperation, self)->_view drawRect: rect];
+            [NS_EXTRA(NSPrintOperation, self)->_view endPage];
+            NS_EXTRA(NSPrintOperation, self)->_currentPage++;
         }
 
         result.length++;
@@ -290,38 +291,50 @@ static NSPrintOperation *_currentOperation = nil;
         [printProgressPanelController setMaxPages: pageRange.length];
         [printProgressPanelController showPanel];
     }
-    for (i = 0, _currentPage = pageRange.location; i < pageRange.length;
-         i++, _currentPage++) {
-        NSRect rect = [_view rectForPage: _currentPage];
-        NSPoint location = [_view locationOfPrintRect: rect];
+    for (i = 0, NS_EXTRA(NSPrintOperation, self)->_currentPage = pageRange.location; i < pageRange.length;
+         i++, NS_EXTRA(NSPrintOperation, self)->_currentPage++) {
+        NSRect rect = [NS_EXTRA(NSPrintOperation, self)->_view rectForPage: NS_EXTRA(NSPrintOperation, self)->_currentPage];
+        NSPoint location = [NS_EXTRA(NSPrintOperation, self)->_view locationOfPrintRect: rect];
 
-        [_view beginPageInRect: rect atPlacement: location];
-        [_view drawRect: rect];
-        [_view endPage];
+        [NS_EXTRA(NSPrintOperation, self)->_view beginPageInRect: rect atPlacement: location];
+        [NS_EXTRA(NSPrintOperation, self)->_view drawRect: rect];
+        [NS_EXTRA(NSPrintOperation, self)->_view endPage];
         [printProgressPanelController setCurrentPage: i];
     }
     [printProgressPanelController hidePanel];
 }
 
+// The PDF document info: the job title, else the view's window title. A view
+// outside any window has neither, and then there is no info dictionary.
+- (NSDictionary *) _documentInfo {
+    NSString *title = [self jobTitle];
+    if (title == nil)
+        title = [[NS_EXTRA(NSPrintOperation, self)->_view window] title];
+    if (title == nil)
+        return nil;
+    return [NSDictionary dictionaryWithObject: title
+                                       forKey: (NSString *) kCGPDFContextTitle];
+}
+
 - (NSGraphicsContext *) createContext {
     CGContextRef context;
 
-    if (_type == NSPrintOperationPrinter) {
-        if (_showsPrintPanel) {
+    if (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationPrinter) {
+        if (NS_EXTRA(NSPrintOperation, self)->_showsPrintPanel) {
             NSPrintPanel *printPanel = [self printPanel];
             int panelResult;
 
             // We can't assume that there are valid titles on every window
-            NSString *title = [[_view window] title];
+            NSString *title = [[NS_EXTRA(NSPrintOperation, self)->_view window] title];
             if (title == nil) {
                 title = @"Printing View";
             }
 
-            [[_printInfo dictionary] setObject: _view forKey: @"_NSView"];
-            [[_printInfo dictionary] setObject: title forKey: @"_title"];
+            [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] setObject: NS_EXTRA(NSPrintOperation, self)->_view forKey: @"_NSView"];
+            [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] setObject: title forKey: @"_title"];
             panelResult = [printPanel runModal];
-            [[_printInfo dictionary] removeObjectForKey: @"_NSView"];
-            [[_printInfo dictionary] removeObjectForKey: @"_title"];
+            [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] removeObjectForKey: @"_NSView"];
+            [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] removeObjectForKey: @"_title"];
 
             if (panelResult != NSOKButton) {
                 return nil;
@@ -332,9 +345,10 @@ static NSPrintOperation *_currentOperation = nil;
         }
 
         if ((context = (CGContextRef)
-                     [[_printInfo dictionary] objectForKey: @"_KGContext"]) ==
+                     [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] objectForKey: @"_KGContext"]) ==
             nil) {
-            NSRect bounds = [_printInfo imageablePageBounds];
+            // No printer context: render into a bitmap context instead.
+            NSRect bounds = [NS_EXTRA(NSPrintOperation, self)->_printInfo imageablePageBounds];
             CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
             context = CGBitmapContextCreate(NULL, fmax(bounds.size.width, 1.0), fmax(bounds.size.height, 1.0), 8, 0, cs, kCGImageAlphaPremultipliedLast);
             CGColorSpaceRelease(cs);
@@ -343,29 +357,25 @@ static NSPrintOperation *_currentOperation = nil;
             }
             [(id) context autorelease];
         }
-    } else if (_type == NSPrintOperationPDFInRect) {
-        NSDictionary *auxiliaryInfo = [NSDictionary
-                dictionaryWithObject: [[_view window] title]
-                              forKey: (NSString *) kCGPDFContextTitle];
+    } else if (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationPDFInRect) {
+        NSDictionary *auxiliaryInfo = [self _documentInfo];
 
         CGDataConsumerRef consumer =
-                CGDataConsumerCreateWithCFData((CFMutableDataRef) _mutableData);
+                CGDataConsumerCreateWithCFData((CFMutableDataRef) NS_EXTRA(NSPrintOperation, self)->_mutableData);
 
-        context = CGPDFContextCreate(consumer, &_insideRect,
+        context = CGPDFContextCreate(consumer, &NS_EXTRA(NSPrintOperation, self)->_insideRect,
                                      (CFDictionaryRef) auxiliaryInfo);
         [(id) context autorelease];
 
         CGDataConsumerRelease(consumer);
-    } else if (_type == NSPrintOperationFile) {
-        NSString *title = [[_view window] title] ?: @"Document";
-        NSDictionary *auxiliaryInfo = [NSDictionary
-                dictionaryWithObject: title
-                              forKey: (NSString *) kCGPDFContextTitle];
+    } else if (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationFile) {
+        NSString *title = [self jobTitle] ?: [[NS_EXTRA(NSPrintOperation, self)->_view window] title] ?: @"Document";
+        NSDictionary *auxiliaryInfo = [self _documentInfo];
 
         NSString *filePath =
-                [_printInfo.dictionary objectForKey: NSPrintSavePath];
+                [NS_EXTRA(NSPrintOperation, self)->_printInfo.dictionary objectForKey: NSPrintSavePath];
         if (filePath == nil) {
-            NSURL *jobURL = [_printInfo.dictionary objectForKey: @"NSPrintJobSavingURL"];
+            NSURL *jobURL = [NS_EXTRA(NSPrintOperation, self)->_printInfo.dictionary objectForKey: @"NSPrintJobSavingURL"];
             filePath = [jobURL path];
         }
         if (filePath == nil) {
@@ -381,7 +391,7 @@ static NSPrintOperation *_currentOperation = nil;
         CGDataConsumerRef consumer = CGDataConsumerCreateWithURL(
                 (CFURLRef) [NSURL fileURLWithPath: filePath]);
 
-        context = CGPDFContextCreate(consumer, &_insideRect,
+        context = CGPDFContextCreate(consumer, &NS_EXTRA(NSPrintOperation, self)->_insideRect,
                                      (CFDictionaryRef) auxiliaryInfo);
         [(id) context autorelease];
 
@@ -395,27 +405,27 @@ static NSPrintOperation *_currentOperation = nil;
 }
 
 - (void) destroyContext {
-    if (_type == NSPrintOperationPrinter) {
-        [[_printInfo dictionary] removeObjectForKey: @"_KGContext"];
+    if (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationPrinter) {
+        [[NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary] removeObjectForKey: @"_KGContext"];
     }
-    [_context release];
-    _context = nil;
+    [NS_EXTRA(NSPrintOperation, self)->_context release];
+    NS_EXTRA(NSPrintOperation, self)->_context = nil;
 }
 
 - (NSGraphicsContext *) context {
-    return _context;
+    return NS_EXTRA(NSPrintOperation, self)->_context;
 }
 
 - (BOOL) runOperation {
     NSRange pageRange = NSMakeRange(NSNotFound, NSNotFound);
     BOOL knowsPageRange;
     CGContextRef cgContext;
-    NSMutableDictionary *dict = [_printInfo dictionary];
+    NSMutableDictionary *dict = [NS_EXTRA(NSPrintOperation, self)->_printInfo dictionary];
 
     _currentOperation = self;
 
     // Set the page range if not set yet
-    knowsPageRange = [_view knowsPageRange: &pageRange];
+    knowsPageRange = [NS_EXTRA(NSPrintOperation, self)->_view knowsPageRange: &pageRange];
 
     if (knowsPageRange) {
         if ([dict objectForKey: NSPrintFirstPage] == nil) {
@@ -437,8 +447,8 @@ static NSPrintOperation *_currentOperation = nil;
         }
     }
 
-    _context = [[self createContext] retain];
-    if (_context == nil) {
+    NS_EXTRA(NSPrintOperation, self)->_context = [[self createContext] retain];
+    if (NS_EXTRA(NSPrintOperation, self)->_context == nil) {
         // It'll be nil if the user cancelled the print panel for example.
         return NO;
     }
@@ -449,18 +459,18 @@ static NSPrintOperation *_currentOperation = nil;
         pageRange.location = firstPage;
         pageRange.length = lastPage - firstPage + 1;
     }
-    cgContext = [_context graphicsPort];
+    cgContext = [NS_EXTRA(NSPrintOperation, self)->_context graphicsPort];
 
-    [_printInfo setUpPrintOperationDefaultValues];
+    [NS_EXTRA(NSPrintOperation, self)->_printInfo setUpPrintOperationDefaultValues];
 
     [NSGraphicsContext saveGraphicsState];
-    [NSGraphicsContext setCurrentContext: _context];
-    [_view beginDocument];
+    [NSGraphicsContext setCurrentContext: NS_EXTRA(NSPrintOperation, self)->_context];
+    [NS_EXTRA(NSPrintOperation, self)->_view beginDocument];
 
-    if (_type == NSPrintOperationPDFInRect) {
-        [_view beginPageInRect: _insideRect atPlacement: NSMakePoint(0, 0)];
-        [_view displayRect: _insideRect];
-        [_view endPage];
+    if (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationPDFInRect) {
+        [NS_EXTRA(NSPrintOperation, self)->_view beginPageInRect: NS_EXTRA(NSPrintOperation, self)->_insideRect atPlacement: NSMakePoint(0, 0)];
+        [NS_EXTRA(NSPrintOperation, self)->_view displayRect: NS_EXTRA(NSPrintOperation, self)->_insideRect];
+        [NS_EXTRA(NSPrintOperation, self)->_view endPage];
     } else {
         if (knowsPageRange)
             [self _paginateWithPageRange: pageRange context: cgContext];
@@ -470,8 +480,10 @@ static NSPrintOperation *_currentOperation = nil;
                                  context: cgContext];
     }
 
-    [_view endDocument];
-    if (cgContext != NULL && _type == NSPrintOperationPDFInRect) {
+    [NS_EXTRA(NSPrintOperation, self)->_view endDocument];
+    // Only the PDF contexts created here are closed; a bitmap fallback context is not.
+    if (cgContext != NULL && (NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationPDFInRect ||
+                              NS_EXTRA(NSPrintOperation, self)->_type == NSPrintOperationFile)) {
         CGPDFContextClose(cgContext);
     }
     [NSGraphicsContext restoreGraphicsState];
@@ -480,8 +492,8 @@ static NSPrintOperation *_currentOperation = nil;
 
     _currentOperation = nil;
 
-    if (_path != nil)
-        return [_mutableData writeToFile: _path atomically: YES];
+    if (NS_EXTRA(NSPrintOperation, self)->_path != nil)
+        return [NS_EXTRA(NSPrintOperation, self)->_mutableData writeToFile: NS_EXTRA(NSPrintOperation, self)->_path atomically: YES];
     return YES;
 }
 
@@ -490,13 +502,13 @@ static NSPrintOperation *_currentOperation = nil;
 @implementation NSPrintOperation (NSJobTitle)
 
 - (NSString *) jobTitle {
-    return _jobTitle;
+    return NS_EXTRA(NSPrintOperation, self)->_jobTitle;
 }
 
 - (void) setJobTitle: (NSString *) title {
     title = [title copy];
-    [_jobTitle release];
-    _jobTitle = title;
+    [NS_EXTRA(NSPrintOperation, self)->_jobTitle release];
+    NS_EXTRA(NSPrintOperation, self)->_jobTitle = title;
 }
 
 @end

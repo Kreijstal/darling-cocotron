@@ -132,25 +132,38 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
     CGSize _shadowOffset;
     BOOL _hidden;
     id _textureContents;
+    uint32_t _textureSeed;
     BOOL _needsDisplayOnBoundsChange;
     NSString *_name;
     id _layoutManager;
     NSArray *_constraints;
-    NSDictionary *_actions;
     BOOL _geometryFlipped;
     CAAutoresizingMask _autoresizingMask;
+    CGFloat _zPosition;
+    CGFloat _anchorPointZ;
+    BOOL _doubleSided;
+    CGRect _contentsRect;
+    float _minificationFilterBias;
+    BOOL _shouldRasterize;
+    CGFloat _rasterizationScale;
+    BOOL _drawsAsynchronously;
+    NSArray *_backgroundFilters;
+    NSDictionary *_actions;
+    NSDictionary *_style;
 }
 
 + layer;
 
-@property CAAutoresizingMask autoresizingMask;
 @property(copy) NSString *name;
 @property(readonly) CALayer *superlayer;
 @property(copy) NSArray<CALayer *> *sublayers;
 @property(assign) id<CALayerDelegate> delegate;
 @property(retain) id<CALayoutManager> layoutManager;
+@property CAAutoresizingMask autoresizingMask;
 @property CGPoint anchorPoint;
 @property CGPoint position;
+@property CGFloat zPosition;
+@property CGFloat anchorPointZ;
 @property CGRect bounds;
 @property CGRect frame;
 @property CGFloat opacity;
@@ -166,6 +179,8 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 @property CGRect contentsCenter;
 @property(copy) CALayerContentsFormat contentsFormat;
 @property(copy) CALayerContentsGravity contentsGravity;
+// The part of the contents to draw, in unit coordinates.
+@property CGRect contentsRect;
 
 // Stored for callers; CARenderer draws standard dynamic range only.
 @property(copy) CADynamicRange preferredDynamicRange;
@@ -179,6 +194,7 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 
 @property(copy) CALayerContentsFilter minificationFilter;
 @property(copy) CALayerContentsFilter magnificationFilter;
+@property float minificationFilterBias;
 
 // Appearance. CARenderer draws the background and the border as rounded rects
 // with cornerRadius, and the contents between them (not clipped to the corners).
@@ -194,6 +210,7 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 @property(retain) CALayer *mask;
 @property(copy) NSArray *filters;
 @property(retain) id compositingFilter;
+@property(copy) NSArray *backgroundFilters;
 @property CGColorRef shadowColor;
 @property float shadowOpacity;
 @property CGFloat shadowRadius;
@@ -203,12 +220,24 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 @property BOOL allowsGroupOpacity;
 
 // Stored only; CARenderer does not yet antialias layer edges.
-@property(copy) NSDictionary *actions;
 @property BOOL allowsEdgeAntialiasing;
 @property CAEdgeAntialiasingMask edgeAntialiasingMask;
 
 // When YES, a change of the bounds size marks the layer as needing display.
 @property BOOL needsDisplayOnBoundsChange;
+
+// Rendering hints. They are stored, but CARenderer draws every layer flat,
+// front-facing and unrasterized, on the calling thread.
+@property(getter=isDoubleSided) BOOL doubleSided;
+@property BOOL shouldRasterize;
+@property CGFloat rasterizationScale;
+@property BOOL drawsAsynchronously;
+
+// Actions keyed by property or event name; -actionForKey: looks here after
+// the delegate. An NSNull value means no action.
+@property(copy) NSDictionary *actions;
+// Stored; property defaults are not looked up in it yet.
+@property(copy) NSDictionary *style;
 
 // YES puts the origin at the top of the bounds for sublayers and drawing;
 // images set as contents display the same either way.
@@ -217,16 +246,17 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 - (BOOL) contentsAreFlipped;
 
 - (nonnull instancetype)init;
-// Copies the layer's properties but not its place in the layer tree or its
-// animations, as for a presentation copy; subclasses copy their own state.
+// Makes a layer in the default state; subclasses override it to copy their own
+// state from the layer they are given. The properties of that layer are not
+// carried over and the argument is not checked.
 - (nonnull instancetype)initWithLayer: (nonnull id)layer;
-// Archives the layer tree below this layer. Raises NSInvalidArchiveOperationException
-// for state that cannot be archived: animations, filter objects, and contents or
-// colors other than CGImages and colors in named or device color spaces.
+// Keyed archiving of the layer and the layers below it, in the layout macOS uses.
 - (nullable instancetype)initWithCoder: (nonnull NSCoder *)coder;
 
 - (void) addSublayer: (CALayer *) layer;
 - (void) insertSublayer: (CALayer *) layer atIndex: (unsigned int) index;
+- (void) insertSublayer: (CALayer *) layer below: (CALayer *) sibling;
+- (void) insertSublayer: (CALayer *) layer above: (CALayer *) sibling;
 - (void) replaceSublayer: (CALayer *) layer with: (CALayer *) other;
 - (void) display;
 - (void) displayIfNeeded;
@@ -247,8 +277,16 @@ CA_EXPORT CAToneMapMode const CAToneMapModeIfSupported;
 - (void) removeAnimationForKey: (NSString *) key;
 - (NSArray *) animationKeys;
 
+// The action for key: the first one that the delegate, actions, the style's
+// actions or +defaultActionForKey: provides, else the implicit animation of
+// the property. NSNull from any of these means no action.
 - (id<CAAction>) actionForKey: (NSString *) key;
++ (id<CAAction>) defaultActionForKey: (NSString *) key;
 
+@end
+
+// NSNull in an actions dictionary disables the action for its key.
+@interface NSNull (CAActionAdditions) <CAAction>
 @end
 
 @protocol CALayoutManager <NSObject>

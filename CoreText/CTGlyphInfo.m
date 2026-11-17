@@ -1,118 +1,191 @@
+/*
+ * Copyright (C) 2026 Lubos Dolezel
+ *
+ * This file is part of Darling.
+ */
 #import <CoreText/CTGlyphInfo.h>
-#import <Foundation/NSObject.h>
-#import <Foundation/NSString.h>
+#import <CoreText/CTStringAttributes.h>
+#import <Foundation/Foundation.h>
 
-@interface DarlingCTGlyphInfo : NSObject {
-    NSString *_baseString;
+// A glyph info describes one override for a run of base characters: a glyph
+// name, a glyph index, or a character identifier within a collection. It is
+// immutable, so copying it returns the same object.
+@interface KTGlyphInfo : NSObject <NSCopying> {
     NSString *_glyphName;
-    CGFontIndex _characterIdentifier;
-    CTCharacterCollection _characterCollection;
+    NSString *_baseString;
+    id _font;
     CGGlyph _glyph;
+    CGFontIndex _cid;
+    CTCharacterCollection _collection;
 }
-
-- (instancetype)initWithBaseString:(NSString *)baseString
-                         glyphName:(NSString *)glyphName
-                             glyph:(CGGlyph)glyph
-               characterIdentifier:(CGFontIndex)identifier
-               characterCollection:(CTCharacterCollection)collection;
-- (CFStringRef)glyphName;
-- (CGFontIndex)characterIdentifier;
-- (CTCharacterCollection)characterCollection;
-- (CGGlyph)glyph;
+- initWithGlyphName: (NSString *) name
+               font: (id) font
+         baseString: (NSString *) baseString;
+- initWithGlyph: (CGGlyph) glyph
+           font: (id) font
+     baseString: (NSString *) baseString;
+- initWithCharacterIdentifier: (CGFontIndex) cid
+                   collection: (CTCharacterCollection) collection
+                   baseString: (NSString *) baseString;
+- (NSString *) glyphName;
+- (CGGlyph) glyph;
+- (CGFontIndex) characterIdentifier;
+- (CTCharacterCollection) characterCollection;
 @end
 
-@implementation DarlingCTGlyphInfo
+static BOOL objectsEqual(id a, id b) {
+    return a == b || (a != nil && b != nil && [a isEqual: b]);
+}
 
-- (instancetype)initWithBaseString:(NSString *)baseString
-                         glyphName:(NSString *)glyphName
-                             glyph:(CGGlyph)glyph
-               characterIdentifier:(CGFontIndex)identifier
-               characterCollection:(CTCharacterCollection)collection
-{
-    if (!(self = [super init])) return nil;
+@implementation KTGlyphInfo
+
+- initWithGlyphName: (NSString *) name
+               font: (id) font
+         baseString: (NSString *) baseString {
+    self = [super init];
+    if (self == nil)
+        return nil;
+    _glyphName = [name copy];
+    _font = [font retain];
     _baseString = [baseString copy];
-    _glyphName = [glyphName copy];
-    _glyph = glyph;
-    _characterIdentifier = identifier;
-    _characterCollection = collection;
+    _collection = kCTCharacterCollectionIdentityMapping;
+    // The glyph the font has under that name, if any; the identifier of
+    // an identity-mapped glyph is the glyph itself.
+    if (name != nil && font != nil) {
+        _glyph = CTFontGetGlyphWithName((CTFontRef) font, (CFStringRef) name);
+        _cid = _glyph;
+    }
     return self;
 }
 
-- (void)dealloc
-{
-    [_baseString release];
+- initWithGlyph: (CGGlyph) glyph
+           font: (id) font
+     baseString: (NSString *) baseString {
+    self = [super init];
+    if (self == nil)
+        return nil;
+    _glyph = glyph;
+    _cid = glyph;
+    _font = [font retain];
+    _baseString = [baseString copy];
+    _collection = kCTCharacterCollectionIdentityMapping;
+    // The name the font gives the glyph, if it has one.
+    if (font != nil)
+        _glyphName = (NSString *) CTFontCopyNameForGlyph((CTFontRef) font, glyph);
+    return self;
+}
+
+- initWithCharacterIdentifier: (CGFontIndex) cid
+                   collection: (CTCharacterCollection) collection
+                   baseString: (NSString *) baseString {
+    self = [super init];
+    if (self == nil)
+        return nil;
+    _cid = cid;
+    _collection = collection;
+    // Identity mapping: the character identifier is the glyph.
+    if (collection == kCTCharacterCollectionIdentityMapping)
+        _glyph = (CGGlyph) cid;
+    _baseString = [baseString copy];
+    return self;
+}
+
+- (void) dealloc {
     [_glyphName release];
+    [_baseString release];
+    [_font release];
     [super dealloc];
 }
 
-- (CFStringRef)glyphName { return (CFStringRef)_glyphName; }
-- (CGFontIndex)characterIdentifier { return _characterIdentifier; }
-- (CTCharacterCollection)characterCollection { return _characterCollection; }
-- (CGGlyph)glyph { return _glyph; }
-- (CFTypeID)_cfTypeID { return CTGlyphInfoGetTypeID(); }
+- (CFTypeID) _cfTypeID {
+    return CTGlyphInfoGetTypeID();
+}
+
+- copyWithZone: (NSZone *) zone {
+    return [self retain];
+}
+
+- (BOOL) isEqual: (id) other {
+    if (other == self)
+        return YES;
+    if (![other isKindOfClass: [KTGlyphInfo class]])
+        return NO;
+    KTGlyphInfo *info = other;
+    return _glyph == info->_glyph && _cid == info->_cid &&
+           _collection == info->_collection &&
+           objectsEqual(_glyphName, info->_glyphName) &&
+           objectsEqual(_baseString, info->_baseString) &&
+           objectsEqual(_font, info->_font);
+}
+
+- (NSUInteger) hash {
+    return [_glyphName hash] ^ [_baseString hash] ^ _glyph ^
+           ((NSUInteger) _cid << 16) ^ ((NSUInteger) _collection << 8);
+}
+
+- (NSString *) glyphName {
+    return _glyphName;
+}
+
+- (CGGlyph) glyph {
+    return _glyph;
+}
+
+- (CGFontIndex) characterIdentifier {
+    return _cid;
+}
+
+- (CTCharacterCollection) characterCollection {
+    return _collection;
+}
 
 @end
 
-CFTypeID CTGlyphInfoGetTypeID(void)
-{
-    return (CFTypeID)[DarlingCTGlyphInfo class];
+CFTypeID CTGlyphInfoGetTypeID(void) {
+    return (CFTypeID) [KTGlyphInfo self];
 }
 
+// The creators reject NULL arguments. They do not look the glyph up in the
+// font: macOS versions differ on that, and the widest behaviour is to accept.
 CTGlyphInfoRef CTGlyphInfoCreateWithGlyphName(CFStringRef glyphName, CTFontRef font,
-                                              CFStringRef baseString)
-{
-    if (!glyphName || !font || !baseString) return NULL;
-    CGGlyph glyph = CTFontGetGlyphWithName(font, glyphName);
-    if (!glyph) return NULL;
-    return (CTGlyphInfoRef)[[DarlingCTGlyphInfo alloc]
-        initWithBaseString:(NSString *)baseString glyphName:(NSString *)glyphName
-        glyph:glyph characterIdentifier:glyph
-        characterCollection:kCTIdentityMappingCharacterCollection];
+                                              CFStringRef baseString) {
+    if (glyphName == NULL || font == NULL || baseString == NULL)
+        return NULL;
+    return (CTGlyphInfoRef) [[KTGlyphInfo alloc] initWithGlyphName: (NSString *) glyphName
+                                                               font: (id) font
+                                                         baseString: (NSString *) baseString];
 }
 
-CTGlyphInfoRef CTGlyphInfoCreateWithGlyph(CGGlyph glyph, CTFontRef font,
-                                          CFStringRef baseString)
-{
-    if (!glyph || !font || !baseString) return NULL;
-    CGFontRef graphicsFont = CTFontCopyGraphicsFont(font, NULL);
-    if (!graphicsFont) return NULL;
-    CFStringRef name = CGFontCopyGlyphNameForGlyph(graphicsFont, glyph);
-    CGFontRelease(graphicsFont);
-    CTGlyphInfoRef info = (CTGlyphInfoRef)[[DarlingCTGlyphInfo alloc]
-        initWithBaseString:(NSString *)baseString glyphName:(NSString *)name
-        glyph:glyph characterIdentifier:glyph
-        characterCollection:kCTIdentityMappingCharacterCollection];
-    if (name) CFRelease(name);
-    return info;
+CTGlyphInfoRef CTGlyphInfoCreateWithGlyph(CGGlyph glyph, CTFontRef font, CFStringRef baseString) {
+    if (font == NULL || baseString == NULL)
+        return NULL;
+    return (CTGlyphInfoRef) [[KTGlyphInfo alloc] initWithGlyph: glyph
+                                                           font: (id) font
+                                                     baseString: (NSString *) baseString];
 }
 
 CTGlyphInfoRef CTGlyphInfoCreateWithCharacterIdentifier(CGFontIndex cid,
-                                                       CTCharacterCollection collection,
-                                                       CFStringRef baseString)
-{
-    if (!baseString) return NULL;
-    CGGlyph glyph = collection == kCTIdentityMappingCharacterCollection ? cid : 0;
-    return (CTGlyphInfoRef)[[DarlingCTGlyphInfo alloc]
-        initWithBaseString:(NSString *)baseString glyphName:nil
-        glyph:glyph characterIdentifier:cid characterCollection:collection];
+                                                        CTCharacterCollection collection,
+                                                        CFStringRef baseString) {
+    if (baseString == NULL || collection > kCTCharacterCollectionAdobeKorea1)
+        return NULL;
+    return (CTGlyphInfoRef) [[KTGlyphInfo alloc] initWithCharacterIdentifier: cid
+                                                                   collection: collection
+                                                                   baseString: (NSString *) baseString];
 }
 
-CFStringRef CTGlyphInfoGetGlyphName(CTGlyphInfoRef info)
-{
-    return [(DarlingCTGlyphInfo *)info glyphName];
+CFStringRef CTGlyphInfoGetGlyphName(CTGlyphInfoRef glyphInfo) {
+    return (CFStringRef) [(KTGlyphInfo *) glyphInfo glyphName];
 }
 
-CGFontIndex CTGlyphInfoGetCharacterIdentifier(CTGlyphInfoRef info)
-{
-    return [(DarlingCTGlyphInfo *)info characterIdentifier];
+CGGlyph CTGlyphInfoGetGlyph(CTGlyphInfoRef glyphInfo) {
+    return [(KTGlyphInfo *) glyphInfo glyph];
 }
 
-CTCharacterCollection CTGlyphInfoGetCharacterCollection(CTGlyphInfoRef info)
-{
-    return [(DarlingCTGlyphInfo *)info characterCollection];
+CGFontIndex CTGlyphInfoGetCharacterIdentifier(CTGlyphInfoRef glyphInfo) {
+    return [(KTGlyphInfo *) glyphInfo characterIdentifier];
 }
 
-CGGlyph CTGlyphInfoGetGlyph(CTGlyphInfoRef info)
-{
-    return [(DarlingCTGlyphInfo *)info glyph];
+CTCharacterCollection CTGlyphInfoGetCharacterCollection(CTGlyphInfoRef glyphInfo) {
+    return [(KTGlyphInfo *) glyphInfo characterCollection];
 }

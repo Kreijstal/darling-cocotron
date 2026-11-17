@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/AppKitExport.h>
 #import <AppKit/NSView.h>
 #import <AppKit/NSControl.h>
@@ -35,46 +36,55 @@ typedef NS_ENUM(NSInteger, NSScrollElasticity) {
     NSScrollElasticityAllowed = 2,
 };
 
+typedef NS_ENUM(NSInteger, NSScrollViewFindBarPosition) {
+    NSScrollViewFindBarPositionAboveHorizontalRuler = 0,
+    NSScrollViewFindBarPositionAboveContent = 1,
+    NSScrollViewFindBarPositionBelowContent = 2,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x78, Apple's; the ivars
+// before the extras sit at Apple's offsets. Add new state to the extra
+// struct, never as an ivar.
 @interface NSScrollView : NSView {
-@public
-    NSClipView *_contentView;
-#define _clipView _contentView
-    NSClipView *_headerClipView;
-    NSView *_cornerView;
     NSScroller *_verticalScroller;
     NSScroller *_horizontalScroller;
-    NSRulerView *_horizontalRuler;
-    NSRulerView *_verticalRuler;
-    NSColor *_backgroundColor;
-    CGFloat _verticalLineScroll;
-    CGFloat _verticalPageScroll;
-    CGFloat _horizontalLineScroll;
-    CGFloat _horizontalPageScroll;
-    int _borderType;
-    BOOL _drawsBackground;
-    BOOL _hasVerticalScroller;
-    BOOL _hasHorizontalScroller;
-    BOOL _hasHorizontalRuler;
-    BOOL _hasVerticalRuler;
-    BOOL _rulersVisible;
-    BOOL _scrollsDynamically;
-    BOOL _autohidesScrollers;
-    NSCursor *_documentCursor;
-    BOOL _allowsMagnification;
-    CGFloat _magnification;
-    CGFloat _minMagnification;
-    CGFloat _maxMagnification;
-    NSScrollElasticity _horizontalScrollElasticity;
-    NSScrollElasticity _verticalScrollElasticity;
-    NSScrollerStyle _scrollerStyle;
-    NSScrollerKnobStyle _scrollerKnobStyle;
+    NSClipView *_clipView;
+    NSClipView *_headerClipView;
+    NSView *_cornerView;
+    NS_LEGACY_IVAR_PAD(_NSScrollViewReserved1, 16)
+    NS_EXTRA_IVARS_BEGIN(NSScrollView)
+        NSRulerView *_horizontalRuler;
+        NSRulerView *_verticalRuler;
+        NSColor *_backgroundColor;
+        CGFloat _verticalLineScroll;
+        CGFloat _verticalPageScroll;
+        CGFloat _horizontalLineScroll;
+        CGFloat _horizontalPageScroll;
+        int _borderType;
+        BOOL _drawsBackground;
+        BOOL _hasVerticalScroller;
+        BOOL _hasHorizontalScroller;
+        BOOL _hasHorizontalRuler;
+        BOOL _hasVerticalRuler;
+        BOOL _rulersVisible;
+        BOOL _scrollsDynamically;
+        BOOL _autohidesScrollers;
+        NSCursor *_documentCursor;
+        BOOL _allowsMagnification;
+        CGFloat _magnification;
+        CGFloat _minMagnification;
+        CGFloat _maxMagnification;
+        NSScrollerKnobStyle _scrollerKnobStyle;
+        NSScrollElasticity _horizontalScrollElasticity;
+        NSScrollElasticity _verticalScrollElasticity;
+        NSScrollerStyle _scrollerStyle;
+    NS_EXTRA_IVARS_END(NSScrollView)
 }
 
-@property NSScrollerStyle scrollerStyle;
 @property NSScrollerKnobStyle scrollerKnobStyle;
+@property NSScrollerStyle scrollerStyle;
 @property NSScrollElasticity horizontalScrollElasticity;
 @property NSScrollElasticity verticalScrollElasticity;
-
 @property BOOL automaticallyAdjustsContentInsets;
 @property NSEdgeInsets contentInsets;
 
@@ -105,74 +115,51 @@ typedef NS_ENUM(NSInteger, NSScrollElasticity) {
 - (NSSize) contentSize;
 
 - documentView;
-- (NSClipView *) contentView;
+@property(nonatomic, retain) NSClipView *contentView;
 - (NSRect) documentVisibleRect;
 
-- (BOOL) drawsBackground;
-- (NSColor *) backgroundColor;
-- (NSBorderType) borderType;
-- (NSScroller *) verticalScroller;
-- (NSScroller *) horizontalScroller;
-- (void) setVerticalRulerView: (NSRulerView *) ruler;
-- (NSRulerView *) verticalRulerView;
-- (void) setHorizontalRulerView: (NSRulerView *) ruler;
-- (NSRulerView *) horizontalRulerView;
-- (BOOL) hasVerticalScroller;
-- (BOOL) hasHorizontalScroller;
-- (BOOL) hasVerticalRuler;
-- (BOOL) hasHorizontalRuler;
-- (BOOL) rulersVisible;
-- (CGFloat) verticalLineScroll;
-- (CGFloat) horizontalLineScroll;
-- (CGFloat) verticalPageScroll;
-- (CGFloat) horizontalPageScroll;
-- (CGFloat) lineScroll;
-- (CGFloat) pageScroll;
-- (BOOL) scrollsDynamically;
-- (BOOL) autohidesScrollers;
+@property(nonatomic) BOOL drawsBackground;
+@property(nonatomic, retain) NSColor *backgroundColor;
+@property(nonatomic) NSBorderType borderType;
+@property(nonatomic, retain) NSScroller *verticalScroller;
+@property(nonatomic, retain) NSScroller *horizontalScroller;
+@property(nonatomic, retain) NSRulerView *verticalRulerView;
+@property(nonatomic, retain) NSRulerView *horizontalRulerView;
+@property(nonatomic) BOOL hasVerticalScroller;
+@property(nonatomic) BOOL hasHorizontalScroller;
+@property(nonatomic) BOOL hasVerticalRuler;
+@property(nonatomic) BOOL hasHorizontalRuler;
+@property(nonatomic) BOOL rulersVisible;
+@property(nonatomic) CGFloat verticalLineScroll;
+@property(nonatomic) CGFloat horizontalLineScroll;
+@property(nonatomic) CGFloat verticalPageScroll;
+@property(nonatomic) CGFloat horizontalPageScroll;
+@property(nonatomic) CGFloat lineScroll;
+@property(nonatomic) CGFloat pageScroll;
+@property(nonatomic) BOOL scrollsDynamically;
+@property(nonatomic) BOOL autohidesScrollers;
 
 - (NSScrollElasticity) horizontalScrollElasticity;
 - (NSScrollElasticity) verticalScrollElasticity;
 - (void) setHorizontalScrollElasticity: (NSScrollElasticity) elasticity;
 - (void) setVerticalScrollElasticity: (NSScrollElasticity) elasticity;
 
-- (NSCursor *) documentCursor;
-- (CGFloat) magnification;
-- (CGFloat) minMagnification;
-- (CGFloat) maxMagnification;
-- (BOOL) allowsMagnification;
+@property(nonatomic, retain) NSCursor *documentCursor;
+@property(nonatomic) CGFloat magnification;
+@property(nonatomic) CGFloat minMagnification;
+@property(nonatomic) CGFloat maxMagnification;
+@property(nonatomic) BOOL allowsMagnification;
 
 - (void) setDocumentView: (NSView *) view;
-- (void) setContentView: (NSClipView *) clipView;
-- (void) setDrawsBackground: (BOOL) value;
-- (void) setBackgroundColor: (NSColor *) color;
-- (void) setBorderType: (NSBorderType) borderType;
-- (void) setVerticalScroller: (NSScroller *) scroller;
-- (void) setHorizontalScroller: (NSScroller *) scroller;
-- (NSScrollerStyle) scrollerStyle;
-- (void) setScrollerStyle: (NSScrollerStyle) scrollerStyle;
 - (NSScrollerKnobStyle) scrollerKnobStyle;
 - (void) setScrollerKnobStyle: (NSScrollerKnobStyle) knobStyle;
-- (void) setHasVerticalScroller: (BOOL) flag;
-- (void) setHasHorizontalScroller: (BOOL) flag;
-- (void) setHasVerticalRuler: (BOOL) flag;
-- (void) setHasHorizontalRuler: (BOOL) flag;
-- (void) setRulersVisible: (BOOL) flag;
-- (void) setVerticalLineScroll: (CGFloat) value;
-- (void) setHorizontalLineScroll: (CGFloat) value;
-- (void) setVerticalPageScroll: (CGFloat) value;
-- (void) setHorizontalPageScroll: (CGFloat) value;
-- (void) setLineScroll: (CGFloat) value;
-- (void) setPageScroll: (CGFloat) value;
-- (void) setScrollsDynamically: (BOOL) flag;
-- (void) setDocumentCursor: (NSCursor *) cursor;
-- (void) setAutohidesScrollers: (BOOL) value;
-- (void) setMagnification: (CGFloat) value;
-- (void) setMinMagnification: (CGFloat) value;
-- (void) setMaxMagnification: (CGFloat) value;
-- (void) setAllowsMagnification: (BOOL) value;
+- (NSScrollerStyle) scrollerStyle;
+- (void) setScrollerStyle: (NSScrollerStyle) scrollerStyle;
 
 - (void) tile;
 - (void) reflectScrolledClipView: (NSClipView *) clipView;
 
 @end
+
+APPKIT_EXPORT NSNotificationName const NSScrollViewWillStartLiveMagnifyNotification;
+APPKIT_EXPORT NSNotificationName const NSScrollViewDidEndLiveMagnifyNotification;

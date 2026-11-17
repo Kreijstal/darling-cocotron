@@ -5,6 +5,7 @@
 #import <Foundation/NSTask.h>
 #import <Foundation/NSFileHandle.h>
 #include <LaunchServices/LaunchServices.h>
+#include <dispatch/dispatch.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <string.h>
 
@@ -312,63 +313,129 @@ static NSImage *ImageForGenericIcon(NSString *name) {
         withApplication: (NSString *) application
           andDeactivate: (BOOL) deactivate
 {
-    /* LaunchServices is not available in the Darling guest yet.  The
-       Applications viewer nevertheless has a real bundle path, so launch
-       its CFBundleExecutable directly.  Keeping the inherited environment
-       is intentional: it carries the reviewed Wayland display and the
-       app-only PAC setting without changing either globally. */
+    /* The Applications viewer has a real bundle path, so an .app is launched
+       through its CFBundleExecutable directly (this keeps the inherited
+       environment on purpose: it carries the reviewed Wayland display and the
+       app-only PAC setting without changing either globally).  Anything else,
+       or a bundle with no launchable executable, goes through LaunchServices. */
     NSString *bundlePath = application;
     if (!bundlePath && path && [path hasSuffix: @".app"])
         bundlePath = path;
-    if (!bundlePath)
-        return NO;
 
-    NSString *plistPath = [bundlePath stringByAppendingPathComponent: @"Contents/Info.plist"];
-    NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile: plistPath];
-    NSString *executable = [plist objectForKey: @"CFBundleExecutable"];
-    if (![executable isKindOfClass: [NSString class]] || [executable length] == 0)
-        executable = [bundlePath lastPathComponent];
-    if ([executable hasSuffix: @".app"])
-        executable = [executable substringToIndex: [executable length] - 4];
+    if (bundlePath) {
+        NSString *plistPath = [bundlePath stringByAppendingPathComponent: @"Contents/Info.plist"];
+        NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile: plistPath];
+        NSString *executable = [plist objectForKey: @"CFBundleExecutable"];
+        if (![executable isKindOfClass: [NSString class]] || [executable length] == 0)
+            executable = [bundlePath lastPathComponent];
+        if ([executable hasSuffix: @".app"])
+            executable = [executable substringToIndex: [executable length] - 4];
 
-    NSString *launchPath = [bundlePath stringByAppendingPathComponent:
-        [NSString stringWithFormat: @"Contents/MacOS/%@", executable]];
-    BOOL isDirectory = NO;
-    if (![[NSFileManager defaultManager] fileExistsAtPath: launchPath isDirectory: &isDirectory] || isDirectory)
-        return NO;
+        NSString *launchPath = [bundlePath stringByAppendingPathComponent:
+            [NSString stringWithFormat: @"Contents/MacOS/%@", executable]];
+        BOOL isDirectory = NO;
+        if ([[NSFileManager defaultManager] fileExistsAtPath: launchPath isDirectory: &isDirectory] && !isDirectory) {
+            NSDictionary *environment = [[NSProcessInfo processInfo] environment];
+            NSLog(@"NSWorkspace launch argv=[%@] bundle=%@ backend=%@ wayland=%@ display=%@ pac=%@",
+                  launchPath, bundlePath,
+                  [environment objectForKey: @"DARLING_APPKIT_BACKEND"],
+                  [environment objectForKey: @"WAYLAND_DISPLAY"],
+                  [environment objectForKey: @"DISPLAY"],
+                  [environment objectForKey: @"DARLING_DISABLE_PTRAUTH"]);
 
-    NSDictionary *environment = [[NSProcessInfo processInfo] environment];
-    NSLog(@"NSWorkspace launch argv=[%@] bundle=%@ backend=%@ wayland=%@ display=%@ pac=%@",
-          launchPath, bundlePath,
-          [environment objectForKey: @"DARLING_APPKIT_BACKEND"],
-          [environment objectForKey: @"WAYLAND_DISPLAY"],
-          [environment objectForKey: @"DISPLAY"],
-          [environment objectForKey: @"DARLING_DISABLE_PTRAUTH"]);
-
-    NSTask *task = [[[NSTask alloc] init] autorelease];
-    [task setLaunchPath: launchPath];
-    [task setArguments: @[]];
-    [task setEnvironment: environment];
-    [task setCurrentDirectoryPath: bundlePath];
-    [task setStandardError: [NSFileHandle fileHandleWithStandardError]];
-    [task setStandardOutput: [NSFileHandle fileHandleWithStandardOutput]];
-    NSError *launchError = nil;
-    if (![task launchAndReturnError: &launchError]) {
-        NSLog(@"NSWorkspace launch failed executable=%@ error=%@", launchPath, launchError);
-        return NO;
+            NSTask *task = [[[NSTask alloc] init] autorelease];
+            [task setLaunchPath: launchPath];
+            [task setArguments: @[]];
+            [task setEnvironment: environment];
+            [task setCurrentDirectoryPath: bundlePath];
+            [task setStandardError: [NSFileHandle fileHandleWithStandardError]];
+            [task setStandardOutput: [NSFileHandle fileHandleWithStandardOutput]];
+            NSError *launchError = nil;
+            if (![task launchAndReturnError: &launchError]) {
+                NSLog(@"NSWorkspace launch failed executable=%@ error=%@", launchPath, launchError);
+                return NO;
+            }
+            NSLog(@"NSWorkspace launch started executable=%@ pid=%d", launchPath, [task processIdentifier]);
+            [task setTerminationHandler: ^(NSTask *finished) {
+                NSLog(@"NSWorkspace child terminated executable=%@ pid=%d status=%d reason=%ld",
+                      launchPath, [finished processIdentifier], [finished terminationStatus],
+                      (long)[finished terminationReason]);
+            }];
+            return YES;
+        }
     }
-    NSLog(@"NSWorkspace launch started executable=%@ pid=%d", launchPath, [task processIdentifier]);
-    [task setTerminationHandler: ^(NSTask *finished) {
-        NSLog(@"NSWorkspace child terminated executable=%@ pid=%d status=%d reason=%ld",
-              launchPath, [finished processIdentifier], [finished terminationStatus],
-              (long)[finished terminationReason]);
-    }];
-    return YES;
+
+    // TODO: Implement handling `deactivate` flag
+    // TODO: Implement handling race-condition between inter-application (when target app is terminating)
+
+    // On macOS, a nil path with a valid application simply launches the
+    // application (and returns YES), so the file URL is only added when a
+    // path was given.
+    NSURL *url = nil;
+    NSURL *appURL = nil;
+
+    if (path != nil) {
+        url = [NSURL fileURLWithPath:path];
+    }
+
+    if (application != nil) {
+        appURL = [NSURL fileURLWithPath:application];
+    }
+
+    LSLaunchURLSpec spec;
+    memset(&spec, 0, sizeof(spec));
+
+    NSArray *urlArray = (url != nil) ? [NSArray arrayWithObject:url] : nil;
+    spec.itemURLs = (CFArrayRef)urlArray;
+    spec.appURL = (CFURLRef)appURL;
+    spec.launchFlags = kLSLaunchDefaults;
+
+    OSStatus status = LSOpenFromURLSpec(&spec, NULL);
+
+    return (status == noErr);
+}
+
+- (BOOL) openURL: (NSURL *) url {
+    return [self _openURL: url flags: kLSLaunchDefaults] == nil;
+}
+
+// Opens urls with LaunchServices; appURL nil means each URL's default
+// application.
+static OSStatus openURLsWithFlags(NSArray *urls, NSURL *appURL,
+                                  LSLaunchFlags flags) {
+    LSLaunchURLSpec spec;
+    memset(&spec, 0, sizeof(spec));
+    spec.appURL = (CFURLRef) appURL;
+    spec.itemURLs = (CFArrayRef) urls;
+    spec.launchFlags = flags;
+    return LSOpenFromURLSpec(&spec, NULL);
+}
+
+static LSLaunchFlags launchFlagsForConfiguration(
+        NSWorkspaceOpenConfiguration *configuration) {
+    LSLaunchFlags flags = kLSLaunchDefaults;
+    if (configuration == nil)
+        return flags;
+    if (![configuration activates])
+        flags |= kLSLaunchDontSwitch;
+    if ([configuration hides])
+        flags |= kLSLaunchAndHide;
+    if ([configuration hidesOthers])
+        flags |= kLSLaunchAndHideOthers;
+    if ([configuration createsNewApplicationInstance])
+        flags |= kLSLaunchNewInstance;
+    if (![configuration addsToRecentItems])
+        flags |= kLSLaunchDontAddToRecents;
+    if ([configuration isForPrinting])
+        flags |= kLSLaunchAndPrint;
+    return flags;
 }
 
 // Launch Services can't launch applications in the guest yet, so .app bundles take -openFile:'s launch path; it
 // reports anything else it can't open with an OSStatus.
-- (NSError *) _openURL: (NSURL *) url {
+- (NSError *) _openURL: (NSURL *) url flags: (LSLaunchFlags) flags {
+    if (url == nil)
+        return [NSError errorWithDomain: NSOSStatusErrorDomain code: paramErr userInfo: nil];
     if ([[url scheme] isEqualToString: @"x-apple.systempreferences"]) {
         NSRunInformationalAlertPanel(@"System Preferences",
             @"Darling does not enforce macOS sandbox or TCC restrictions. Full Disk Access is already granted to all applications.",
@@ -382,26 +449,58 @@ static NSImage *ImageForGenericIcon(NSString *name) {
                                    code: NSFileReadUnknownError
                                userInfo: @{NSURLErrorKey: url}];
     }
-    OSStatus status = LSOpenCFURLRef((CFURLRef) url, NULL);
+    OSStatus status = openURLsWithFlags([NSArray arrayWithObject: url], nil, flags);
     if (status == noErr)
         return nil;
     return [NSError errorWithDomain: NSOSStatusErrorDomain code: status userInfo: @{NSURLErrorKey: url}];
 }
 
-- (BOOL) openURL: (NSURL *) url {
-    return [self _openURL: url] == nil;
-}
-
-// The launched application isn't tracked, so success passes a nil app; the configuration has nothing to act on.
+// The handler runs asynchronously, on a concurrent queue, as documented.
+// Which application took the URL is not known here, so it gets nil.
 - (void) openURL: (NSURL *) url
         configuration: (NSWorkspaceOpenConfiguration *) configuration
     completionHandler: (void (^)(NSRunningApplication *app, NSError *error)) completionHandler
 {
-    NSError *error = [self _openURL: url];
-    if (completionHandler)
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            completionHandler(nil, error);
-        });
+    LSLaunchFlags flags = launchFlagsForConfiguration(configuration);
+    [url retain];
+    void (^handler)(NSRunningApplication *, NSError *) = [completionHandler copy];
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error = [self _openURL: url flags: flags];
+        if (handler != nil)
+            handler(nil, error);
+        [handler release];
+        [url release];
+    });
+}
+
+- (BOOL) openURLs: (NSArray<NSURL *> *) urls
+           withAppBundleIdentifier: (NSString *) bundleIdentifier
+                           options: (NSWorkspaceLaunchOptions) options
+    additionalEventParamDescriptor: (NSAppleEventDescriptor *) descriptor
+                 launchIdentifiers: (NSArray **) identifiers
+{
+    if (identifiers != NULL)
+        *identifiers = nil;
+    if ([urls count] == 0)
+        return NO;
+
+    NSURL *appURL = nil;
+    if (bundleIdentifier != nil) {
+        appURL = [self URLForApplicationWithBundleIdentifier: bundleIdentifier];
+        if (appURL == nil)
+            return NO;
+    }
+
+    // The launch options share their values with LaunchServices' launch flags.
+    LSLaunchFlags flags = kLSLaunchDefaults |
+            (options & (NSWorkspaceLaunchAndPrint |
+                        NSWorkspaceLaunchWithoutAddingToRecents |
+                        NSWorkspaceLaunchWithoutActivation |
+                        NSWorkspaceLaunchAsync |
+                        NSWorkspaceLaunchNewInstance |
+                        NSWorkspaceLaunchAndHide |
+                        NSWorkspaceLaunchAndHideOthers));
+    return openURLsWithFlags(urls, appURL, flags) == noErr;
 }
 
 - (BOOL) selectFile: (NSString *) path

@@ -19,7 +19,6 @@
  SOFTWARE. */
 
 #import "X11DraggingManager.h"
-#import "X11DragOperations.h"
 #import "X11DropSession.h"
 #import "X11Display.h"
 #import "X11Window.h"
@@ -43,12 +42,6 @@ static const unsigned X11XdndVersion = 5;
 // left in the queue for when the drag is over.
 static const NSEventMask X11XdndDragEventMask =
         NSLeftMouseUpMask | NSLeftMouseDraggedMask | NSMouseMovedMask;
-
-// A drag's selection is a selection of its own, so a second drag started before
-// the first target finished reading cannot be served the first one's data. That
-// is the hole version 0 of the protocol leaves open, and a fresh selection for
-// every drag closes it.
-static unsigned X11DragCount;
 
 // How long the source waits for the answer to the position it is dropping on, and
 // for the target to finish with the data it asked for. Both are bounded: a target
@@ -77,14 +70,6 @@ static BOOL X11HasProperty(Display *xdpy, Window w, Atom prop, Atom type) {
     if (data)
         XFree(data);
     return present;
-}
-
-// An action is advertised by a property of its own name holding that action. The
-// protocol's XdndActionList belongs to the XdndActionAsk dialog, which this
-// source does not offer.
-static void X11AdvertiseAction(Display *xdpy, Window w, Atom action) {
-    XChangeProperty(xdpy, w, action, XA_ATOM, 32, PropModeReplace,
-                    (unsigned char *) &action, 1);
 }
 
 // The selection a drag publishes is served from the pasteboard the application
@@ -170,6 +155,7 @@ static X11DraggingManager *X11SharedManager;
         _atom.actionCopy = XInternAtom(_xdpy, "XdndActionCopy", False);
         _atom.actionMove = XInternAtom(_xdpy, "XdndActionMove", False);
         _atom.actionLink = XInternAtom(_xdpy, "XdndActionLink", False);
+        _atom.actionList = XInternAtom(_xdpy, "XdndActionList", False);
     }
     return self;
 }
@@ -245,10 +231,11 @@ static X11DraggingManager *X11SharedManager;
     }
 
     // The selection's helper window is the drag's source window: the target reads
-    // the properties below from it and converts the selection it names, so one
-    // window answers both and there is nothing to keep in step.
-    X11Pasteboard *board = [[X11Pasteboard alloc] initWithName:
-            [NSString stringWithFormat: @"COCOTRON_DRAG_SELECTION_%u", ++X11DragCount]];
+    // the properties below from it and converts the selection, so one window
+    // answers both and there is nothing to keep in step. XDND fixes the selection a
+    // drag is served on: a target converts XdndSelection and nothing else, so the
+    // helper pasteboard owns exactly that selection (one drag runs at a time).
+    X11Pasteboard *board = [[X11Pasteboard alloc] initWithName: @"XdndSelection"];
     X11DragProvider *provider = [[X11DragProvider alloc] initWithPasteboard: pasteboard];
     [board addTypes: [pasteboard types] owner: provider];
     [provider release];
@@ -257,19 +244,17 @@ static X11DraggingManager *X11SharedManager;
     unsigned long version = X11XdndVersion;
     XChangeProperty(_xdpy, sourceWindow, _atom.aware, XA_ATOM, 32, PropModeReplace,
                     (unsigned char *) &version, 1);
-    // XdndSelection names the selection to convert, and may carry a second atom
-    // naming the property to receive it on. The conversion lands on the property
-    // the target names in XConvertSelection whatever this says, so the second
-    // atom is left out rather than guessed at by whatever reads it.
-    Atom selection = [board selectionAtom];
-    XChangeProperty(_xdpy, sourceWindow, _atom.selection, XA_ATOM, 32, PropModeReplace,
-                    (unsigned char *) &selection, 1);
+    // XdndActionList names the actions this source can perform.
+    Atom actions[3];
+    int actionCount = 0;
     if (operations & NSDragOperationCopy)
-        X11AdvertiseAction(_xdpy, sourceWindow, _atom.actionCopy);
+        actions[actionCount++] = _atom.actionCopy;
     if (operations & NSDragOperationMove)
-        X11AdvertiseAction(_xdpy, sourceWindow, _atom.actionMove);
+        actions[actionCount++] = _atom.actionMove;
     if (operations & NSDragOperationLink)
-        X11AdvertiseAction(_xdpy, sourceWindow, _atom.actionLink);
+        actions[actionCount++] = _atom.actionLink;
+    XChangeProperty(_xdpy, sourceWindow, _atom.actionList, XA_ATOM, 32, PropModeReplace,
+                    (unsigned char *) actions, actionCount);
     _dragTypeCount = [names count];
     _dragTypes = malloc(sizeof(Atom) * _dragTypeCount);
     for (unsigned long i = 0; i < _dragTypeCount; i++)
@@ -510,7 +495,7 @@ static X11DraggingManager *X11SharedManager;
     // a time could not tell this drag from the next one either.
     long fields[5] = { (long) _dragWindow, 0,
                        ((long) (rootX & 0xFFFF) << 16) | (rootY & 0xFFFF), 0,
-                       (long) X11ActionsFromOperations(_offeredOperations) };
+                       (long) [self atomForOperations: _offeredOperations] };
     [self sendXdndMessage: _atom.position destination: target fields: fields];
     _awaitingStatus = YES;
 }
@@ -628,36 +613,16 @@ static X11DraggingManager *X11SharedManager;
 #pragma mark Source properties
 
 static NSString *X11PropertyAtomName(Display *xdpy, Atom atom) {
+    // XdndEnter leaves the unused type slots at None; asking the server for the
+    // name of None is a BadAtom error.
+    if (atom == None)
+        return nil;
     char *name = XGetAtomName(xdpy, atom);
     if (name == NULL)
         return nil;
     NSString *result = [NSString stringWithUTF8String: name];
     XFree(name);
     return result;
-}
-
-- (NSString *) selectionNameFromSource: (Window) source {
-    Atom type;
-    int format;
-    unsigned long count, remaining;
-    unsigned char *data = NULL;
-    // XdndSelection is a pair: the selection to convert, and the property the
-    // target is asked to receive it on. X11Pasteboard always receives on its own
-    // RECEIVING_PROPERTY, which every source honours because the X protocol has
-    // the conversion write to whatever property the requestor named, so only the
-    // selection half is needed here.
-    if (XGetWindowProperty(_xdpy, source, _atom.selection, 0, 2, False, XA_ATOM,
-                           &type, &format, &count, &remaining,
-                           &data) == Success &&
-        type == XA_ATOM && format == 32 && count >= 1) {
-        NSString *name = X11PropertyAtomName(_xdpy, (Atom) ((long *) data)[0]);
-        if (data)
-            XFree(data);
-        return name;
-    }
-    if (data)
-        XFree(data);
-    return nil;
 }
 
 - (NSString *) pasteboardTypeForAtom: (Atom) atom {
@@ -702,32 +667,37 @@ static NSString *X11PropertyAtomName(Display *xdpy, Atom atom) {
     return types;
 }
 
-- (BOOL) source: (Window) source advertises: (Atom) action {
+// The actions a source lists in XdndActionList, as drag operations.
+- (NSDragOperation) actionListOfSource: (Window) source {
+    NSDragOperation operations = NSDragOperationNone;
     Atom type;
     int format;
     unsigned long count, remaining;
     unsigned char *data = NULL;
-    BOOL present =
-            XGetWindowProperty(_xdpy, source, action, 0, 1, False, XA_ATOM, &type,
-                               &format, &count, &remaining, &data) == Success &&
-            type != None;
+    if (XGetWindowProperty(_xdpy, source, _atom.actionList, 0, 32, False, XA_ATOM, &type,
+                           &format, &count, &remaining, &data) == Success &&
+        type == XA_ATOM && format == 32) {
+        for (unsigned long i = 0; i < count; i++) {
+            Atom action = ((Atom *) data)[i];
+            if (action == _atom.actionCopy)
+                operations |= NSDragOperationCopy;
+            else if (action == _atom.actionMove)
+                operations |= NSDragOperationMove;
+            else if (action == _atom.actionLink)
+                operations |= NSDragOperationLink;
+        }
+    }
     if (data)
         XFree(data);
-    return present;
+    return operations;
 }
 
 - (NSDragOperation) operationsFromSource: (Window) source version: (unsigned) version {
     // Versions 0 and 1 predate action negotiation, and their action is always copy.
     if (version < 2)
         return NSDragOperationCopy;
-    NSDragOperation operations = NSDragOperationNone;
-    if ([self source: source advertises: _atom.actionCopy])
-        operations |= NSDragOperationCopy;
-    if ([self source: source advertises: _atom.actionMove])
-        operations |= NSDragOperationMove;
-    if ([self source: source advertises: _atom.actionLink])
-        operations |= NSDragOperationLink;
-    // The specified default for a source that advertises no action at all.
+    // The specified default for a source that lists no action at all.
+    NSDragOperation operations = [self actionListOfSource: source];
     return operations != NSDragOperationNone ? operations : NSDragOperationCopy;
 }
 
@@ -756,16 +726,21 @@ static NSString *X11PropertyAtomName(Display *xdpy, Atom atom) {
 
 - (void) handleEnter: (XClientMessageEvent *) message toWindow: (X11Window *) window {
     Window source = (Window) message->data.l[0];
-    unsigned version = (unsigned) (message->data.l[1] & 0xFF);
-    // A version this target does not speak cannot be negotiated. A new offer is
-    // also refused while a drop is being performed, because the receiver's own
-    // callbacks can pump the X connection and the running session must survive.
-    if (source == None || version > X11XdndVersion || _inDrop)
+    // The protocol version is in the top byte of the word; a source newer than this
+    // target is spoken to in the target's own version.
+    unsigned version = (unsigned) ((message->data.l[1] >> 24) & 0xFF);
+    if (version > X11XdndVersion)
+        version = X11XdndVersion;
+    // A new offer is refused while a drop is being performed, because the
+    // receiver's own callbacks can pump the X connection and the running session
+    // must survive.
+    if (source == None || _inDrop)
         return;
 
-    NSString *selection = [self selectionNameFromSource: source];
-    NSArray *types = selection ? [self typesFromEnter: message source: source] : nil;
-    if (selection == nil || [types count] == 0)
+    // The drag is always served on the XdndSelection selection.
+    NSString *selection = @"XdndSelection";
+    NSArray *types = [self typesFromEnter: message source: source];
+    if ([types count] == 0)
         return;
 
     // A source that re-enters without leaving first would otherwise strand the
@@ -789,8 +764,8 @@ static NSString *X11PropertyAtomName(Display *xdpy, Atom atom) {
         long packed = message->data.l[2];
         accepted = [_session updateAtRootX: (int) ((packed >> 16) & 0xFFFF)
                                      rootY: (int) (packed & 0xFFFF)
-                           requestedActions: X11OperationsFromActions(
-                                   (uint32_t) message->data.l[4])];
+                           requestedActions: [self operationForAction:
+                                                     (Atom) message->data.l[4]]];
     }
     [self sendStatusTo: window source: source operations: accepted];
 }
@@ -832,7 +807,7 @@ static NSString *X11PropertyAtomName(Display *xdpy, Atom atom) {
     // in step with the pointer to draw its drop feedback.
     event.xclient.data.l[2] = 0;
     event.xclient.data.l[3] = 0;
-    event.xclient.data.l[4] = (long) X11ActionsFromOperations(operations);
+    event.xclient.data.l[4] = (long) [self atomForOperations: operations];
     XSendEvent(_xdpy, source, False, NoEventMask, &event);
     XFlush(_xdpy);
 }

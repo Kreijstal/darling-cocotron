@@ -30,21 +30,64 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <Foundation/NSException.h>
 #import <Foundation/NSRaise.h>
 
-@interface _NSEventLocalMonitor : NSObject {
+// The object +addLocalMonitorForEventsMatchingMask:handler: returns.
+@interface NSLocalEventMonitor : NSObject {
 @public
     NSEventMask _mask;
     NSEvent * (^_handler)(NSEvent *);
 }
 @end
 
-@implementation _NSEventLocalMonitor
+@implementation NSLocalEventMonitor
+
 - (void) dealloc {
     [_handler release];
     [super dealloc];
 }
+
 @end
 
-static NSMutableArray<_NSEventLocalMonitor *> *s_localMonitors = nil;
+// The object +addGlobalMonitorForEventsMatchingMask:handler: returns. It keeps
+// its handler only so that the monitor lives until it is removed; the handler
+// is never called (see the method).
+@interface NSGlobalEventMonitor : NSObject {
+@public
+    NSEventMask _mask;
+    void (^_handler)(NSEvent *);
+}
+@end
+
+@implementation NSGlobalEventMonitor
+
+- (void) dealloc {
+    [_handler release];
+    [super dealloc];
+}
+
+@end
+
+static NSMutableArray *localEventMonitors = nil;
+static NSMutableArray *globalEventMonitors = nil;
+
+__attribute__((visibility("hidden")))
+NSEvent *NSEventApplyLocalMonitors(NSEvent *event) {
+    if ([localEventMonitors count] == 0)
+        return event;
+
+    // A handler may add or remove monitors. Added ones see the next event;
+    // removed ones are not called again, not even for this one.
+    NSArray *monitors = [[localEventMonitors copy] autorelease];
+
+    for (NSLocalEventMonitor *monitor in monitors) {
+        if (event == nil)
+            break;
+        if ([localEventMonitors indexOfObjectIdenticalTo: monitor] == NSNotFound)
+            continue;
+        if (monitor->_mask & NSEventMaskFromType([event type]))
+            event = monitor->_handler(event);
+    }
+    return event;
+}
 
 @implementation NSEvent
 
@@ -78,12 +121,12 @@ static BOOL _mouseCoalescingEnabled = YES;
     return [[NSDisplay currentDisplay] mouseLocation];
 }
 
-+ (NSUInteger) pressedMouseButtons {
-    return 0;
-}
-
 + (NSEventModifierFlags) modifierFlags {
     return [[NSDisplay currentDisplay] currentModifierFlags];
+}
+
++ (NSUInteger) pressedMouseButtons {
+    return [[NSDisplay currentDisplay] pressedMouseButtons];
 }
 
 - (instancetype) initWithType: (NSEventType) type
@@ -274,8 +317,19 @@ static BOOL _mouseCoalescingEnabled = YES;
     return 0;
 }
 
-- (CGFloat) deltaZ {
-    return 0;
+// Only magnify and rotate events (NSEvent_gesture) carry a phase. No backend
+// produces precise (trackpad) scrolling yet: every scroll event is a wheel
+// notch measured in lines, with no phase, as a mouse wheel reports on macOS.
+- (NSEventPhase) phase {
+    return NSEventPhaseNone;
+}
+
+- (NSEventPhase) momentumPhase {
+    return NSEventPhaseNone;
+}
+
+- (BOOL) hasPreciseScrollingDeltas {
+    return NO;
 }
 
 - (CGFloat) scrollingDeltaX {
@@ -286,7 +340,7 @@ static BOOL _mouseCoalescingEnabled = YES;
     return [self deltaY];
 }
 
-- (BOOL) hasPreciseScrollingDeltas {
+- (BOOL) isDirectionInvertedFromDevice {
     return NO;
 }
 
@@ -294,12 +348,12 @@ static BOOL _mouseCoalescingEnabled = YES;
     return NO;
 }
 
-- (NSEventPhase) phase {
-    return NSEventPhaseNone;
+- (CGEventRef) CGEvent {
+    return NULL;
 }
 
-- (NSEventPhase) momentumPhase {
-    return NSEventPhaseNone;
+- (CGFloat) deltaZ {
+    return 0;
 }
 
 - (CGFloat) magnification {
@@ -434,41 +488,53 @@ static NSTimer *_periodicTimer = nil;
 + (id) addLocalMonitorForEventsMatchingMask: (NSEventMask) mask
                                     handler: (NSEvent * (^)(NSEvent *event)) block
 {
-    if (!block)
+    if (block == nil)
         return nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        s_localMonitors = [NSMutableArray new];
-    });
 
-    _NSEventLocalMonitor *monitor = [_NSEventLocalMonitor new];
+    if (localEventMonitors == nil)
+        localEventMonitors = [[NSMutableArray alloc] init];
+
+    NSLocalEventMonitor *monitor = [[NSLocalEventMonitor alloc] init];
     monitor->_mask = mask;
     monitor->_handler = [block copy];
-    [s_localMonitors addObject: monitor];
-    [monitor release];
-    return monitor;
+    [localEventMonitors addObject: monitor];
+    return [monitor autorelease];
+}
+
++ (id) addGlobalMonitorForEventsMatchingMask: (NSEventMask) mask
+                                      handler: (void (^)(NSEvent *event)) block
+{
+    // A global monitor is for events that go to other applications. Neither
+    // X11 nor Wayland lets a client see another client's input (Wayland
+    // deliberately; X11 only through grabs or XInput2 root-window selection,
+    // which would also steal or duplicate this application's own input), so
+    // the handler never fires. The returned monitor is a valid token that
+    // removeMonitor: accepts, which is all that callers can observe on a
+    // system where the event stream of the other applications is hidden from
+    // them, as when macOS withholds it without accessibility permission.
+    if (block == nil)
+        return nil;
+
+    if (globalEventMonitors == nil)
+        globalEventMonitors = [[NSMutableArray alloc] init];
+
+    NSGlobalEventMonitor *monitor = [[NSGlobalEventMonitor alloc] init];
+    monitor->_mask = mask;
+    monitor->_handler = [block copy];
+    [globalEventMonitors addObject: monitor];
+    return [monitor autorelease];
 }
 
 + (void) removeMonitor: (id) eventMonitor {
-    if (eventMonitor && s_localMonitors)
-        [s_localMonitors removeObjectIdenticalTo: eventMonitor];
+    // Removing a monitor that is already removed, or nil, does nothing.
+    [localEventMonitors removeObjectIdenticalTo: eventMonitor];
+    [globalEventMonitors removeObjectIdenticalTo: eventMonitor];
 }
 
+// The name the application code used before the monitors were filtered by
+// NSEventApplyLocalMonitors().
 + (NSEvent *) _filterEventWithLocalMonitors: (NSEvent *) event {
-    if (event == nil || [s_localMonitors count] == 0)
-        return event;
-
-    NSEventMask eventMask = NSEventMaskFromType([event type]);
-    NSArray *monitors = [s_localMonitors copy];
-    for (_NSEventLocalMonitor *m in monitors) {
-        if (m->_mask & eventMask) {
-            event = m->_handler(event);
-            if (event == nil)
-                break;
-        }
-    }
-    [monitors release];
-    return event;
+    return NSEventApplyLocalMonitors(event);
 }
 
 @end

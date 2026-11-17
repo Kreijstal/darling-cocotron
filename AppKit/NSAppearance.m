@@ -18,6 +18,11 @@
 */
 
 #import <AppKit/NSAppearance.h>
+#import <AppKit/NSApplication.h>
+#import <Foundation/NSArray.h>
+#import <Foundation/NSDictionary.h>
+#import <Foundation/NSException.h>
+#import <Foundation/NSThread.h>
 #import <AppKit/NSColor.h>
 
 NSString *const NSAppearanceNameAqua = @"NSAppearanceNameAqua";
@@ -49,53 +54,116 @@ BOOL NSSolariumEnabled(void) {
 
 @implementation NSAppearance
 
+static NSString *const NSAppearanceThreadKey = @"NSAppearanceCurrentDrawingAppearance";
+
 + (NSAppearance *) appearanceNamed: (NSAppearanceName) name {
-    NSAppearance *appearance = [[NSAppearance alloc] init];
-    appearance->_name = [name copy];
-    return appearance;
+    static NSMutableDictionary *appearances;
+    @synchronized(self) {
+        if (appearances == nil) {
+            NSAppearanceName names[] = {
+                NSAppearanceNameAqua,
+                NSAppearanceNameDarkAqua,
+                NSAppearanceNameSystem,
+                NSAppearanceNameTouchBar,
+                NSAppearanceNameVibrantDark,
+                NSAppearanceNameVibrantLight,
+                NSAppearanceNameAccessibilityHighContrastAqua,
+                NSAppearanceNameAccessibilityHighContrastDarkAqua,
+                NSAppearanceNameAccessibilityHighContrastSystem,
+                NSAppearanceNameAccessibilityHighContrastVibrantLight,
+                NSAppearanceNameAccessibilityHighContrastVibrantDark,
+                NSAppearanceNameLightContent,
+            };
+            appearances = [NSMutableDictionary new];
+            for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+                NSAppearance *appearance = [[NSAppearance alloc] init];
+                appearance->_name = [names[i] copy];
+                [appearances setObject: appearance forKey: names[i]];
+                [appearance release];
+            }
+        }
+        return name == nil ? nil : [appearances objectForKey: name];
+    }
 }
 
-static NSString *const NSAppearanceDrawingAppearanceKey = @"NSAppearanceCurrentDrawingAppearance";
+- (void) dealloc {
+    [_name release];
+    [super dealloc];
+}
+
+- (NSAppearanceName) name {
+    return _name;
+}
+
+static BOOL isDarkAppearanceName(NSAppearanceName name) {
+    return [name isEqualToString: NSAppearanceNameDarkAqua] ||
+           [name isEqualToString: NSAppearanceNameVibrantDark] ||
+           [name isEqualToString:
+                         NSAppearanceNameAccessibilityHighContrastDarkAqua] ||
+           [name isEqualToString:
+                         NSAppearanceNameAccessibilityHighContrastVibrantDark];
+}
+
+// The receiver's own name if listed, else the basic appearance of its
+// family (Aqua or Dark Aqua), so that asking with Aqua and Dark Aqua tells
+// light from dark appearances, as Apple's Dark Mode documentation does.
+- (NSAppearanceName) bestMatchFromAppearancesWithNames:
+        (NSArray<NSAppearanceName> *) appearances
+{
+    if (_name == nil)
+        return nil;
+    if ([appearances containsObject: _name])
+        return _name;
+    NSAppearanceName family = isDarkAppearanceName(_name)
+                                      ? NSAppearanceNameDarkAqua
+                                      : NSAppearanceNameAqua;
+    if ([appearances containsObject: family])
+        return family;
+    return nil;
+}
 
 + (NSAppearance *) currentDrawingAppearance {
-    NSAppearance *drawing =
-            [[[NSThread currentThread] threadDictionary] objectForKey: NSAppearanceDrawingAppearanceKey];
-    if (drawing != nil)
-        return drawing;
-    if (!sCurrentAppearance) {
-        sCurrentAppearance = [self appearanceNamed:NSAppearanceNameAqua];
-    }
-    return sCurrentAppearance;
+    NSAppearance *appearance = [[[NSThread currentThread] threadDictionary]
+            objectForKey: NSAppearanceThreadKey];
+    if (appearance == nil)
+        appearance = sCurrentAppearance;
+    if (appearance == nil)
+        appearance = [NSApp effectiveAppearance];
+    if (appearance == nil)
+        appearance = [self appearanceNamed: NSAppearanceNameAqua];
+    return appearance;
 }
 
 + (NSAppearance *) currentAppearance {
     return [self currentDrawingAppearance];
 }
 
+// The process-wide appearance; -performAsCurrentDrawingAppearance: overrides it per thread.
++ (void) setCurrentAppearance: (NSAppearance *) appearance {
+    @synchronized(self) {
+        if (sCurrentAppearance != appearance) {
+            [sCurrentAppearance release];
+            sCurrentAppearance = [appearance retain];
+        }
+    }
+}
+
+// Blocks nest, and the previous appearance comes back also when the block
+// raises.
 - (void) performAsCurrentDrawingAppearance: (void (^)(void)) block {
-    NSMutableDictionary *threadDictionary = [[NSThread currentThread] threadDictionary];
-    NSAppearance *previous = [[threadDictionary objectForKey: NSAppearanceDrawingAppearanceKey] retain];
-    [threadDictionary setObject: self forKey: NSAppearanceDrawingAppearanceKey];
+    NSMutableDictionary *thread = [[NSThread currentThread] threadDictionary];
+    NSAppearance *previous =
+            [[thread objectForKey: NSAppearanceThreadKey] retain];
+    [thread setObject: self forKey: NSAppearanceThreadKey];
     @try {
         block();
     } @finally {
         if (previous != nil)
-            [threadDictionary setObject: previous forKey: NSAppearanceDrawingAppearanceKey];
+            [thread setObject: previous forKey: NSAppearanceThreadKey];
         else
-            [threadDictionary removeObjectForKey: NSAppearanceDrawingAppearanceKey];
+            [thread removeObjectForKey: NSAppearanceThreadKey];
         [previous release];
     }
-}
-
-+ (void) setCurrentAppearance: (NSAppearance *) appearance {
-    if (sCurrentAppearance != appearance) {
-        [sCurrentAppearance release];
-        sCurrentAppearance = [appearance retain];
-    }
-}
-
-- (NSAppearanceName) name {
-    return _name ? _name : NSAppearanceNameAqua;
 }
 
 // How far colorByAdjustingLightnessOfColor:darker: blends towards black or white.
@@ -108,22 +176,10 @@ static const CGFloat NSAppearanceLightnessAdjustment = 0.1;
     return result ? result : color;
 }
 
-- (NSAppearanceName) bestMatchFromAppearancesWithNames: (NSArray *) appearances {
-    if ([appearances containsObject: [self name]]) {
-        return [self name];
-    }
-    if ([appearances count] > 0) {
-        return [appearances objectAtIndex: 0];
-    }
-    return nil;
-}
-
 - (void) encodeWithCoder: (NSCoder *) aCoder {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
 }
 
 - (id) initWithCoder: (NSCoder *) aDecoder {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
     return self;
 }
 

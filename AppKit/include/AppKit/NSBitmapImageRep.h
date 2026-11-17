@@ -17,29 +17,34 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSColorSpace.h>
 #import <AppKit/NSGraphics.h>
 #import <AppKit/NSImageRep.h>
 #import <ApplicationServices/ApplicationServices.h>
 
-typedef enum {
-    NSTIFFFileType,
-    NSBMPFileType,
-    NSGIFFileType,
-    NSJPEGFileType,
-    NSPNGFileType,
-    NSJPEG2000FileType,
+typedef NS_ENUM(NSUInteger, NSBitmapImageFileType) {
+    NSBitmapImageFileTypeTIFF,
+    NSBitmapImageFileTypeBMP,
+    NSBitmapImageFileTypeGIF,
+    NSBitmapImageFileTypeJPEG,
+    NSBitmapImageFileTypePNG,
+    NSBitmapImageFileTypeJPEG2000,
 
     // Names used by the macOS 10.12+ SDK.
-    NSBitmapImageFileTypeTIFF = NSTIFFFileType,
-    NSBitmapImageFileTypeBMP = NSBMPFileType,
-    NSBitmapImageFileTypeGIF = NSGIFFileType,
-    NSBitmapImageFileTypeJPEG = NSJPEGFileType,
-    NSBitmapImageFileTypePNG = NSPNGFileType,
-    NSBitmapImageFileTypeJPEG2000 = NSJPEG2000FileType,
-} NSBitmapImageFileType;
+};
 
-typedef enum {
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSTIFFFileType = NSBitmapImageFileTypeTIFF,
+    NSBMPFileType = NSBitmapImageFileTypeBMP,
+    NSGIFFileType = NSBitmapImageFileTypeGIF,
+    NSJPEGFileType = NSBitmapImageFileTypeJPEG,
+    NSPNGFileType = NSBitmapImageFileTypePNG,
+    NSJPEG2000FileType = NSBitmapImageFileTypeJPEG2000,
+};
+
+typedef NS_ENUM(NSUInteger, NSTIFFCompression) {
     NSTIFFCompressionNone = 1,
     NSTIFFCompressionCCITTFAX3 = 3,
     NSTIFFCompressionCCITTFAX4 = 4,
@@ -48,15 +53,22 @@ typedef enum {
     NSTIFFCompressionNEXT = 32766,
     NSTIFFCompressionPackBits = 32773,
     NSTIFFCompressionOldJPEG = 32865,
-} NSTIFFCompression;
+};
 
-typedef enum {
-    NSAlphaFirstBitmapFormat = 0x01,
-    NSAlphaNonpremultipliedBitmapFormat = 0x02,
-    NSFloatingPointSamplesBitmapFormat = 0x04,
-} NSBitmapFormat;
+typedef NS_OPTIONS(NSUInteger, NSBitmapFormat) {
+    NSBitmapFormatAlphaFirst = 0x01,
+    NSBitmapFormatAlphaNonpremultiplied = 0x02,
+    NSBitmapFormatFloatingPointSamples = 0x04,
+};
 
-typedef NSString *NSBitmapImageRepPropertyKey;
+// Names used before the modern spellings; plain constants, so Swift does not see them.
+enum {
+    NSAlphaFirstBitmapFormat = NSBitmapFormatAlphaFirst,
+    NSAlphaNonpremultipliedBitmapFormat = NSBitmapFormatAlphaNonpremultiplied,
+    NSFloatingPointSamplesBitmapFormat = NSBitmapFormatFloatingPointSamples,
+};
+
+typedef NSString *NSBitmapImageRepPropertyKey NS_STRING_ENUM;
 
 APPKIT_EXPORT NSBitmapImageRepPropertyKey NSImageCompressionFactor;
 APPKIT_EXPORT NSBitmapImageRepPropertyKey NSImageCompressionMethod;
@@ -73,18 +85,32 @@ APPKIT_EXPORT NSBitmapImageRepPropertyKey NSImageLoopCount;
 APPKIT_EXPORT NSBitmapImageRepPropertyKey NSImageCurrentFrameDuration;
 APPKIT_EXPORT NSBitmapImageRepPropertyKey NSImageCurrentFrame;
 
+typedef NS_ENUM(NSInteger, NSImageRepLoadStatus) {
+    NSImageRepLoadStatusUnknownType = -1,
+    NSImageRepLoadStatusReadingHeader = -2,
+    NSImageRepLoadStatusWillNeedAllData = -3,
+    NSImageRepLoadStatusInvalidData = -4,
+    NSImageRepLoadStatusUnexpectedEOF = -5,
+    NSImageRepLoadStatusCompleted = -6,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x34, Apple's; the ivars
+// before the extras keep their position in the original order. Add new state
+// to the extra struct, never as an ivar.
 @interface NSBitmapImageRep : NSImageRep {
     int _samplesPerPixel;
     int _bitsPerPixel;
     int _bytesPerRow;
     int _bytesPerPlane;
     NSBitmapFormat _bitmapFormat;
-    BOOL _freeWhenDone;
-    BOOL _isPlanar;
-    unsigned char **_bitmapPlanes;
-    NSMutableDictionary *_properties;
+    NS_EXTRA_IVARS_BEGIN(NSBitmapImageRep)
+        BOOL _freeWhenDone;
+        BOOL _isPlanar;
+        unsigned char **_bitmapPlanes;
+        NSMutableDictionary *_properties;
 
-    CGImageRef _cgImage;
+        CGImageRef _cgImage;
+    NS_EXTRA_IVARS_END(NSBitmapImageRep)
 }
 
 + (void) getTIFFCompressionTypes: (const NSTIFFCompression **) types

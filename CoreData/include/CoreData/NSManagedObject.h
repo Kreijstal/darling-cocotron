@@ -19,6 +19,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <CoreData/CoreDataExports.h>
 #import <Foundation/NSObject.h>
 #import <CoreData/NSFetchRequestResult.h>
+#import <CoreData/NSFetchRequest.h>
 
 @class NSManagedObjectID, NSEntityDescription, NSManagedObjectContext,
         NSPropertyDescription, NSMutableDictionary, NSDictionary, NSError,

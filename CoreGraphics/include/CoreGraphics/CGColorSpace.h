@@ -12,6 +12,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include <CoreFoundation/CoreFoundation.h>
 
 #import <CoreGraphics/CGGeometry.h>
+#import <CoreGraphics/CGDataProvider.h>
 
 typedef struct CF_BRIDGED_TYPE(id) O2ColorSpace *CGColorSpaceRef;
 
@@ -34,6 +35,7 @@ COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceACESCGLinear;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceITUR_709;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceITUR_2020;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceITUR_2100_PQ;
+COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceITUR_2100_HLG;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceROMMRGB;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceDCIP3;
 COREGRAPHICS_EXPORT const CFStringRef kCGColorSpaceExtendedSRGB;
@@ -48,8 +50,8 @@ typedef CF_ENUM(int32_t, CGColorRenderingIntent) {
     kCGRenderingIntentDefault CF_SWIFT_NAME(defaultIntent),
     kCGRenderingIntentAbsoluteColorimetric CF_SWIFT_NAME(absoluteColorimetric),
     kCGRenderingIntentRelativeColorimetric CF_SWIFT_NAME(relativeColorimetric),
-    kCGRenderingIntentSaturation CF_SWIFT_NAME(saturation),
     kCGRenderingIntentPerceptual CF_SWIFT_NAME(perceptual),
+    kCGRenderingIntentSaturation CF_SWIFT_NAME(saturation),
 };
 
 typedef enum {
@@ -71,21 +73,31 @@ COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateDeviceGray();
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateDeviceCMYK();
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreatePattern(CGColorSpaceRef baseSpace);
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateLab(const CGFloat *whitePoint, const CGFloat *blackPoint, const CGFloat *range);
+COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateIndexed(CGColorSpaceRef baseSpace, size_t lastIndex, const unsigned char *colorTable);
 
 COREGRAPHICS_EXPORT CGColorSpaceModel CGColorSpaceGetModel(CGColorSpaceRef self);
+COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceGetBaseColorSpace(CGColorSpaceRef self);
+COREGRAPHICS_EXPORT size_t CGColorSpaceGetColorTableCount(CGColorSpaceRef self);
+COREGRAPHICS_EXPORT void CGColorSpaceGetColorTable(CGColorSpaceRef self, uint8_t *table);
 COREGRAPHICS_EXPORT size_t CGColorSpaceGetNumberOfComponents(CGColorSpaceRef self);
 
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateWithName(CFStringRef name)
     CF_SWIFT_NAME(CGColorSpace.init(name:));
 COREGRAPHICS_EXPORT CFStringRef CGColorSpaceGetName(CGColorSpaceRef colorSpace);
 COREGRAPHICS_EXPORT CFStringRef CGColorSpaceCopyName(CGColorSpaceRef colorSpace);
+COREGRAPHICS_EXPORT CFDataRef CGColorSpaceCopyICCData(CGColorSpaceRef colorSpace);
+COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateICCBased(
+    size_t nComponents, const CGFloat *range, CGDataProviderRef profile,
+    CGColorSpaceRef alternate);
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateExtended(CGColorSpaceRef space);
 COREGRAPHICS_EXPORT CGColorSpaceRef CGColorSpaceCreateExtendedLinearized(CGColorSpaceRef space);
 COREGRAPHICS_EXPORT bool CGColorSpaceUsesExtendedRange(CGColorSpaceRef space);
 
-// True if the space uses an ITU-R BT.2100 transfer function (PQ or HLG).
+// True if the space uses a transfer function defined in ITU-R BT.2100 (PQ or HLG).
 COREGRAPHICS_EXPORT bool CGColorSpaceUsesITUR_2100TF(CGColorSpaceRef space);
 COREGRAPHICS_EXPORT bool CGColorSpaceIsHLGBased(CGColorSpaceRef space);
+COREGRAPHICS_EXPORT bool CGColorSpaceIsHDR(CGColorSpaceRef space);
+COREGRAPHICS_EXPORT bool CGColorSpaceSupportsOutput(CGColorSpaceRef space);
 
 CF_IMPLICIT_BRIDGING_DISABLED
 

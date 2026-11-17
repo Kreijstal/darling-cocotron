@@ -17,6 +17,7 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <Foundation/NSGeometry.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <Foundation/NSRange.h>
 #import <Foundation/NSObject.h>
 #import <AppKit/AppKitExport.h>
@@ -26,23 +27,29 @@ APPKIT_EXPORT NSString *const NSTextInputContextKeyboardSelectionDidChangeNotifi
 typedef NSString *NSTextInputSourceIdentifier;
 
 @class NSEvent;
+@protocol NSTextInputClient;
 
+// There is no input method, so a context turns key events into text and
+// commands for its client through the key bindings.
 @interface NSTextInputContext : NSObject {
     id _client;
+    NS_LEGACY_IVAR_PAD(_NSTextInputContextReserved, 40)
 }
 
-+ (NSTextInputContext *)currentInputContext;
-+ (NSString *)localizedNameForInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier;
-- (instancetype)initWithClient:(id)client;
-- (id)client;
-- (BOOL)handleEvent:(NSEvent *)event;
-- (void)activate;
-- (void)deactivate;
-- (void)discardMarkedText;
-- (void)invalidateCharacterCoordinates;
-- (NSTextInputSourceIdentifier)selectedKeyboardInputSource;
-- (void)setSelectedKeyboardInputSource:(NSTextInputSourceIdentifier)inputSourceIdentifier;
-- (NSArray *)keyboardInputSources;
+// The context of the key window's first responder, or nil.
++ (NSTextInputContext *) currentInputContext;
++ (NSString *) localizedNameForInputSource: (NSTextInputSourceIdentifier) inputSourceIdentifier;
+- (instancetype) initWithClient: (id<NSTextInputClient>) client;
+@property(readonly) id<NSTextInputClient> client;
+
+- (BOOL) handleEvent: (NSEvent *) event;
+- (void) activate;
+- (void) deactivate;
+- (void) discardMarkedText;
+- (void) invalidateCharacterCoordinates;
+- (NSTextInputSourceIdentifier) selectedKeyboardInputSource;
+- (void) setSelectedKeyboardInputSource: (NSTextInputSourceIdentifier) inputSourceIdentifier;
+- (NSArray *) keyboardInputSources;
 
 @end
 

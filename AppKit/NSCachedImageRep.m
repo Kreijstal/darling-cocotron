@@ -64,11 +64,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     return self;
 }
 
-// Typedstream archives keep a cached image as TIFF data followed by a char and three ints. The window it was cached in
-// doesn't exist when unarchiving, so the image comes back as the bitmap rep of that TIFF data.
+// A cached image rep in an NSArchiver (typedstream) archive is TIFF data followed by a char
+// and three ints (of unknown meaning). The window it was cached in does not exist when
+// unarchiving, so the rep comes back as the NSBitmapImageRep of the TIFF data; without data
+// no rep comes back, as on macOS. Versions up to 16 are refused.
 - (instancetype) initWithCoder: (NSCoder *) coder {
     if ([coder allowsKeyedCoding])
         return [super initWithCoder: coder];
+
+    // A class the archive does not record gives NSNotFound, which passes the gate.
+    NSInteger version = [coder versionForClassName: @"NSCachedImageRep"];
+    if (version < 17)
+        [NSException raise: NSInternalInconsistencyException
+                    format: @"Cannot decode very old archived cached image reps.  Cached image rep is version %ld.",
+                            (long) version];
 
     NSData *tiff = [coder decodeDataObject];
     char unknownChar;
@@ -76,13 +85,18 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [coder decodeValuesOfObjCTypes: "c", &unknownChar];
     [coder decodeValuesOfObjCTypes: "iii", &unknownInts[0], &unknownInts[1], &unknownInts[2]];
 
+    if (tiff == nil) {
+        [self release];
+        return nil;
+    }
+
     NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc] initWithData: tiff];
     if (bitmap == nil)
         [NSException raise: NSInvalidArgumentException
                     format: @"-[%@ %s]: unreadable TIFF data (%lu bytes)", [self class], sel_getName(_cmd),
                             (unsigned long) [tiff length]];
     [self release];
-    return bitmap;
+    return (id) bitmap;
 }
 
 - (void) dealloc {

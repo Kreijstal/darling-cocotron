@@ -171,6 +171,10 @@ static Class _fontPanelFactory;
     NSMutableArray *result = [NSMutableArray array];
     if (familyName == nil)
         return result;
+    // -fontFamilyWithName: pretends to have any family, which would list the
+    // fallback font's faces for a name that is not installed.
+    if (![[NSFontFamily allFontFamilyNames] containsObject: familyName])
+        return result;
     NSFontFamily *family = [NSFontFamily fontFamilyWithName: familyName];
     NSArray *typefaces = [family typefaces];
     int i, count = [typefaces count];
@@ -179,6 +183,15 @@ static Class _fontPanelFactory;
         NSFontTypeface *typeface = [typefaces objectAtIndex: i];
         NSString *name = [typeface name];
         NSString *traitName = [typeface traitName];
+        NSFontTraitMask traits = [typeface traits];
+        // The weight scale runs from 0 to 15, 5 being the normal weight and 9
+        // bold.
+        int weight = (traits & NSBoldFontMask) ? 9 : 5;
+
+        if (name == nil)
+            name = familyName;
+        if (traitName == nil)
+            traitName = @"Regular";
 
         if (name == nil)
             name = familyName;
@@ -188,9 +201,9 @@ static Class _fontPanelFactory;
         // Callers expect an array of four objects
         [result addObject: [NSArray arrayWithObjects: name, traitName,
                                                       [NSNumber
-                                                              numberWithInt: 0],
+                                                              numberWithInt: weight],
                                                       [NSNumber
-                                                              numberWithInt: 0],
+                                                              numberWithUnsignedInteger: traits],
                                                       nil]];
     }
 
@@ -454,7 +467,7 @@ static Class _fontPanelFactory;
              toHaveTrait: (NSFontTraitMask) addTraits
 {
     NSFontFamily *family =
-            [NSFontFamily fontFamilyWithTypefaceName: [font fontName]];
+            [NSFontFamily fontFamilyForFontName: [font fontName]];
     NSFontTypeface *typeface = [family typefaceWithName: [font fontName]];
     NSFontTraitMask traits = [typeface traits];
 
@@ -486,12 +499,7 @@ static Class _fontPanelFactory;
     }
 
     NSFontFamily *family =
-            [NSFontFamily fontFamilyWithTypefaceName: [font fontName]];
-    // A name no installed face has (the system font's "San Francisco" where
-    // no such font is installed) is taken as a family: its faces are those
-    // of the family fontconfig draws it with.
-    if (family == nil)
-        family = [NSFontFamily fontFamilyWithName: [font fontName]];
+            [NSFontFamily fontFamilyForFontName: [font fontName]];
     NSFontTypeface *typeface = [family typefaceWithName: [font fontName]];
     NSFontTraitMask traits = [typeface traits];
     NSFontTypeface *newface;
@@ -504,6 +512,12 @@ static Class _fontPanelFactory;
         traits &= ~NSBoldFontMask;
     if (addTraits & NSUnitalicFontMask)
         traits &= ~NSItalicFontMask;
+
+    // A font that already has the requested traits is returned as it is: the
+    // face found for the trait mask can be another face of the family, with a
+    // different name.
+    if (traits == [typeface traits] && typeface != nil)
+        return font;
 
     newface = [family typefaceWithTraits: traits];
 
@@ -524,6 +538,8 @@ static Class _fontPanelFactory;
     NSFontFamily *family = [NSFontFamily fontFamilyWithName: [font familyName]];
     NSFontTypeface *typeface = [family typefaceWithName: [font fontName]];
     NSFontTraitMask traits = [typeface traits];
+    if ((traits & trait) == 0)
+        return font; // it has none of these traits already
     traits &= ~trait; // remove the traits
     NSFontTypeface *newface;
 

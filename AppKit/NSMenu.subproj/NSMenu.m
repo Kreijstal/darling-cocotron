@@ -20,9 +20,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSEvent.h>
 #import <AppKit/NSMenu.h>
+#import <AppKit/NSMenu+Private.h>
 #import <AppKit/NSMenuItem.h>
 #import <AppKit/NSMenuView.h>
 #import <AppKit/NSMenuWindow.h>
+#import <AppKit/NSKeyEquivalentMatching.h>
 #import <AppKit/NSWindow.h>
 #import <Foundation/NSKeyedArchiver.h>
 
@@ -37,6 +39,13 @@ NSString *const NSRecentDocumentsMenuName = @"Recents";
 NSString *const NSServicesMenuName = @"Services";
 NSString *const NSWindowsMenuName = @"Window";
 
+const NSNotificationName NSMenuDidAddItemNotification = @"NSMenuDidAddItemNotification";
+const NSNotificationName NSMenuDidRemoveItemNotification = @"NSMenuDidRemoveItemNotification";
+const NSNotificationName NSMenuDidChangeItemNotification = @"NSMenuDidChangeItemNotification";
+
+// Not declared in a public header.
+APPKIT_EXPORT const NSNotificationName NSMenuDidCompleteInteractionNotification;
+const NSNotificationName NSMenuDidCompleteInteractionNotification = @"NSMenuDidCompleteInteractionNotification";
 NSString *const _NSFontMenuName = @"Font";
 NSString *const _NSHelpMenuName = @"Help";
 NSString *const _NSMainMenuName = @"Application";
@@ -46,8 +55,8 @@ NSString *const _NSWindowsMenuName = @"Window";
 
 @implementation NSMenu
 
-@synthesize showsStateColumn = _showsStateColumn;
-@synthesize identifier = _identifier;
+NS_EXTRA_SYNTHESIZE_ASSIGN(NSMenu, showsStateColumn, _showsStateColumn, BOOL, showsStateColumn, setShowsStateColumn:)
+NS_EXTRA_SYNTHESIZE_COPY(NSMenu, identifier, _identifier, NSUserInterfaceItemIdentifier, identifier, setIdentifier:)
 
 + (void) popUpContextMenu: (NSMenu *) menu
                 withEvent: (NSEvent *) event
@@ -61,6 +70,10 @@ NSString *const _NSWindowsMenuName = @"Window";
         NSMenuView *menuView = [menuWindow menuView];
         NSMenuItem *item;
 
+        // The view whose contextual menu this is gets told when it opens and
+        // when it has closed, before the chosen item's action is sent.
+        [view willOpenMenu: menu withEvent: event];
+
         [menuWindow setReleasedWhenClosed: YES];
         [menuWindow setFrameTopLeftPoint: [window convertBaseToScreen: point]];
         [menuWindow orderFront: nil];
@@ -69,8 +82,17 @@ NSString *const _NSWindowsMenuName = @"Window";
 
         [menuWindow close];
 
-        if (item != nil)
-            [NSApp sendAction: [item action] to: [item target] from: item];
+        [view didCloseMenu: menu withEvent: event];
+
+        if (item != nil) {
+            NSMenu *owner = [item menu] != nil ? [item menu] : menu;
+            NSInteger index = [owner indexOfItem: item];
+
+            if (index != NSNotFound)
+                [owner performActionForItemAtIndex: index];
+            else
+                [NSApp sendAction: [item action] to: [item target] from: item];
+        }
     }
 }
 
@@ -80,9 +102,9 @@ NSString *const _NSWindowsMenuName = @"Window";
 
 - (void) encodeWithCoder: (NSCoder *) coder {
     [coder encodeObject: _title forKey: @"NSTitle"];
-    [coder encodeObject: _name forKey: @"NSName"];
-    [coder encodeObject: _itemArray forKey: @"NSMenuItems"];
-    [coder encodeBool: !_autoenablesItems forKey: @"NSNoAutoenable"];
+    [coder encodeObject: NS_EXTRA(NSMenu, self)->_name forKey: @"NSName"];
+    [coder encodeObject: NS_EXTRA(NSMenu, self)->_itemArray forKey: @"NSMenuItems"];
+    [coder encodeBool: !NS_EXTRA(NSMenu, self)->_autoenablesItems forKey: @"NSNoAutoenable"];
 }
 
 - (void) setMenuChangedMessagesEnabled: (BOOL) flag {
@@ -90,87 +112,42 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - initWithCoder: (NSCoder *) coder {
-    _showsStateColumn = YES; // TODO: figure out the right coding for this
+    NS_EXTRA(NSMenu, self)->_showsStateColumn = YES;
 
     if ([coder allowsKeyedCoding]) {
         NSKeyedUnarchiver *keyed = (NSKeyedUnarchiver *) coder;
 
         _supermenu = [keyed decodeObjectForKey: @"NSMenu"];
         _title = [[keyed decodeObjectForKey: @"NSTitle"] copy];
-        _name = [[keyed decodeObjectForKey: @"NSName"] copy];
+        NS_EXTRA(NSMenu, self)->_name = [[keyed decodeObjectForKey: @"NSName"] copy];
 
-        _itemArray = [[NSMutableArray alloc]
+        NS_EXTRA(NSMenu, self)->_itemArray = [[NSMutableArray alloc]
                 initWithArray: [keyed decodeObjectForKey: @"NSMenuItems"]];
-        _autoenablesItems = ![keyed decodeBoolForKey: @"NSNoAutoenable"];
+        NS_EXTRA(NSMenu, self)->_autoenablesItems = ![keyed decodeBoolForKey: @"NSNoAutoenable"];
     } else {
-        NSInteger version;
-        version = [coder versionForClassName: @"NSMenu"];
+        // One layout for every class version, as recorded from Mac archives: a flag word
+        // (bit 31: no automatic enabling of items, bit 29: no state column), the title,
+        // the item array and the name.
+        int flags;
 
-        if (version == NSNotFound)
-            version = [coder versionForClassName: @"NSMenuPanel"];
+        [coder decodeValuesOfObjCTypes: "i@@@", &flags, &_title, &NS_EXTRA(NSMenu, self)->_itemArray, &NS_EXTRA(NSMenu, self)->_name];
 
-        if (version <= 203) {
-            NSString *title, *name;
-            id matrix;
-            if (version <= 16) {
-                BOOL noAutoEnable;
+        NS_EXTRA(NSMenu, self)->_autoenablesItems = !(flags & 0x80000000);
+        NS_EXTRA(NSMenu, self)->_showsStateColumn = !(flags & 0x20000000);
 
-                [coder decodePoint];
-                [coder decodeValuesOfObjCTypes: "@@@s", &title, &matrix, &name,
-                                                &noAutoEnable];
-
-                _autoenablesItems = !noAutoEnable;
-            } else if (version <= 40) {
-                char bytes[6];
-
-                [coder decodePoint];
-                [coder decodeArrayOfObjCType: @encode(char) count: 6 at: bytes];
-                _autoenablesItems = !bytes[0];
-
-                [coder decodeValuesOfObjCTypes: "@@@", &title, &matrix, &name];
-            } else {
-                int flag;
-
-                [coder decodePoint];
-                [coder decodeValueOfObjCType: @encode(int) at: &flag];
-                _autoenablesItems = !(flag & 0x40000000);
-                [self setMenuChangedMessagesEnabled: flag & 0x200000];
-
-                [coder decodeValuesOfObjCTypes: "@@@", &title, &matrix, &name];
-            }
-
-            if ([matrix isKindOfClass: [NSMatrix class]]) {
-                NSInteger numRows, numColumns;
-                [matrix getNumberOfRows: &numRows columns: &numColumns];
-
-                if (numRows != 0) {
-                    NSMenuItem *item = [matrix cellAtRow: 0 column: 0];
-                    [self addItem: item];
-                }
-            }
-
-            _title = title;
-            _name = name;
-        } else {
-            int flags;
-
-            [coder decodeValuesOfObjCTypes: "i@@@", &flags, &_title, &_itemArray,
-                                            &_name];
-
-            _autoenablesItems = !(flags & 0x80000000);
-            // _excludeMarkColumn = flags & 0x80000;
-            // _cmPluginMode = (flags >> 21) & 3;
-            // _invertedCMPluginTypes = (flags >> 23) & 3;
-        }
+        NSMutableArray *items = [NS_EXTRA(NSMenu, self)->_itemArray isKindOfClass: [NSArray class]] ? [NS_EXTRA(NSMenu, self)->_itemArray mutableCopy]
+                                                                           : [[NSMutableArray alloc] init];
+        [NS_EXTRA(NSMenu, self)->_itemArray release];
+        NS_EXTRA(NSMenu, self)->_itemArray = items;
     }
     return self;
 }
 
 - initWithTitle: (NSString *) title {
     _title = [title copy];
-    _itemArray = [NSMutableArray new];
-    _autoenablesItems = YES;
-    _showsStateColumn = YES;
+    NS_EXTRA(NSMenu, self)->_itemArray = [NSMutableArray new];
+    NS_EXTRA(NSMenu, self)->_autoenablesItems = YES;
+    NS_EXTRA(NSMenu, self)->_showsStateColumn = YES;
     return self;
 }
 
@@ -180,21 +157,23 @@ NSString *const _NSWindowsMenuName = @"Window";
 
 - (void) dealloc {
     [_title release];
-    [_name release];
-    [_itemArray makeObjectsPerformSelector: @selector(_setMenu:)
+    [NS_EXTRA(NSMenu, self)->_name release];
+    [NS_EXTRA(NSMenu, self)->_itemArray makeObjectsPerformSelector: @selector(_setMenu:)
                                 withObject: nil];
-    [_itemArray release];
-    [_identifier release];
+    [NS_EXTRA(NSMenu, self)->_itemArray release];
+    [NS_EXTRA(NSMenu, self)->_identifier release];
+    NS_EXTRA_FREE(NSMenu, self);
     [super dealloc];
 }
 
 - copyWithZone: (NSZone *) zone {
     NSMenu *copy = NSCopyObject(self, 0, zone);
+    NS_EXTRA_COPY(NSMenu, copy, self);
 
     copy->_title = [_title copyWithZone: zone];
-    copy->_name = [_name copyWithZone: zone];
-    copy->_itemArray = [[NSMutableArray alloc] init];
-    for (NSMenuItem *item in _itemArray) {
+    NS_EXTRA(NSMenu, copy)->_name = [NS_EXTRA(NSMenu, self)->_name copyWithZone: zone];
+    NS_EXTRA(NSMenu, copy)->_itemArray = [[NSMutableArray alloc] init];
+    for (NSMenuItem *item in NS_EXTRA(NSMenu, self)->_itemArray) {
         [copy addItem: [[item copyWithZone: zone] autorelease]];
     }
 
@@ -210,33 +189,33 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (NSInteger) numberOfItems {
-    return [_itemArray count];
+    return [NS_EXTRA(NSMenu, self)->_itemArray count];
 }
 
 - (NSArray *) itemArray {
-    return [NSArray arrayWithArray: _itemArray];
+    return [NSArray arrayWithArray: NS_EXTRA(NSMenu, self)->_itemArray];
 }
 
 - (void) _setItemArray: itemArray {
-    if (_itemArray != itemArray) {
-        [_itemArray release];
-        _itemArray = [itemArray retain];
+    if (NS_EXTRA(NSMenu, self)->_itemArray != itemArray) {
+        [NS_EXTRA(NSMenu, self)->_itemArray release];
+        NS_EXTRA(NSMenu, self)->_itemArray = [itemArray retain];
     }
 }
 
 - (BOOL) autoenablesItems {
-    return _autoenablesItems;
+    return NS_EXTRA(NSMenu, self)->_autoenablesItems;
 }
 
 - (NSMenuItem *) itemAtIndex: (NSInteger) index {
-    return [_itemArray objectAtIndex: index];
+    return [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: index];
 }
 
 - (NSMenuItem *) itemWithTag: (NSInteger) tag {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; i++) {
-        NSMenuItem *item = [_itemArray objectAtIndex: i];
+        NSMenuItem *item = [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i];
 
         if ([item tag] == tag)
             return item;
@@ -246,10 +225,10 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (NSMenuItem *) itemWithTitle: (NSString *) title {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; i++) {
-        NSMenuItem *item = [_itemArray objectAtIndex: i];
+        NSMenuItem *item = [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i];
 
         if ([[item title] isEqualToString: title])
             return item;
@@ -259,34 +238,34 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (NSInteger) indexOfItem: (NSMenuItem *) item {
-    return [_itemArray indexOfObjectIdenticalTo: item];
+    return [NS_EXTRA(NSMenu, self)->_itemArray indexOfObjectIdenticalTo: item];
 }
 
 - (NSInteger) indexOfItemWithTag: (NSInteger) tag {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; ++i)
-        if ([[_itemArray objectAtIndex: i] tag] == tag)
+        if ([[NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i] tag] == tag)
             return i;
 
     return -1;
 }
 
 - (NSInteger) indexOfItemWithTitle: (NSString *) title {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; i++)
-        if ([[[_itemArray objectAtIndex: i] title] isEqualToString: title])
+        if ([[[NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i] title] isEqualToString: title])
             return i;
 
     return -1;
 }
 
 - (NSInteger) indexOfItemWithRepresentedObject: object {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; i++)
-        if ([[(NSMenuItem *) [_itemArray objectAtIndex: i] representedObject]
+        if ([[(NSMenuItem *) [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i] representedObject]
                     isEqual: object])
             return i;
 
@@ -295,10 +274,10 @@ NSString *const _NSWindowsMenuName = @"Window";
 
 // needed this for NSApplication windowsMenu stuff, so i did 'em all..
 - (NSInteger) indexOfItemWithTarget: (id) target andAction: (SEL) action {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; ++i) {
-        NSMenuItem *item = [_itemArray objectAtIndex: i];
+        NSMenuItem *item = [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i];
 
         if ([item target] == target) {
             if (action == NULL)
@@ -312,10 +291,10 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (NSInteger) indexOfItemWithSubmenu: (NSMenu *) submenu {
-    NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
     for (i = 0; i < count; ++i)
-        if ([[_itemArray objectAtIndex: i] submenu] == submenu)
+        if ([[NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i] submenu] == submenu)
             return i;
 
     return -1;
@@ -332,12 +311,27 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (void) setAutoenablesItems: (BOOL) flag {
-    _autoenablesItems = flag;
+    NS_EXTRA(NSMenu, self)->_autoenablesItems = flag;
+}
+
+// Tells observers that the structure of the menu changed. The index is
+// the position of the item concerned, as documented for the notifications.
+- (void) _postItemNotification: (NSNotificationName) name
+                       atIndex: (NSInteger) index
+{
+    [[NSNotificationCenter defaultCenter]
+            postNotificationName: name
+                          object: self
+                        userInfo: @{
+                            @"NSMenuItemIndex" : [NSNumber numberWithInteger: index]
+                        }];
 }
 
 - (void) addItem: (NSMenuItem *) item {
     [item performSelector: @selector(_setMenu:) withObject: self];
-    [_itemArray addObject: item];
+    [NS_EXTRA(NSMenu, self)->_itemArray addObject: item];
+    [self _postItemNotification: NSMenuDidAddItemNotification
+                        atIndex: [NS_EXTRA(NSMenu, self)->_itemArray count] - 1];
 }
 
 - (NSMenuItem *) addItemWithTitle: (NSString *) title
@@ -355,22 +349,28 @@ NSString *const _NSWindowsMenuName = @"Window";
 }
 
 - (void) removeAllItems {
-    while ([_itemArray count] > 0)
-        [self removeItem: [_itemArray lastObject]];
+    while ([NS_EXTRA(NSMenu, self)->_itemArray count] > 0)
+        [self removeItem: [NS_EXTRA(NSMenu, self)->_itemArray lastObject]];
 }
 
 - (void) removeItem: (NSMenuItem *) item {
+    NSInteger index = [NS_EXTRA(NSMenu, self)->_itemArray indexOfObjectIdenticalTo: item];
+
     [item performSelector: @selector(_setMenu:) withObject: nil];
-    [_itemArray removeObjectIdenticalTo: item];
+    [NS_EXTRA(NSMenu, self)->_itemArray removeObjectIdenticalTo: item];
+    if (index != NSNotFound)
+        [self _postItemNotification: NSMenuDidRemoveItemNotification
+                            atIndex: index];
 }
 
 - (void) removeItemAtIndex: (NSInteger) index {
-    [self removeItem: [_itemArray objectAtIndex: index]];
+    [self removeItem: [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: index]];
 }
 
 - (void) insertItem: (NSMenuItem *) item atIndex: (NSInteger) index {
     [item performSelector: @selector(_setMenu:) withObject: self];
-    [_itemArray insertObject: item atIndex: index];
+    [NS_EXTRA(NSMenu, self)->_itemArray insertObject: item atIndex: index];
+    [self _postItemNotification: NSMenuDidAddItemNotification atIndex: index];
 }
 
 - (NSMenuItem *) insertItemWithTitle: (NSString *) title
@@ -448,18 +448,18 @@ BOOL itemIsEnabled(NSMenuItem *item) {
         return;
     sUpdateRecursionDepth++;
     @try {
-        if ([_delegate respondsToSelector: @selector(menuNeedsUpdate:)]) {
-            [_delegate menuNeedsUpdate: self];
+        if ([NS_EXTRA(NSMenu, self)->_delegate respondsToSelector: @selector(menuNeedsUpdate:)]) {
+            [NS_EXTRA(NSMenu, self)->_delegate menuNeedsUpdate: self];
         }
 
-        NSInteger i, count = [_itemArray count];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
-        for (i = 0; i < count; i++) {
-            NSMenuItem *item = [_itemArray objectAtIndex: i];
+    for (i = 0; i < count; i++) {
+        NSMenuItem *item = [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i];
 
-            if (_autoenablesItems) {
-                BOOL enabled = itemIsEnabled(item) ? YES : NO;
-                BOOL currentlyEnabled = [item isEnabled] ? YES : NO;
+        if (NS_EXTRA(NSMenu, self)->_autoenablesItems) {
+            BOOL enabled = itemIsEnabled(item) ? YES : NO;
+            BOOL currentlyEnabled = [item isEnabled] ? YES : NO;
 
                 if (enabled != currentlyEnabled &&
                     ![item _binderForBinding: @"enabled" create: NO]) {
@@ -476,53 +476,90 @@ BOOL itemIsEnabled(NSMenuItem *item) {
 }
 
 - (void) itemChanged: (NSMenuItem *) item {
+    NSInteger index = [NS_EXTRA(NSMenu, self)->_itemArray indexOfObjectIdenticalTo: item];
+
+    if (index != NSNotFound)
+        [self _postItemNotification: NSMenuDidChangeItemNotification
+                            atIndex: index];
+}
+
+// Sends the action of an enabled item the way a choice made in the menu does,
+// without updating or validating the menu first. A disabled item does nothing.
+- (void) performActionForItemAtIndex: (NSInteger) index {
+    NSMenuItem *item = [self itemAtIndex: index];
+
+    if (![item isEnabled])
+        return;
+
+    NSDictionary *userInfo = @{@"MenuItem" : item};
+    NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
+
+    [center postNotificationName: NSMenuWillSendActionNotification
+                          object: self
+                        userInfo: userInfo];
+    [NSApp sendAction: [item action] to: [item target] from: item];
+    [center postNotificationName: NSMenuDidSendActionNotification
+                          object: self
+                        userInfo: userInfo];
 }
 
 - (BOOL) performKeyEquivalent: (NSEvent *) event {
-    NSInteger i, count = [_itemArray count];
-    NSString *characters = [event charactersIgnoringModifiers];
-    unsigned modifiers = [event modifierFlags];
+    NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
-    if (_autoenablesItems)
+    if (NS_EXTRA(NSMenu, self)->_autoenablesItems)
         [self update];
 
     for (i = 0; i < count; i++) {
-        NSMenuItem *item = [_itemArray objectAtIndex: i];
-        const unsigned keyModifiers = NSCommandKeyMask | NSAlternateKeyMask |
-                                      NSShiftKeyMask | NSControlKeyMask;
-        unsigned itemModifiers = [item keyEquivalentModifierMask] & keyModifiers;
-        NSString *key = [item keyEquivalent];
+        NSMenuItem *item = [NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i];
 
-        // Uppercase key equivalents carry an implicit Shift modifier.
-        if ([key length] > 0 && ![key isEqualToString: [key lowercaseString]])
-            itemModifiers |= NSShiftKeyMask;
-
-        unsigned effectiveModifiers = modifiers & keyModifiers;
-        BOOL modifierMatch = (effectiveModifiers == itemModifiers);
-        if (!modifierMatch && (itemModifiers & NSCommandKeyMask) && !(itemModifiers & NSControlKeyMask)) {
-            // On Linux / PC keyboards, allow Control to satisfy Command requirement when Command (Super) is not pressed
-            unsigned ctrlMapped = (effectiveModifiers & ~NSControlKeyMask) | NSCommandKeyMask;
-            if (ctrlMapped == itemModifiers)
-                modifierMatch = YES;
-        }
-
-        if (modifierMatch && ([key length] != 0)) {
-
-            // Explicit Shift on a lowercase equivalent also accepts its
-            // uppercase event spelling. Keep the exact match for backends
-            // that report an unshifted charactersIgnoringModifiers value.
-            BOOL matches = [key isEqualToString: characters] ||
-                           [[key lowercaseString] isEqualToString: [characters lowercaseString]];
-            if (matches) {
-                /* This *must* accurately reflect menu validation when ignoring
-                   or processing key equivalents. Relying on update to keep
-                   isEnabled in the proper state is unfortunately too tenuous.
-                 */
-                if ([item isEnabled] && itemIsEnabled(item))
-                    return [NSApp sendAction: [item action]
-                                          to: [item target]
-                                        from: item];
+        BOOL matched = NSKeyEquivalentMatchesEvent([item keyEquivalent],
+                                                   [item keyEquivalentModifierMask], event);
+#if !defined(__APPLE__)
+        if (!matched) {
+            // On Linux / PC keyboards, allow Control to satisfy a Command
+            // requirement when Command (Super) is not pressed.
+            const NSUInteger keyModifiers = NSCommandKeyMask | NSAlternateKeyMask |
+                                            NSShiftKeyMask | NSControlKeyMask;
+            NSUInteger itemMask = [item keyEquivalentModifierMask] & keyModifiers;
+            NSUInteger eventMask = [event modifierFlags] & keyModifiers;
+            if ((itemMask & NSCommandKeyMask) && !(itemMask & NSControlKeyMask) &&
+                (eventMask & NSControlKeyMask) && !(eventMask & NSCommandKeyMask)) {
+                NSUInteger mapped = (eventMask & ~NSControlKeyMask) | NSCommandKeyMask;
+                NSString *key = [item keyEquivalent];
+                NSString *characters = [event charactersIgnoringModifiers];
+                BOOL upper = [key length] > 0 && ![key isEqualToString: [key lowercaseString]];
+                NSUInteger wanted = itemMask | (upper ? NSShiftKeyMask : 0);
+                if (!upper) {
+                    mapped &= ~(NSUInteger)NSShiftKeyMask;
+                    wanted &= ~(NSUInteger)NSShiftKeyMask;
+                }
+                if ([key length] != 0 && mapped == wanted)
+                    matched = [key isEqualToString: characters] ||
+                              ((eventMask & NSShiftKeyMask) &&
+                               [[key lowercaseString] isEqualToString: [characters lowercaseString]]);
             }
+        }
+#endif
+
+        if (matched) {
+            // With automatic enabling, -update above brought isEnabled in
+            // line with validation. Without it only isEnabled counts and
+            // validation is not consulted.
+            BOOL enabled = [item isEnabled];
+            if (enabled && NS_EXTRA(NSMenu, self)->_autoenablesItems)
+                enabled = itemIsEnabled(item);
+            if (enabled)
+                [NSApp sendAction: [item action]
+                               to: [item target]
+                             from: item];
+            // QUIRK: a matching item consumes the key equivalent even when it
+            // is disabled or has no target to perform the action; the
+            // result is YES in every case. Not documented. Evidence:
+            // black-box observation on macOS 27 (tier 2), recorded as
+            // MC11.12 and MC11.13 of the upstreaming evidence notes.
+            // Test: appkit-menu-key-equivalents.m
+            // (disabled_matching_item_consumes_the_key)
+            return YES;
         }
 
         if ([[item submenu] performKeyEquivalent: event])
@@ -533,31 +570,34 @@ BOOL itemIsEnabled(NSMenuItem *item) {
 }
 
 - (void) setDelegate: (id<NSMenuDelegate>) object {
-    _delegate = object;
+    NS_EXTRA(NSMenu, self)->_delegate = object;
 }
 
 - (id<NSMenuDelegate>) delegate {
-    return _delegate;
+    return NS_EXTRA(NSMenu, self)->_delegate;
 }
 
 - (NSString *) _name {
-    return _name;
+    return NS_EXTRA(NSMenu, self)->_name;
 }
 
 - (void) _setMenuName: (NSString *) name {
     NSString* copied = [name copy];
-    [_name release];
-    _name = copied;
+    [NS_EXTRA(NSMenu, self)->_name release];
+    NS_EXTRA(NSMenu, self)->_name = copied;
+}
+
+- (void) _setHasPadding: (BOOL) hasPadding onEdge: (NSInteger) edge {
 }
 
 - (NSMenu *) _menuWithName: (NSString *) name {
-    if ([_name isEqual: name])
+    if ([NS_EXTRA(NSMenu, self)->_name isEqual: name])
         return self;
     else {
-        NSInteger i, count = [_itemArray count];
+        NSInteger i, count = [NS_EXTRA(NSMenu, self)->_itemArray count];
 
         for (i = 0; i < count; i++) {
-            NSMenu *check = [[[_itemArray objectAtIndex: i] submenu]
+            NSMenu *check = [[[NS_EXTRA(NSMenu, self)->_itemArray objectAtIndex: i] submenu]
                     _menuWithName: name];
 
             if (check != nil)

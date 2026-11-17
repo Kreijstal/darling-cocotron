@@ -18,15 +18,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSCell.h>
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSControl.h>
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSSegmentSwitchTracking) {
     NSSegmentSwitchTrackingSelectOne,
     NSSegmentSwitchTrackingSelectAny,
     NSSegmentSwitchTrackingMomentary
-} NSSegmentSwitchTracking;
+};
 
-enum {
+typedef NS_ENUM(NSInteger, NSSegmentStyle) {
     NSSegmentStyleAutomatic = 0,
     NSSegmentStyleRounded = 1,
     NSSegmentStyleTexturedRounded = 2,
@@ -35,13 +36,24 @@ enum {
     NSSegmentStyleCapsule = 5,
     NSSegmentStyleSmallSquare = 6,
 };
-typedef NSInteger NSSegmentStyle;
 
-@interface NSSegmentedControl : NSControl
+typedef NS_ENUM(NSInteger, NSSegmentDistribution) {
+    NSSegmentDistributionFit = 0,
+    NSSegmentDistributionFill,
+    NSSegmentDistributionFillEqually,
+    NSSegmentDistributionFillProportionally,
+};
 
-- (NSInteger) segmentCount;
-- (NSSegmentStyle) segmentStyle;
-- (NSSegmentSwitchTracking) trackingMode;
+// Legacy ObjC ABI (i386): instance size must stay 0x6c, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
+@interface NSSegmentedControl : NSControl {
+    NS_LEGACY_IVAR_PAD(_NSSegmentedControlReserved1, 16)
+}
+
+@property(nonatomic) NSInteger segmentCount;
+@property(nonatomic) NSSegmentStyle segmentStyle;
+@property(nonatomic) NSSegmentSwitchTracking trackingMode;
 
 - (NSInteger) tagForSegment: (NSInteger) segment;
 - (NSImage *) imageForSegment: (NSInteger) segment;
@@ -52,12 +64,9 @@ typedef NSInteger NSSegmentStyle;
 - (CGFloat) widthForSegment: (NSInteger) segment;
 - (NSImageScaling) imageScalingForSegment: (NSInteger) segment;
 
-- (NSInteger) selectedSegment;
+@property(nonatomic) NSInteger selectedSegment;
 - (BOOL) isSelectedForSegment: (NSInteger) segment;
 
-- (void) setSegmentCount: (NSInteger) count;
-- (void) setSegmentStyle: (NSSegmentStyle) value;
-- (void) setTrackingMode: (NSSegmentSwitchTracking) trackingMode;
 
 - (void) setTag: (NSInteger) tag forSegment: (NSInteger) segment;
 - (void) setImage: (NSImage *) image forSegment: (NSInteger) segment;
@@ -71,6 +80,5 @@ typedef NSInteger NSSegmentStyle;
 
 - (BOOL) selectSegmentWithTag: (NSInteger) tag;
 - (void) setSelected: (BOOL) flag forSegment: (NSInteger) segment;
-- (void) setSelectedSegment: (NSInteger) segment;
 
 @end

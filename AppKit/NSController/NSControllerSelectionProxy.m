@@ -60,6 +60,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     [_cachedValues release];
     [_observableSelection release];
 
+    // Observers that outlive the proxy are released with it rather than
+    // raising, which would crash ordinary controller-binding teardown. It is
+    // only reported under a diagnostic flag.
     if ([_observationProxies count] > 0 && getenv("DARLING_KVO_DIAG") != NULL)
         NSLog(@"NSControllerSelectionProxy deallocated while still observed "
               @"by %@ on %@",

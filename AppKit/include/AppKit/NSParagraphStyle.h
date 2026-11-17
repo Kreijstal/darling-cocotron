@@ -18,10 +18,11 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSText.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSTextBlock, NSTextList, NSTextTab;
 
-NS_HEADER_AUDIT_BEGIN(nullability, sendability)
+NS_ASSUME_NONNULL_BEGIN
 
 #if !__NSPARAGRAPH_STYLE_SHARED_SECTION__
 #define __NSPARAGRAPH_STYLE_SHARED_SECTION__ 1
@@ -48,7 +49,13 @@ typedef NS_OPTIONS(NSUInteger, NSLineBreakStrategy) {
 // rejects a class that two modules define differently.
 // i386's fragile runtime needs these in the @interface; elsewhere the
 // implementation declares them, keeping the interface identical to Apple's.
+// Tells the implementation (UIFoundation) that the instance variables are in
+// the extra-state structure, to be reached with NS_EXTRA.
+#define _NS_HAS_EXTRA_IVARS_NSParagraphStyle 1
+
 #define _NSPARAGRAPHSTYLE_IVARS \
+    NS_LEGACY_IVAR_PAD(_NSParagraphStyleReserved, 40) \
+    NS_EXTRA_IVARS_BEGIN(NSParagraphStyle) \
     NSWritingDirection _writingDirection; \
     CGFloat _paragraphSpacing; \
     CGFloat _paragraphSpacingBefore; \
@@ -71,7 +78,8 @@ typedef NS_OPTIONS(NSUInteger, NSLineBreakStrategy) {
     NSInteger _horizontalAlignment; \
     BOOL _usesDefaultHyphenation; \
     BOOL _allowsDefaultTighteningForTruncation; \
-    NSLineBreakStrategy _lineBreakStrategy;
+    NSLineBreakStrategy _lineBreakStrategy; \
+    NS_EXTRA_IVARS_END(NSParagraphStyle)
 
 @interface NSParagraphStyle : NSObject <NSCopying, NSMutableCopying, NSSecureCoding>
 #if !__OBJC2__
@@ -125,6 +133,6 @@ typedef NS_OPTIONS(NSUInteger, NSLineBreakStrategy) {
 @property (readonly) NSInteger horizontalAlignment;
 @end
 
-NS_HEADER_AUDIT_END(nullability, sendability)
+NS_ASSUME_NONNULL_END
 
 #import <AppKit/NSMutableParagraphStyle.h>

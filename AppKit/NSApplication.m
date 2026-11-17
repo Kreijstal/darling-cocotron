@@ -18,9 +18,12 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSAlert.h>
+#import <AppKit/NSAppearance.h>
 #import <AppKit/NSApplication.h>
+#import <AppKit/NSUserInterfaceItemSearching.h>
 #import <AppKit/NSColorPanel.h>
 #import <AppKit/NSDisplay.h>
+#import <AppKit/NSGlobalMenu+Private.h>
 #import <AppKit/NSDockTile.h>
 #import <AppKit/NSDocumentController.h>
 #import <AppKit/NSEvent.h>
@@ -45,7 +48,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSWindow-Private.h>
 #import <AppKit/NSWorkspace.h>
 #import <CoreGraphics/CGSServerSPI.h>
+#import <CoreGraphics/CoreGraphicsPrivate.h>
+#import <HIToolbox/CarbonEvents.h>
+#import <HIToolbox/CarbonEventsCore.h>
 #import <CoreGraphics/CGWindowPrivate.h>
+#import <Foundation/NSAppleEventManager.h>
+#import <Foundation/NSAppleEventDescriptor.h>
 #import <objc/message.h>
 #import <pthread.h>
 #import <stdatomic.h>
@@ -54,6 +62,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 @interface NSEvent (LocalMonitorsInternal)
 + (NSEvent *) _filterEventWithLocalMonitors: (NSEvent *) event;
 @end
+
+// Runs the +[NSEvent addLocalMonitorForEventsMatchingMask:handler:] handlers.
+extern NSEvent *NSEventApplyLocalMonitors(NSEvent *event);
 
 const NSRunLoopMode NSModalPanelRunLoopMode = @"NSModalPanelRunLoopMode";
 const NSRunLoopMode NSEventTrackingRunLoopMode = @"NSEventTrackingRunLoopMode";
@@ -94,6 +105,13 @@ const NSNotificationName NSApplicationWillTerminateNotification =
 const NSNotificationName NSApplicationDidChangeScreenParametersNotification =
         @"NSApplicationDidChangeScreenParametersNotification";
 
+NSNotificationName
+        NSApplicationShouldBeginSuppressingHighDynamicRangeContentNotification =
+                @"NSApplicationShouldBeginSuppressingHighDynamicRangeContentNotification";
+NSNotificationName
+        NSApplicationShouldEndSuppressingHighDynamicRangeContentNotification =
+                @"NSApplicationShouldEndSuppressingHighDynamicRangeContentNotification";
+
 NSString *const NSApplicationLaunchIsDefaultLaunchKey =
         @"NSApplicationLaunchIsDefaultLaunchKey";
 NSString *const NSApplicationLaunchUserNotificationKey =
@@ -115,7 +133,62 @@ NSApplication *NSApp = nil;
 - initWithOwner: owner;
 @end
 
+// The window system reports a hot key press or release as a system-defined event record; it is
+// queued for the application like any event, and -[NSApplication sendEvent:] passes it on.
+static void hotKeyEventNotification(CGSNotificationType type, void *data, unsigned long length, void *client) {
+    const CGSEventRecord *record = data;
+
+    if (length < sizeof(*record) || record->type != NX_SYSDEFINED)
+        return;
+
+    int subtype = record->data.compound.subType;
+    if (subtype != kCGSHotKeyPressedSubtype && subtype != kCGSHotKeyReleasedSubtype)
+        return;
+
+    // CG global coordinates have y down from the main display's top; NSEvent's have y up
+    NSRect main = [[[NSScreen screens] firstObject] frame];
+    NSPoint location = NSMakePoint(record->location.x, NSMaxY(main) - record->location.y);
+    NSEvent *event = [NSEvent otherEventWithType: NSSystemDefined
+                                        location: location
+                                   modifierFlags: (NSUInteger) record->flags & NSDeviceIndependentModifierFlagsMask
+                                       timestamp: (NSTimeInterval) record->time / 1e9
+                                    windowNumber: 0
+                                         context: nil
+                                         subtype: subtype
+                                           data1: record->data.compound.misc.L[0]
+                                           data2: 0];
+    [NSApp postEvent: event atStart: NO];
+}
+
+// The documents a process argument list asks to open (arguments[0] is the
+// executable), by the rule the Cocoa application object follows: every
+// argument that is not a switch names a document, and "--" ends the list.
+// Every switch, -NSOpen included, takes the following argument as its value
+// ("-NSBindingDebugLogLevel 2", "-psn_0_12345"), so the value is not a
+// document, except that the value of -NSOpen is one. Empty arguments are
+// documents like any other.
+static NSArray *NSApplicationDocumentsInArguments(NSArray *arguments) {
+    NSMutableArray *documents = [NSMutableArray array];
+
+    for (NSUInteger i = 1; i < [arguments count]; i++) {
+        NSString *argument = [arguments objectAtIndex: i];
+
+        if ([argument isEqualToString: @"--"])
+            break;
+        if (![argument hasPrefix: @"-"]) {
+            [documents addObject: argument];
+            continue;
+        }
+        if (++i < [arguments count] && [argument isEqualToString: @"-NSOpen"]) {
+            [documents addObject: [arguments objectAtIndex: i]];
+        }
+    }
+    return documents;
+}
+
 @implementation NSApplication
+
+NS_EXTRA_DEALLOC(NSApplication)
 
 - (NSUserInterfaceLayoutDirection) userInterfaceLayoutDirection {
     // Use the app's selected localization, not the user's regional locale:
@@ -127,18 +200,6 @@ NSApplication *NSApp = nil;
         return NSUserInterfaceLayoutDirectionRightToLeft;
     }
     return NSUserInterfaceLayoutDirectionLeftToRight;
-}
-
-@synthesize appearance = _appearance;
-
-- (NSAppearance *) effectiveAppearance {
-    static NSAppearance *aqua = nil;
-
-    if (_appearance != nil)
-        return _appearance;
-    if (aqua == nil)
-        aqua = [[NSAppearance appearanceNamed: NSAppearanceNameAqua] retain];
-    return aqua;
 }
 
 + (NSApplication *) sharedApplication {
@@ -196,24 +257,32 @@ NSApplication *NSApp = nil;
     if (NSApp)
         NSAssert(!NSApp, @"NSApplication is a singleton");
     NSApp = self;
-    _display = [[NSDisplay currentDisplay] retain];
+    NS_EXTRA(NSApplication, self)->_display = [[NSDisplay currentDisplay] retain];
 
     _windows = [NSMutableArray new];
     _mainMenu = nil;
-    _servicesMenu = nil;
-    _helpMenu = nil;
+    NS_EXTRA(NSApplication, self)->_servicesMenu = nil;
+    NS_EXTRA(NSApplication, self)->_helpMenu = nil;
 
-    _dockTile = [[NSDockTile alloc] initWithOwner: self];
-    _modalStack = [NSMutableArray new];
+    NS_EXTRA(NSApplication, self)->_dockTile = [[NSDockTile alloc] initWithOwner: self];
+    NS_EXTRA(NSApplication, self)->_modalStack = [NSMutableArray new];
 
-    _lock = NSZoneMalloc(NULL, sizeof(pthread_mutex_t));
+    CGSRegisterNotifyProc(hotKeyEventNotification, CGSNotificationSingleEventType(NX_SYSDEFINED), NULL);
+
+    NS_EXTRA(NSApplication, self)->_lock = NSZoneMalloc(NULL, sizeof(pthread_mutex_t));
 
     CFRunLoopAddCommonMode(CFRunLoopGetCurrent(),
                            (CFStringRef) NSModalPanelRunLoopMode);
     CFRunLoopAddCommonMode(CFRunLoopGetCurrent(),
                            (CFStringRef) NSEventTrackingRunLoopMode);
 
-    pthread_mutex_init(_lock, NULL);
+    pthread_mutex_init(NS_EXTRA(NSApplication, self)->_lock, NULL);
+
+    [[NSNotificationCenter defaultCenter]
+            addObserver: self
+               selector: @selector(_windowWillClose:)
+                   name: NSWindowWillCloseNotification
+                 object: nil];
 
     [[NSNotificationCenter defaultCenter] addObserver: self
                                              selector: @selector(_windowWillClose:)
@@ -222,7 +291,162 @@ NSApplication *NSApp = nil;
 
     [self _showSplashImage];
 
+    // URLs opened for the application's schemes arrive as kAEGetURL events. An application that
+    // installs its own handler for the event replaces this one.
+    [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler: self
+                andSelector: @selector(_handleGetURLEvent:withReplyEvent:)
+              forEventClass: kInternetEventClass
+                 andEventID: kAEGetURL];
+
+    // Documents opened or printed through Launch Services arrive as kAEOpenDocuments and
+    // kAEPrintDocuments events.
+    [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler: self
+                andSelector: @selector(_handleOpenDocumentsEvent:withReplyEvent:)
+              forEventClass: kCoreEventClass
+                 andEventID: kAEOpenDocuments];
+    [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler: self
+                andSelector: @selector(_handlePrintDocumentsEvent:withReplyEvent:)
+              forEventClass: kCoreEventClass
+                 andEventID: kAEPrintDocuments];
+    [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler: self
+                andSelector: @selector(_handleOpenApplicationEvent:withReplyEvent:)
+              forEventClass: kCoreEventClass
+                 andEventID: kAEOpenApplication];
+    [[NSAppleEventManager sharedAppleEventManager]
+            setEventHandler: self
+                andSelector: @selector(_handleReopenApplicationEvent:withReplyEvent:)
+              forEventClass: kCoreEventClass
+                 andEventID: kAEReopenApplication];
+
     return NSApp;
+}
+
+// Paths named by the direct object of an open or print documents event: a file URL or a list of them.
+static NSArray *pathsOfDocumentsEvent(NSAppleEventDescriptor *event) {
+    NSAppleEventDescriptor *object = [event paramDescriptorForKeyword: keyDirectObject];
+    NSMutableArray *paths = [NSMutableArray array];
+    NSInteger count = [object descriptorType] == typeAEList ? [object numberOfItems] : 1;
+
+    if (object == nil)
+        return paths;
+    for (NSInteger i = 1; i <= count; i++) {
+        NSAppleEventDescriptor *item =
+                [object descriptorType] == typeAEList ? [object descriptorAtIndex: i] : object;
+        NSData *data = [item data];
+        NSString *string = nil;
+
+        if ([item descriptorType] == typeFileURL || [item descriptorType] == typeUTF8Text)
+            string = [[[NSString alloc] initWithData: data encoding: NSUTF8StringEncoding] autorelease];
+
+        NSURL *url = string != nil ? [NSURL URLWithString: string] : nil;
+        if ([url isFileURL] && [[url path] length] > 0)
+            [paths addObject: [url path]];
+    }
+    return paths;
+}
+
+// Every launch receives one initial Apple Event: kAEOpenDocuments or kAEPrintDocuments when the
+// application was started to open documents, otherwise kAEOpenApplication. -finishLaunching waits
+// for it, handles it, and only then posts NSApplicationDidFinishLaunchingNotification.
+enum { InitialEventNone, InitialEventOpenApplication, InitialEventOpenDocuments, InitialEventPrintDocuments };
+
+// How long -finishLaunching waits for the initial event. The event is expected to arrive; this
+// only keeps an application running when nothing can send it.
+#define INITIAL_EVENT_TIMEOUT 5.0
+
+static int initialEventKind = InitialEventNone;     // an initial event that arrived before the wait began
+static NSArray *initialEventPaths = nil;
+static BOOL waitingForInitialEvent = NO;
+static BOOL initialEventHandled = NO;
+static BOOL launchComplete = NO;
+static BOOL finishLaunchingDeferred = NO;
+static BOOL argumentDocumentsOpened = NO;
+// Documents that arrive during launch after the initial event; opened when launching is done.
+static NSMutableArray *pendingOpenFiles = nil;
+
+- (void) _launchEvent: (int) kind paths: (NSArray *) paths {
+    if (initialEventHandled || (initialEventKind != InitialEventNone && !waitingForInitialEvent)) {
+        if (kind == InitialEventOpenDocuments && [paths count] > 0) {
+            if (pendingOpenFiles == nil)
+                pendingOpenFiles = [[NSMutableArray alloc] init];
+            [pendingOpenFiles addObjectsFromArray: paths];
+        }
+        return;
+    }
+    if (!waitingForInitialEvent) {
+        initialEventKind = kind;
+        initialEventPaths = [paths copy];
+        return;
+    }
+    [self _handleInitialEvent: kind paths: paths];
+}
+
+- (void) _handleOpenDocumentsEvent: (NSAppleEventDescriptor *) event
+                    withReplyEvent: (NSAppleEventDescriptor *) reply {
+    NSArray *paths = pathsOfDocumentsEvent(event);
+
+    if (launchComplete) {
+        if ([paths count] > 0)
+            [self _openFileNames: paths];
+        return;
+    }
+    [self _launchEvent: InitialEventOpenDocuments paths: paths];
+}
+
+- (void) _printFileNames: (NSArray *) paths {
+    if ([paths count] == 0)
+        return;
+    if ([_delegate respondsToSelector: @selector(application:
+                                                  printFiles:withSettings:
+                                              showPrintPanels:)]) {
+        [_delegate application: self
+                    printFiles: paths
+                  withSettings: nil
+               showPrintPanels: YES];
+    } else if ([_delegate respondsToSelector: @selector(application:printFile:)]) {
+        for (NSString *path in paths)
+            [_delegate application: self printFile: path];
+    }
+}
+
+- (void) _handlePrintDocumentsEvent: (NSAppleEventDescriptor *) event
+                     withReplyEvent: (NSAppleEventDescriptor *) reply {
+    NSArray *paths = pathsOfDocumentsEvent(event);
+
+    if (launchComplete)
+        [self _printFileNames: paths];
+    else
+        [self _launchEvent: InitialEventPrintDocuments paths: paths];
+}
+
+- (void) _handleOpenApplicationEvent: (NSAppleEventDescriptor *) event
+                      withReplyEvent: (NSAppleEventDescriptor *) reply {
+    // Only the launch's own event matters; an application that is running is already open.
+    if (!launchComplete)
+        [self _launchEvent: InitialEventOpenApplication paths: nil];
+}
+
+- (void) _handleReopenApplicationEvent: (NSAppleEventDescriptor *) event
+                        withReplyEvent: (NSAppleEventDescriptor *) reply {
+    if (!launchComplete)
+        return;
+
+    BOOL hasVisibleWindows = NO;
+    for (NSWindow *window in _windows)
+        if ([window isVisible] && !([window styleMask] & NSAppKitPrivateWindow))
+            hasVisibleWindows = YES;
+
+    BOOL handle = YES;
+    if ([_delegate respondsToSelector: @selector(applicationShouldHandleReopen:
+                                                               hasVisibleWindows:)])
+        handle = [_delegate applicationShouldHandleReopen: self
+                                        hasVisibleWindows: hasVisibleWindows];
+    if (handle && !hasVisibleWindows)
+        [self _openUntitledFileIfNeeded];
 }
 
 - (NSGraphicsContext *) context {
@@ -244,8 +468,12 @@ NSApplication *NSApp = nil;
 - (NSWindow *) windowWithWindowNumber: (NSInteger) number {
     NSWindow *window = [[CGWindow windowWithWindowNumber: number] delegate];
 
-    if (window == nil ||
-        [_windows indexOfObjectIdenticalTo: window] == NSNotFound)
+    if (window == nil)
+        return nil;
+    // Windows of the framework's own (not listed in -windows) still get the
+    // events that land on them.
+    if ([_windows indexOfObjectIdenticalTo: window] == NSNotFound &&
+        !([window styleMask] & NSAppKitPrivateWindow))
         return nil;
     return window;
 }
@@ -255,13 +483,13 @@ NSApplication *NSApp = nil;
 }
 
 - (NSMenu *) dockMenu {
-    return _dockMenu;
+    return NS_EXTRA(NSApplication, self)->_dockMenu;
 }
 
 - (void) setDockMenu: (NSMenu *) menu {
-    if (_dockMenu != menu) {
-        [_dockMenu release];
-        _dockMenu = [menu retain];
+    if (NS_EXTRA(NSApplication, self)->_dockMenu != menu) {
+        [NS_EXTRA(NSApplication, self)->_dockMenu release];
+        NS_EXTRA(NSApplication, self)->_dockMenu = [menu retain];
     }
 }
 
@@ -270,14 +498,14 @@ NSApplication *NSApp = nil;
 }
 
 - (NSMenu *) windowsMenu {
-    if (_windowsMenu == nil) {
-        _windowsMenu = [[NSApp mainMenu] _menuWithName: @"_NSWindowsMenu"];
-        NSMenuItem *lastItem = [[_windowsMenu itemArray] lastObject];
-        if (_windowsMenu && ![lastItem isSeparatorItem])
-            [_windowsMenu addItem: [NSMenuItem separatorItem]];
+    if (NS_EXTRA(NSApplication, self)->_windowsMenu == nil) {
+        NS_EXTRA(NSApplication, self)->_windowsMenu = [[NSApp mainMenu] _menuWithName: @"_NSWindowsMenu"];
+        NSMenuItem *lastItem = [[NS_EXTRA(NSApplication, self)->_windowsMenu itemArray] lastObject];
+        if (NS_EXTRA(NSApplication, self)->_windowsMenu && ![lastItem isSeparatorItem])
+            [NS_EXTRA(NSApplication, self)->_windowsMenu addItem: [NSMenuItem separatorItem]];
     }
 
-    return _windowsMenu;
+    return NS_EXTRA(NSApplication, self)->_windowsMenu;
 }
 
 - (NSWindow *) mainWindow {
@@ -297,7 +525,7 @@ NSApplication *NSApp = nil;
 }
 
 - (NSImage *) applicationIconImage {
-    return _applicationIconImage;
+    return NS_EXTRA(NSApplication, self)->_applicationIconImage;
 }
 
 - (BOOL) isActiveExcludingWindow: (NSWindow *) exclude {
@@ -316,16 +544,78 @@ NSApplication *NSApp = nil;
     return NO;
 }
 
+// The application is active from the end of launching, and while one of its
+// windows has the input focus. Having a visible window is not required.
 - (BOOL) isActive {
-    return [self isActiveExcludingWindow: nil];
+    return NS_EXTRA(NSApplication, self)->_isActive || [self isActiveExcludingWindow: nil];
+}
+
+// Becomes the active application, posting the notifications, unless it is
+// already active.
+- (void) _becomeActive {
+    if ([self isActive])
+        return;
+
+    [[NSNotificationCenter defaultCenter]
+            postNotificationName: NSApplicationWillBecomeActiveNotification
+                          object: self];
+    NS_EXTRA(NSApplication, self)->_isActive = YES;
+    [[NSNotificationCenter defaultCenter]
+            postNotificationName: NSApplicationDidBecomeActiveNotification
+                          object: self];
+    [_windows makeObjectsPerformSelector: @selector(_invalidateTrackingAreas)];
+    [self _checkForAppActivation];
 }
 
 - (BOOL) isHidden {
-    return _isHidden;
+    return NS_EXTRA(NSApplication, self)->_isHidden;
 }
 
 - (BOOL) isRunning {
-    return _isRunning;
+    return _running;
+}
+
+// There is no system setting for full keyboard access to read.
+- (BOOL) isFullKeyboardAccessEnabled {
+    return NO;
+}
+
+- (NSAppearance *) appearance {
+    return _appearance;
+}
+
++ (NSSet *) keyPathsForValuesAffectingEffectiveAppearance {
+    return [NSSet setWithObject: @"appearance"];
+}
+
+// Observers of a window's effectiveAppearance are told when the application's
+// appearance changes, because a window without an appearance of its own
+// follows the application's.
+- (void) setAppearance: (NSAppearance *) appearance {
+    NSArray *windows = [[self windows] copy];
+
+    for (NSWindow *window in windows)
+        [window willChangeValueForKey: @"effectiveAppearance"];
+    appearance = [appearance retain];
+    [_appearance release];
+    _appearance = appearance;
+    for (NSWindow *window in windows)
+        [window didChangeValueForKey: @"effectiveAppearance"];
+    [windows release];
+}
+
+// Without an explicit appearance the application follows the system one,
+// which is always Aqua here.
+- (NSAppearance *) effectiveAppearance {
+    static NSAppearance *systemAppearance;
+
+    if (_appearance != nil)
+        return _appearance;
+
+    if (systemAppearance == nil)
+        systemAppearance =
+                [[NSAppearance appearanceNamed: NSAppearanceNameAqua] retain];
+    return systemAppearance;
 }
 
 - (BOOL) _running {
@@ -364,7 +654,7 @@ NSApplication *NSApp = nil;
 
 - (NSArray *) orderedWindows {
     NSMutableArray *result = [NSMutableArray array];
-    NSArray *numbers = [_display orderedWindowNumbers];
+    NSArray *numbers = [NS_EXTRA(NSApplication, self)->_display orderedWindowNumbers];
 
     for (NSNumber *number in numbers) {
         NSWindow *window = [self windowWithWindowNumber: [number integerValue]];
@@ -480,26 +770,28 @@ NSApplication *NSApp = nil;
         if (![window isKindOfClass: [NSPanel class]])
             [window setMenu: _mainMenu];
     }
+
+    [NS_EXTRA(NSApplication, self)->_display _mainMenuDidChange: _mainMenu];
 }
 
 - (BOOL) isAutomaticCustomizeTouchBarMenuItemEnabled {
-    return _automaticCustomizeTouchBarMenuItemEnabled;
+    return NS_EXTRA(NSApplication, self)->_automaticCustomizeTouchBarMenuItemEnabled;
 }
 
 - (void) setAutomaticCustomizeTouchBarMenuItemEnabled: (BOOL) enabled {
-    _automaticCustomizeTouchBarMenuItemEnabled = enabled;
+    NS_EXTRA(NSApplication, self)->_automaticCustomizeTouchBarMenuItemEnabled = enabled;
 }
 
-- (NSInteger) contextID {
+- (unsigned int) contextID {
     return CGSMainConnectionID();
 }
 
 - (BOOL) isDefaultHelpBookSearchEnabled {
-    return _defaultHelpBookSearchEnabled;
+    return NS_EXTRA(NSApplication, self)->_defaultHelpBookSearchEnabled;
 }
 
 - (void) setDefaultHelpBookSearchEnabled: (BOOL) enabled {
-    _defaultHelpBookSearchEnabled = enabled;
+    NS_EXTRA(NSApplication, self)->_defaultHelpBookSearchEnabled = enabled;
 }
 
 - (void) setMenu: (NSMenu *) menu {
@@ -508,8 +800,8 @@ NSApplication *NSApp = nil;
 
 - (void) setApplicationIconImage: (NSImage *) image {
     image = [image retain];
-    [_applicationIconImage release];
-    _applicationIconImage = image;
+    [NS_EXTRA(NSApplication, self)->_applicationIconImage release];
+    NS_EXTRA(NSApplication, self)->_applicationIconImage = image;
 
     [image setName: NSImageNameApplicationIcon];
 }
@@ -525,8 +817,8 @@ NSApplication *NSApp = nil;
 }
 
 - (void) setWindowsMenu: (NSMenu *) menu {
-    [_windowsMenu autorelease];
-    _windowsMenu = [menu retain];
+    [NS_EXTRA(NSApplication, self)->_windowsMenu autorelease];
+    NS_EXTRA(NSApplication, self)->_windowsMenu = [menu retain];
 }
 
 - (void) addWindowsItem: (NSWindow *) window
@@ -901,6 +1193,15 @@ static void _hookXcodeDevTools(void)
         }
     }
 
+    [defaults removeObjectForKey: @"NSOpen"];
+
+    return [self _openFileNames: openFiles];
+}
+
+// Hands documents to the delegate (or the document controller) the way a request to open files is.
+- (BOOL) _openFileNames: (NSArray *) openFiles {
+    BOOL opened = NO;
+
     if ([openFiles count] == 0) {
         return NO;
     }
@@ -921,7 +1222,6 @@ static void _hookXcodeDevTools(void)
             opened |= [target application: self openFile: aFile];
         }
     }
-    [defaults removeObjectForKey: @"NSOpen"];
 
     return opened;
 }
@@ -930,10 +1230,35 @@ static void _hookXcodeDevTools(void)
     return NO;
 }
 
+// Hands launch documents to the delegate (or the document controller) one call
+// per file, in order, as macOS does for documents named in the process
+// arguments: -application:openFiles: with a one-element array when the
+// delegate implements it, otherwise -application:openFile:.
+- (BOOL) _openArgumentDocuments: (NSArray *) documents {
+    BOOL opened = NO;
+
+    for (NSString *document in documents) {
+        NSArray *one = [NSArray arrayWithObject: document];
+
+        if ([_delegate respondsToSelector: @selector(application:openFiles:)]) {
+            [_delegate application: self openFiles: one];
+            opened = YES;
+        } else {
+            opened |= [self _openFileNames: one];
+        }
+    }
+    return opened;
+}
+
 - (void) finishLaunching {
+    // The launch notifications are delivered once. Applications may call
+    // this themselves before -run, which calls it as well.
+    if (NS_EXTRA(NSApplication, self)->_finishedLaunching)
+        return;
+    NS_EXTRA(NSApplication, self)->_finishedLaunching = YES;
+
     _hookXcodeDevTools();
     NSAutoreleasePool *pool = [NSAutoreleasePool new];
-    BOOL needsUntitled = YES;
 
     NS_DURING [[NSNotificationCenter defaultCenter]
             postNotificationName: NSApplicationWillFinishLaunchingNotification
@@ -961,15 +1286,51 @@ static void _hookXcodeDevTools(void)
 
     [self _closeSplashImage];
 
+    // Documents named on the command line are opened first; an initial open-application event then
+    // creates no untitled document.
+    argumentDocumentsOpened = [self _openArgumentDocuments:
+            NSApplicationDocumentsInArguments(
+                    [[NSProcessInfo processInfo] arguments])];
+
+    if (!initialEventHandled) {
+        if (initialEventKind != InitialEventNone) {
+            int kind = initialEventKind;
+            NSArray *paths = [initialEventPaths autorelease];
+
+            initialEventKind = InitialEventNone;
+            initialEventPaths = nil;
+            [self _handleInitialEvent: kind paths: paths];
+        } else {
+            // Without launchservicesd nothing can send the event.
+            const char *noServer = getenv("SCDontUseServer");
+            NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow: INITIAL_EVENT_TIMEOUT];
+
+            waitingForInitialEvent = !(noServer != NULL && atoi(noServer) != 0);
+            while (waitingForInitialEvent && !initialEventHandled &&
+                   [deadline timeIntervalSinceNow] > 0)
+                CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.05, true);
+            waitingForInitialEvent = NO;
+            if (!initialEventHandled)
+                [self _handleInitialEvent: InitialEventOpenApplication paths: nil];
+        }
+    }
+    if (finishLaunchingDeferred) {
+        finishLaunchingDeferred = NO;
+        [self _finishLaunchingIsDefault: NO];
+    }
+
+    [pool release];
+}
+
+// Opens a new untitled document the way a launch without documents does, if the delegate or the
+// document controller wants one.
+- (void) _openUntitledFileIfNeeded {
+    BOOL needsUntitled = YES;
     NSDocumentController *controller = nil;
     id types = [[[NSBundle mainBundle] infoDictionary]
             objectForKey: @"CFBundleDocumentTypes"];
     if ([types count] > 0)
         controller = [NSDocumentController sharedDocumentController];
-
-    if ([self openFiles]) {
-        needsUntitled = NO;
-    }
 
     if (needsUntitled && _delegate &&
         [_delegate respondsToSelector: @selector
@@ -992,27 +1353,55 @@ static void _hookXcodeDevTools(void)
         [controller documentClassForType: [controller defaultType]] != Nil) {
         [controller newDocument: self];
     }
+}
 
+// Handles the launch's initial event and completes launching: the application is told it
+// finished, with whether this was a plain launch (open-application) or one to open documents.
+- (void) _handleInitialEvent: (int) kind paths: (NSArray *) paths {
+    initialEventHandled = YES;
+
+    if (kind == InitialEventOpenApplication) {
+        if (!argumentDocumentsOpened)
+            [self _openUntitledFileIfNeeded];
+    } else if (kind == InitialEventOpenDocuments) {
+        [self _openFileNames: paths];
+    } else {
+        [self _printFileNames: paths];
+    }
+
+    // The did-finish notification follows the open-application event within its handling, but a
+    // documents event once its handling is over.
+    if (kind == InitialEventOpenApplication)
+        [self _finishLaunchingIsDefault: YES];
+    else
+        finishLaunchingDeferred = YES;
+}
+
+// Posts the did-finish notification and completes launching.
+- (void) _finishLaunchingIsDefault: (BOOL) isDefault {
     NS_DURING [[NSNotificationCenter defaultCenter]
             postNotificationName: NSApplicationDidFinishLaunchingNotification
-                          object: self];
+                          object: self
+                        userInfo: [NSDictionary
+                                          dictionaryWithObject: [NSNumber
+                                                                        numberWithBool: isDefault]
+                                                        forKey: NSApplicationLaunchIsDefaultLaunchKey]];
     NS_HANDLER [self reportException: localException];
     NS_ENDHANDLER
 
-    // At the end of finishLaunching (run once on startup): if the application launched
-    // without opening any windows, notify the delegate that the app was opened without visible windows.
-    BOOL hasVisible = NO;
-    for (NSWindow *w in _windows) {
-        if ([w isVisible]) {
-            hasVisible = YES;
-            break;
-        }
-    }
-    if (!hasVisible) {
-        [self _reopen];
-    }
+    // A launched application becomes active once it has finished launching,
+    // whether or not it has a visible window.
+    NS_DURING [self _becomeActive];
+    NS_HANDLER [self reportException: localException];
+    NS_ENDHANDLER
 
-    [pool release];
+    launchComplete = YES;
+    if ([pendingOpenFiles count] > 0) {
+        NSArray *paths = [pendingOpenFiles autorelease];
+
+        pendingOpenFiles = nil;
+        [self _openFileNames: paths];
+    }
 }
 
 - (void) _checkForReleasedWindows {
@@ -1039,26 +1428,39 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) _windowWillClose: (NSNotification *) note {
-    [self performSelector: @selector(_checkForTerminate)
-               withObject: nil
-               afterDelay: 0.0];
+    if (![[note object] isKindOfClass: [NSPanel class]]) {
+        NS_EXTRA(NSApplication, self)->_windowClosedSinceTerminateCheck = YES;
+        // Also checked once the window is gone when no event loop of the
+        // application's own is running to do it.
+        [self performSelector: @selector(_checkForTerminate)
+                   withObject: nil
+                   afterDelay: 0.0];
+    }
 }
 
+// Terminates the application once its last window has been closed, if the
+// delegate asks for that. Hiding or never opening windows does not count.
 - (void) _checkForTerminate {
+    if (!NS_EXTRA(NSApplication, self)->_windowClosedSinceTerminateCheck)
+        return;
+    NS_EXTRA(NSApplication, self)->_windowClosedSinceTerminateCheck = NO;
+
     int count = [_windows count];
 
     while (--count >= 0) {
         NSWindow *check = [_windows objectAtIndex: count];
 
-        if (![check isKindOfClass: [NSPanel class]]) {
-            if ([check isVisible] || [check _isHiddenForDeactivate]) {
-                return;
-            }
-        }
+        if ([check isKindOfClass: [NSPanel class]])
+            continue;
+        if ([check isVisible] || [check _isHiddenForDeactivation])
+            return;
     }
 
+    // Without a delegate answer, the environment or the user defaults can ask
+    // for quitting on the last window; the default is to keep running.
     BOOL shouldTerminate = NO;
-    if ([_delegate respondsToSelector: @selector(applicationShouldTerminateAfterLastWindowClosed:)]) {
+    if ([_delegate respondsToSelector: @selector
+                   (applicationShouldTerminateAfterLastWindowClosed:)]) {
         shouldTerminate = [_delegate applicationShouldTerminateAfterLastWindowClosed: self];
     } else {
         NSString *env = [[[NSProcessInfo processInfo] environment] objectForKey: @"DARLING_QUIT_ON_LAST_WINDOW"];
@@ -1066,14 +1468,10 @@ static void _hookXcodeDevTools(void)
             shouldTerminate = [env boolValue];
         } else {
             id pref = [[NSUserDefaults standardUserDefaults] objectForKey: @"NSQuitOnLastWindowClosed"];
-            if (pref != nil) {
+            if (pref != nil)
                 shouldTerminate = [pref boolValue];
-            } else {
-                shouldTerminate = NO;
-            }
         }
     }
-
     if (shouldTerminate) {
         [self terminate: self];
     }
@@ -1090,17 +1488,13 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) run {
-    static BOOL didlaunch = NO;
     NSAutoreleasePool *pool;
 
-    _isRunning = YES;
+    _running = YES;
 
-    if (!didlaunch) {
-        didlaunch = YES;
-        pool = [NSAutoreleasePool new];
-        [self finishLaunching];
-        [pool release];
-    }
+    pool = [NSAutoreleasePool new];
+    [self finishLaunching];
+    [pool release];
 
     do {
         pool = [NSAutoreleasePool new];
@@ -1120,7 +1514,7 @@ static void _hookXcodeDevTools(void)
         [self _checkForReleasedWindows];
 
         [pool release];
-    } while (_isRunning);
+    } while (_running);
 }
 
 - (BOOL) _performKeyEquivalent: (NSEvent *) event {
@@ -1144,9 +1538,36 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) sendEvent: (NSEvent *) event {
-    event = [NSEvent _filterEventWithLocalMonitors: event];
+    // Local monitors see every event dispatched here, and may replace it or
+    // swallow it by returning nil.
+    event = NSEventApplyLocalMonitors(event);
     if (event == nil)
         return;
+
+    // QUIRK: a system-defined event of subtype 6 is a hot key press and one of subtype 9 a
+    // release; data1 names the hot key. HIToolbox turns it into the Carbon hot key event (AppKit
+    // passes it on with CreateEventWithCGEvent and SendEventToEventTarget), so an
+    // application that overrides -sendEvent: without calling super gets no Carbon callback, as on
+    // macOS. Not documented. Evidence: public write-ups (The Register, 2009,
+    // https://www.theregister.co.uk/2009/02/24/hotkeys_framework2/; cocoa-dev 2011-10,
+    // https://lists.apple.com/archives/cocoa-dev/2011/Oct/msg00526.html; cocoa-dev 2009-09,
+    // https://lists.apple.com/archives/cocoa-dev/2009/Sep/msg01824.html), tier 4. That data1 is
+    // the uid that HIToolbox gave the window system is inference: its value on 64-bit macOS is
+    // not verified.
+    // Test: tests/src/carbon_hotkeys_appkit.m
+    if ([event type] == NSSystemDefined &&
+        ([event subtype] == kCGSHotKeyPressedSubtype || [event subtype] == kCGSHotKeyReleasedSubtype)) {
+        // Through the public Carbon Event Manager: a raw event made from the event's CGEvent goes to
+        // the event dispatcher target, whose standard handler (in HIToolbox) sends the hot key event.
+        CGEventRef cgEvent = [event CGEvent];
+        EventRef carbonEvent = NULL;
+
+        if (cgEvent != NULL && CreateEventWithCGEvent(NULL, cgEvent, kEventAttributeNone, &carbonEvent) == noErr) {
+            SendEventToEventTarget(carbonEvent, GetEventDispatcherTarget());
+            ReleaseEvent(carbonEvent);
+        }
+        return;
+    }
 
     if ([event type] == NSKeyDown) {
         unsigned modifierFlags = [event modifierFlags];
@@ -1174,7 +1595,7 @@ static void _hookXcodeDevTools(void)
     }
 }
 
-- (NSEvent *) nextEventMatchingMask: (NSEventMask) mask
+- (NSEvent *) nextEventMatchingMask: (NSUInteger) mask
                           untilDate: (NSDate *) untilDate
                              inMode: (NSRunLoopMode) mode
                             dequeue: (BOOL) dequeue
@@ -1197,7 +1618,7 @@ static void _hookXcodeDevTools(void)
         [self _checkForAppActivation];
         [self _displayAllWindowsIfNeeded];
 
-        nextEvent = [[_display nextEventMatchingMask: mask
+        nextEvent = [[NS_EXTRA(NSApplication, self)->_display nextEventMatchingMask: mask
                                            untilDate: untilDate
                                               inMode: mode
                                              dequeue: dequeue] retain];
@@ -1216,10 +1637,10 @@ static void _hookXcodeDevTools(void)
     if (nextEvent != nil) {
         nextEvent = [nextEvent retain];
 
-        pthread_mutex_lock(_lock);
+        pthread_mutex_lock(NS_EXTRA(NSApplication, self)->_lock);
         [_currentEvent release];
         _currentEvent = nextEvent;
-        pthread_mutex_unlock(_lock);
+        pthread_mutex_unlock(NS_EXTRA(NSApplication, self)->_lock);
     }
 
     return [nextEvent autorelease];
@@ -1230,21 +1651,21 @@ static void _hookXcodeDevTools(void)
      * OS X, so we need to be safe here too. */
     NSEvent *result;
 
-    pthread_mutex_lock(_lock);
+    pthread_mutex_lock(NS_EXTRA(NSApplication, self)->_lock);
     result = [_currentEvent retain];
-    pthread_mutex_unlock(_lock);
+    pthread_mutex_unlock(NS_EXTRA(NSApplication, self)->_lock);
 
     return [result autorelease];
 }
 
-- (void) discardEventsMatchingMask: (NSEventMask) mask
+- (void) discardEventsMatchingMask: (NSUInteger) mask
                        beforeEvent: (NSEvent *) event
 {
-    [_display discardEventsMatchingMask: mask beforeEvent: event];
+    [NS_EXTRA(NSApplication, self)->_display discardEventsMatchingMask: mask beforeEvent: event];
 }
 
 - (void) postEvent: (NSEvent *) event atStart: (BOOL) atStart {
-    [_display postEvent: event atStart: atStart];
+    [NS_EXTRA(NSApplication, self)->_display postEvent: event atStart: atStart];
 }
 
 - _searchForAction: (SEL) action responder: target {
@@ -1367,17 +1788,26 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) setWindowsNeedUpdate: (BOOL) value {
-    _windowsNeedUpdate = value;
+    NS_EXTRA(NSApplication, self)->_windowsNeedUpdate = value;
 }
 
 - (void) updateWindows {
     [_windows makeObjectsPerformSelector: @selector(update)];
 }
 
-// There are no other Darling applications to take activation from, so activating
-// means making a window key again, which asks the platform for input focus: the
-// key window, else the main window, else the frontmost window that can become key.
+// Unless the display backend activates the process itself, activating means
+// making a window key again, which asks the platform for input focus: the key
+// window, else the main window, else the frontmost window that can become key.
 - (void) activateIgnoringOtherApps: (BOOL) flag {
+    // Without the flag the application may only become active if no other
+    // application is, which cannot be determined here, so leave focus alone.
+    if (!flag)
+        return;
+
+    if ([NS_EXTRA(NSApplication, self)->_display activateProcessIdentifier:
+                      [[NSProcessInfo processInfo] processIdentifier]])
+        return;
+
     NSWindow *window = _keyWindow;
 
     if (![window isVisible])
@@ -1392,7 +1822,10 @@ static void _hookXcodeDevTools(void)
         }
     }
 
-    [window makeKeyAndOrderFront: self];
+    if (window != nil)
+        [window makeKeyAndOrderFront: self];
+    else
+        [self _becomeActive];
 }
 
 - (void) activate {
@@ -1403,14 +1836,24 @@ static void _hookXcodeDevTools(void)
     NSUnimplementedMethod();
 }
 
+// Cooperative activation: an application tells the system that another one
+// may take over activation. The display backends activate a window on request
+// without checking who asked, so there is no activation to hand over and
+// nothing to record. The calls accept any argument and return at once.
+- (void) yieldActivationToApplication: (NSRunningApplication *) application {
+}
+
+- (void) yieldActivationToApplicationWithBundleIdentifier: (NSString *) bundleIdentifier {
+}
+
 - (NSWindow *) modalWindow {
-    return [[_modalStack lastObject] modalWindow];
+    return [[NS_EXTRA(NSApplication, self)->_modalStack lastObject] modalWindow];
 }
 
 - (NSModalSession) beginModalSessionForWindow: (NSWindow *) window {
     NSModalSessionX *session = [NSModalSessionX sessionWithWindow: window];
 
-    [_modalStack addObject: session];
+    [NS_EXTRA(NSApplication, self)->_modalStack addObject: session];
 
     [window _hideMenuViewIfNeeded];
     if (![window isVisible]) {
@@ -1488,25 +1931,25 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) endModalSession: (NSModalSession) session {
-    if (session != [_modalStack lastObject])
+    if (session != [NS_EXTRA(NSApplication, self)->_modalStack lastObject])
         [NSException
                  raise: NSInvalidArgumentException
                 format: @"-[%@ %s] modal session %@ is not the current one %@",
                         [self class], sel_getName(_cmd), session,
-                        [_modalStack lastObject]];
+                        [NS_EXTRA(NSApplication, self)->_modalStack lastObject]];
 
     for (NSEvent *requeue in [session unprocessedEvents]) {
         [self postEvent: requeue atStart: YES];
     }
 
     [[session modalWindow] _showMenuViewIfNeeded];
-    [_modalStack removeLastObject];
+    [NS_EXTRA(NSApplication, self)->_modalStack removeLastObject];
 }
 
 - (void) stopModalWithCode: (NSModalResponse) code {
     // This should silently ignore any attempt to end a session when there is
     // none.
-    [[_modalStack lastObject] stopModalWithCode: code];
+    [[NS_EXTRA(NSApplication, self)->_modalStack lastObject] stopModalWithCode: code];
 }
 
 - (void) _mainThreadRunModalForWindow: (NSMutableDictionary *) values {
@@ -1666,8 +2109,8 @@ static void _hookXcodeDevTools(void)
 }
 
 - (int) requestUserAttention: (NSRequestUserAttentionType) attentionType {
-    [_attentionTimer invalidate];
-    _attentionTimer =
+    [NS_EXTRA(NSApplication, self)->_attentionTimer invalidate];
+    NS_EXTRA(NSApplication, self)->_attentionTimer =
             [NSTimer scheduledTimerWithTimeInterval: 3
                                              target: self
                                            selector: @selector(_attentionTimer:)
@@ -1678,7 +2121,9 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) cancelUserAttentionRequest: (int) requestNumber {
-    NSUnimplementedMethod();
+    // There is only ever one request, so any number cancels it.
+    [NS_EXTRA(NSApplication, self)->_attentionTimer invalidate];
+    NS_EXTRA(NSApplication, self)->_attentionTimer = nil;
 }
 
 - (void) runPageLayout: sender {
@@ -1695,7 +2140,7 @@ static void _hookXcodeDevTools(void)
 
 - (void) hide: (id) sender {
     // Deactivates the application and hides all windows.
-    if (_isHidden) {
+    if (NS_EXTRA(NSApplication, self)->_isHidden) {
         return;
     }
     [[NSNotificationCenter defaultCenter]
@@ -1708,7 +2153,7 @@ static void _hookXcodeDevTools(void)
     [[NSNotificationCenter defaultCenter]
             postNotificationName: NSApplicationDidHideNotification
                           object: self];
-    _isHidden = YES;
+    NS_EXTRA(NSApplication, self)->_isHidden = YES;
 }
 
 - (void) hideOtherApplications: sender {
@@ -1717,7 +2162,7 @@ static void _hookXcodeDevTools(void)
 
 - (void) unhide: sender {
 
-    if (_isHidden) {
+    if (NS_EXTRA(NSApplication, self)->_isHidden) {
         [[NSNotificationCenter defaultCenter]
                 postNotificationName: NSApplicationWillUnhideNotification
                               object: self];
@@ -1727,7 +2172,7 @@ static void _hookXcodeDevTools(void)
                 postNotificationName: NSApplicationDidUnhideNotification
                               object: self];
     }
-    _isHidden = NO;
+    NS_EXTRA(NSApplication, self)->_isHidden = NO;
     //[self activateIgnoringOtherApps:NO]
 }
 
@@ -1736,7 +2181,7 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) unhideWithoutActivation {
-    if (_isHidden) {
+    if (NS_EXTRA(NSApplication, self)->_isHidden) {
 
         [[NSNotificationCenter defaultCenter]
                 postNotificationName: NSApplicationWillUnhideNotification
@@ -1747,16 +2192,16 @@ static void _hookXcodeDevTools(void)
                 postNotificationName: NSApplicationDidUnhideNotification
                               object: self];
     }
-    _isHidden = NO;
+    NS_EXTRA(NSApplication, self)->_isHidden = NO;
 }
 
 - (void) stop: sender {
-    if ([_modalStack lastObject] != nil) {
+    if ([NS_EXTRA(NSApplication, self)->_modalStack lastObject] != nil) {
         [self stopModal];
         return;
     }
 
-    _isRunning = NO;
+    _running = NO;
 }
 
 - (void) terminate: sender {
@@ -1871,26 +2316,26 @@ static void _hookXcodeDevTools(void)
 }
 
 - (void) setServicesMenu: (NSMenu *) menu {
-    [_servicesMenu autorelease];
+    [NS_EXTRA(NSApplication, self)->_servicesMenu autorelease];
 
     if ([menu _name] == nil) {
         [menu _setMenuName: @"_NSServicesMenu"];
     }
 
-    _servicesMenu = [menu retain];
+    NS_EXTRA(NSApplication, self)->_servicesMenu = [menu retain];
 }
 
 - (NSMenu *) helpMenu {
-    return _helpMenu;
+    return NS_EXTRA(NSApplication, self)->_helpMenu;
 }
 
 - (void) setHelpMenu: (NSMenu *) menu {
-    [_helpMenu autorelease];
+    [NS_EXTRA(NSApplication, self)->_helpMenu autorelease];
 
-    [_helpMenu _setMenuName: @""];
+    [NS_EXTRA(NSApplication, self)->_helpMenu _setMenuName: @""];
     [menu _setMenuName: @"_NSHelpMenu"];
 
-    _helpMenu = [menu retain];
+    NS_EXTRA(NSApplication, self)->_helpMenu = [menu retain];
 }
 
 - servicesProvider {
@@ -1996,7 +2441,7 @@ static void _hookXcodeDevTools(void)
 }
 
 - (NSDockTile *) dockTile {
-    return _dockTile;
+    return NS_EXTRA(NSApplication, self)->_dockTile;
 }
 
 // Darling has no login session that relaunches apps, so these only record the setting.
@@ -2029,8 +2474,8 @@ static _Atomic long relaunchOnLoginDisableCount;
 }
 
 - (void) _windowWillBecomeActive: (NSWindow *) window {
-    [_attentionTimer invalidate];
-    _attentionTimer = nil;
+    [NS_EXTRA(NSApplication, self)->_attentionTimer invalidate];
+    NS_EXTRA(NSApplication, self)->_attentionTimer = nil;
 
     if (![self isActive]) {
         [[NSNotificationCenter defaultCenter]
@@ -2039,8 +2484,17 @@ static _Atomic long relaunchOnLoginDisableCount;
     }
 }
 
+// The display backend reports the input focus moving between two windows of
+// the application as the focus leaving one window and then arriving in the
+// other. The application must not resign in between, as on macOS, so the
+// decision to resign is taken once the current run-loop pass has finished,
+// and is dropped when a window has taken the focus by then.
+static BOOL resignPending;
+
 - (void) _windowDidBecomeActive: (NSWindow *) window {
-    if (![self isActiveExcludingWindow: window]) {
+    resignPending = NO;
+    if (!NS_EXTRA(NSApplication, self)->_isActive) {
+        NS_EXTRA(NSApplication, self)->_isActive = YES;
         [[NSNotificationCenter defaultCenter]
                 postNotificationName: NSApplicationDidBecomeActiveNotification
                               object: self];
@@ -2048,45 +2502,58 @@ static _Atomic long relaunchOnLoginDisableCount;
 }
 
 - (void) _windowWillBecomeDeactive: (NSWindow *) window {
-    if (![self isActiveExcludingWindow: window]) {
-        [[NSNotificationCenter defaultCenter]
-                postNotificationName: NSApplicationWillResignActiveNotification
-                              object: self];
+    if (![self isActiveExcludingWindow: window] && !resignPending) {
+        resignPending = YES;
+        CFRunLoopPerformBlock(CFRunLoopGetMain(), kCFRunLoopCommonModes, ^{
+            [self _resignIfNoWindowIsActive];
+        });
+        CFRunLoopWakeUp(CFRunLoopGetMain());
     }
 }
 
 - (void) _windowDidBecomeDeactive: (NSWindow *) window {
-    if (![self isActive]) {
+    // Resigning, if it happens, is decided by -_resignIfNoWindowIsActive.
+}
 
-        // Exposed menus are running tight event tracking loops and would remain
-        // visible when the app deactivates (making the UI less than community
-        // minded) - unfortunately because they're in these tracking loops
-        // they're waiting on events and even though they could receive the
-        // notification sent here they can't deal with it until an event is
-        // received to let them proceed. This special event type was added to
-        // help them get unstuck and remove the menu on deactivation
-        NSEvent *appKitEvent =
-                [NSEvent otherEventWithType: NSAppKitDefined
-                                   location: NSZeroPoint
-                              modifierFlags: 0
-                                  timestamp: 0
-                               windowNumber: 0
-                                    context: nil
-                                    subtype: NSApplicationDeactivated
-                                      data1: 0
-                                      data2: 0];
-        [self postEvent: appKitEvent atStart: YES];
+- (void) _resignIfNoWindowIsActive {
+    if (!resignPending)
+        return;
+    resignPending = NO;
+    if ([self isActiveExcludingWindow: nil])
+        return;
 
-        [[NSNotificationCenter defaultCenter]
-                postNotificationName: NSApplicationDidResignActiveNotification
-                              object: self];
-    }
+    [[NSNotificationCenter defaultCenter]
+            postNotificationName: NSApplicationWillResignActiveNotification
+                          object: self];
+    NS_EXTRA(NSApplication, self)->_isActive = NO;
+
+    // Exposed menus are running tight event tracking loops and would remain
+    // visible when the app deactivates (making the UI less than community
+    // minded) - unfortunately because they're in these tracking loops
+    // they're waiting on events and even though they could receive the
+    // notification sent here they can't deal with it until an event is
+    // received to let them proceed. This special event type was added to
+    // help them get unstuck and remove the menu on deactivation
+    NSEvent *appKitEvent = [NSEvent otherEventWithType: NSAppKitDefined
+                                              location: NSZeroPoint
+                                         modifierFlags: 0
+                                             timestamp: 0
+                                           windowNumber: 0
+                                                 context: nil
+                                                 subtype: NSApplicationDeactivated
+                                                   data1: 0
+                                                   data2: 0];
+    [self postEvent: appKitEvent atStart: YES];
+
+    [[NSNotificationCenter defaultCenter]
+            postNotificationName: NSApplicationDidResignActiveNotification
+                          object: self];
 }
 
 // private method called when the application is reopened
 - (void) _reopen {
     BOOL hasVisible = NO;
-    if (!_isHidden) {
+    if (!NS_EXTRA(NSApplication, self)->_isHidden) {
         for (NSWindow *w in _windows) {
             if ([w isVisible]) {
                 hasVisible = YES;
@@ -2101,7 +2568,7 @@ static _Atomic long relaunchOnLoginDisableCount;
                                           hasVisibleWindows: hasVisible];
     if (!doReopen)
         return;
-    if (_isHidden)
+    if (NS_EXTRA(NSApplication, self)->_isHidden)
         [self unhide: nil];
 }
 
@@ -2114,7 +2581,7 @@ static _Atomic long relaunchOnLoginDisableCount;
 }
 
 - (NSApplicationPresentationOptions) presentationOptions {
-    return _presentationOptions;
+    return NS_EXTRA(NSApplication, self)->_presentationOptions;
 }
 
 - (void) setPresentationOptions: (NSApplicationPresentationOptions) options {
@@ -2172,11 +2639,14 @@ static _Atomic long relaunchOnLoginDisableCount;
     }
 #endif
 
-    _presentationOptions = options;
+    NS_EXTRA(NSApplication, self)->_presentationOptions = options;
 }
 
 @end
 
+// argc and argv are not read: the documents to open come from the process
+// arguments when launching finishes (see -finishLaunching), as on macOS, so an
+// argv that does not match the process arguments is harmless.
 int NSApplicationMain(int argc, const char *argv[]) {
 #ifndef DARLING
     __NSInitializeProcess(argc, argv);
@@ -2186,25 +2656,6 @@ int NSApplicationMain(int argc, const char *argv[]) {
     NSBundle *bundle = [NSBundle mainBundle];
     Class class = [bundle principalClass];
     NSString *nibFile = [bundle infoDictionary][@"NSMainNibFile"];
-
-if (argc > 1) {
-        NSMutableArray *arguments =
-                [NSMutableArray arrayWithCapacity: argc - 1];
-        for (int i = 1; i < argc; i++)
-            if (argv[i][0] != '-')
-                [arguments addObject: [NSString stringWithUTF8String: argv[i]]];
-            else if (argv[i][1] == '-' && argv[i][2] == '\0')
-                break;
-            else // (argv[i][0] == '-' && argv[i] != "--")
-                    if (strcmp(argv[i], "-NSOpen") != 0)
-                i++;
-
-        if ((argc = [arguments count]))
-            [[NSUserDefaults standardUserDefaults]
-                    setObject: ((argc == 1) ? [arguments lastObject]
-                                            : arguments)
-                       forKey: @"NSOpen"];
-    }
 
 #ifndef DARLING
     [NSClassFromString(@"Win32RunningCopyPipe")
@@ -2219,7 +2670,9 @@ if (argc > 1) {
     NSStoryboard *storyboard = [NSStoryboard mainStoryboard];
     if (storyboard != nil)
         [storyboard _instantiateAsMainStoryboard];
-    else {
+    else if (nibFile != nil) {
+        // An app that declares no NSMainNibFile (a SwiftUI app, or one that builds its UI in code)
+        // has no main nib to load.
         nibFile = [nibFile stringByDeletingPathExtension];
 
         if (![NSBundle loadNibNamed: nibFile owner: NSApp])
@@ -2246,6 +2699,18 @@ BOOL NSApplicationLoad(void) {
     [NSApplication sharedApplication];
     return YES;
 }
+
+@implementation NSApplication (NSUserInterfaceItemSearching)
+
+// There is no system search service to forward the handler's results to, so
+// registration is accepted and has no effect.
+- (void) registerUserInterfaceItemSearchHandler: (id<NSUserInterfaceItemSearching>) handler {
+}
+
+- (void) unregisterUserInterfaceItemSearchHandler: (id<NSUserInterfaceItemSearching>) handler {
+}
+
+@end
 
 @implementation NSApplication (NSWindowEnumeration)
 
@@ -2279,3 +2744,11 @@ BOOL NSApplicationLoad(void) {
 }
 
 @end
+
+NSAboutPanelOptionKey const NSAboutPanelOptionCredits = @"Credits";
+NSAboutPanelOptionKey const NSAboutPanelOptionApplicationName = @"ApplicationName";
+NSAboutPanelOptionKey const NSAboutPanelOptionApplicationIcon = @"ApplicationIcon";
+NSAboutPanelOptionKey const NSAboutPanelOptionVersion = @"Version";
+NSAboutPanelOptionKey const NSAboutPanelOptionApplicationVersion = @"ApplicationVersion";
+NSString * const NSApplicationLaunchRemoteNotificationKey = @"NSApplicationLaunchRemoteNotificationKey";
+NSNotificationName const NSApplicationDidChangeOcclusionStateNotification = @"NSApplicationDidChangeOcclusionStateNotification";

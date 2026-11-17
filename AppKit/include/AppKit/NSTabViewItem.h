@@ -18,10 +18,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <Foundation/Foundation.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSView, NSColor, NSTabView, NSViewController;
 
-typedef enum { NSSelectedTab, NSBackgroundTab, NSPressedTab } NSTabState;
+typedef NS_ENUM(NSUInteger, NSTabState) {
+    NSSelectedTab,
+    NSBackgroundTab,
+    NSPressedTab,
+};
 
 @interface NSTabViewItem : NSObject {
     id _identifier;
@@ -34,6 +39,7 @@ typedef enum { NSSelectedTab, NSBackgroundTab, NSPressedTab } NSTabState;
     NSRect _lastRect;
     NSViewController *_viewController;
     BOOL _loadingControllerView;
+    NS_LEGACY_IVAR_PAD(_NSTabViewItemReserved, 16)
 }
 
 + (instancetype) tabViewItemWithViewController: (NSViewController *) viewController;

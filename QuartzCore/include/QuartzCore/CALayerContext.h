@@ -16,9 +16,14 @@
 
     NSTimer *_timer;
     CGSubWindow* _subwindow;
+    // The drawable rendered into: the subwindow's own one, which this context
+    // created and owns, or the parent window's, which the subwindow lends.
     void* _cglWindow;
     BOOL _rendered;
+    BOOL _ownsCglWindow;
     BOOL _renderRequested;
+    // The swap interval last set for the Metal layers in the tree, or -1.
+    GLint _swapInterval;
     BOOL _renderInProgress;
 }
 

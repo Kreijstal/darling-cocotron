@@ -18,27 +18,34 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/NSTextField.h>
+#import <AppKit/AppKitIvarLayout.h>
 
 @class NSButtonCell, NSMenu;
 
-@interface NSSearchField : NSTextField
+@class NSSearchField;
 
-- (NSArray *) recentSearches;
-- (NSString *) recentsAutosaveName;
-- (int) maximumRecents;
-- (BOOL) sendsWholeSearchString;
-- (BOOL) sendsSearchStringImmediately;
-- (NSButtonCell *) searchButtonCell;
-- (NSButtonCell *) cancelButtonCell;
-- (NSMenu *) searchMenuTemplate;
+@protocol NSSearchFieldDelegate <NSTextFieldDelegate>
+@optional
+- (void) searchFieldDidStartSearching: (NSSearchField *) sender;
+- (void) searchFieldDidEndSearching: (NSSearchField *) sender;
+@end
 
-- (void) setRecentSearches: (NSArray *) searches;
-- (void) setRecentsAutosaveName: (NSString *) name;
-- (void) setMaximumRecents: (int) maxRecents;
-- (void) setSendsWholeSearchString: (BOOL) flag;
-- (void) setSendsSearchStringImmediately: (BOOL) flag;
-- (void) setSearchButtonCell: (NSButtonCell *) cell;
-- (void) setCancelButtonCell: (NSButtonCell *) cell;
-- (void) setSearchMenuTemplate: (NSMenu *) menu;
+// Legacy ObjC ABI (i386): instance size must stay 0x74, Apple's; an
+// application's subclass is laid out right after it. New state goes to a
+// side structure, never to a larger ivar block.
+@interface NSSearchField : NSTextField {
+    BOOL _searching;
+    NS_LEGACY_IVAR_PAD(_NSSearchFieldReserved1, 15)
+}
+
+@property(nonatomic, copy) NSArray *recentSearches;
+@property(nonatomic, copy) NSString *recentsAutosaveName;
+@property(nonatomic) int maximumRecents;
+@property(nonatomic) BOOL sendsWholeSearchString;
+@property(nonatomic) BOOL sendsSearchStringImmediately;
+@property(nonatomic, retain) NSButtonCell *searchButtonCell;
+@property(nonatomic, retain) NSButtonCell *cancelButtonCell;
+@property(nonatomic, retain) NSMenu *searchMenuTemplate;
+
 
 @end

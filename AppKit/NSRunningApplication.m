@@ -1,9 +1,14 @@
 #import <AppKit/NSRunningApplication.h>
+#import <AppKit/NSApplication.h>
+#import <AppKit/NSDisplay.h>
 #import <Foundation/NSBundle.h>
 #import <Foundation/NSProcessInfo.h>
+#import <Foundation/NSString.h>
+#include <errno.h>
+#include <libproc.h>
+#include <signal.h>
+#include <sys/param.h>
 #include <unistd.h>
-
-// DUMMY
 
 // Implementation notes:
 // _LSCopyApplicationInformationItem(-2, ...) is used to fetch properties, such
@@ -22,55 +27,122 @@
 
 @implementation NSRunningApplication
 
-+ (NSArray<NSRunningApplication *> *) runningApplicationsWithBundleIdentifier: (NSString *) bundleIdentifier {
-    printf("STUB %s\n", __PRETTY_FUNCTION__);
-    return [NSArray array];
+static BOOL processExists(pid_t pid) {
+    return pid > 0 && (kill(pid, 0) == 0 || errno == EPERM);
 }
 
-+ (instancetype) currentApplication {
-    static NSRunningApplication *current = nil;
+- (instancetype) _initWithProcessIdentifier: (pid_t) pid {
+    self = [super init];
+    if (self != nil)
+        _processIdentifier = pid;
+    return self;
+}
+
++ (NSRunningApplication *) currentApplication {
+    static NSRunningApplication *current;
+
     @synchronized(self) {
-        if (current == nil) {
-            current = [[NSRunningApplication alloc] init];
-            current->_processIdentifier = getpid();
+        if (current == nil || current->_processIdentifier != getpid()) {
+            [current release];
+            current = [[NSRunningApplication alloc]
+                    _initWithProcessIdentifier: getpid()];
         }
+        return current;
     }
-    return current;
 }
 
 + (instancetype) runningApplicationWithProcessIdentifier: (pid_t) pid {
-    return pid == getpid() ? [self currentApplication] : nil;
+    if (pid == getpid())
+        return [self currentApplication];
+    if (!processExists(pid))
+        return nil;
+    return [[[self alloc] _initWithProcessIdentifier: pid] autorelease];
+}
+
+- (BOOL) isEqual: (id) other {
+    return [other isKindOfClass: [NSRunningApplication class]] &&
+           ((NSRunningApplication *) other)->_processIdentifier ==
+                   _processIdentifier;
+}
+
+- (NSUInteger) hash {
+    return (NSUInteger) _processIdentifier;
 }
 
 - (pid_t) processIdentifier {
     return _processIdentifier;
 }
 
+- (BOOL) _isCurrent {
+    return _processIdentifier == getpid();
+}
+
+// Only the current process's bundle is known here.
 - (NSString *) bundleIdentifier {
-    return _processIdentifier == getpid() ? [[NSBundle mainBundle] bundleIdentifier] : nil;
+    return [self _isCurrent] ? [[NSBundle mainBundle] bundleIdentifier] : nil;
 }
 
 - (NSString *) localizedName {
-    if (_processIdentifier != getpid())
+    if ([self _isCurrent]) {
+        NSBundle *bundle = [NSBundle mainBundle];
+        NSString *name =
+                [bundle objectForInfoDictionaryKey: @"CFBundleDisplayName"];
+        if (name == nil)
+            name = [bundle objectForInfoDictionaryKey: @"CFBundleName"];
+        return name ? name : [[NSProcessInfo processInfo] processName];
+    }
+
+    char name[2 * MAXCOMLEN + 1];
+    if (proc_name(_processIdentifier, name, sizeof(name)) <= 0)
         return nil;
-    NSString *name = [[NSBundle mainBundle] objectForInfoDictionaryKey: @"CFBundleName"];
-    return name ? name : [[NSProcessInfo processInfo] processName];
+    return [NSString stringWithUTF8String: name];
+}
+
+- (BOOL) isTerminated {
+    return !processExists(_processIdentifier);
+}
+
+- (BOOL) activateWithOptions: (NSApplicationActivationOptions) options {
+    if ([self isTerminated])
+        return NO;
+
+    if ([self _isCurrent]) {
+        if (NSApp == nil)
+            return NO;
+        [NSApp activateIgnoringOtherApps:
+                       (options & NSApplicationActivateIgnoringOtherApps) != 0];
+        return YES;
+    }
+
+    return [[NSDisplay currentDisplay]
+            activateProcessIdentifier: _processIdentifier];
+}
+
+// Activation requested on behalf of another application, which has yielded
+// activation to this one. The display backends do not arbitrate activation
+// between applications, so the request is honoured as an activation that
+// overrides other applications; only a missing source application is
+// refused.
+- (BOOL) activateFromApplication: (NSRunningApplication *) application
+                         options: (NSApplicationActivationOptions) options
+{
+    if (application == nil)
+        return NO;
+    return [self activateWithOptions:
+                         options | NSApplicationActivateIgnoringOtherApps];
+}
+
++ (NSArray<NSRunningApplication *> *) runningApplicationsWithBundleIdentifier: (NSString *) bundleIdentifier {
+    printf("STUB %s\n", __PRETTY_FUNCTION__);
+    return [NSArray array];
 }
 
 - (BOOL) isActive {
-    return YES;
+    return [self _isCurrent];
 }
 
 - (BOOL) isHidden {
     return NO;
-}
-
-- (BOOL) isTerminated {
-    return NO;
-}
-
-- (BOOL) activateWithOptions: (NSApplicationActivationOptions) options {
-    return YES;
 }
 
 - (BOOL) hide {

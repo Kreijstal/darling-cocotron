@@ -47,6 +47,9 @@ find_package(OpenGL REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PC_CAIRO cairo)
+# The X11 backend exports the main menu on the host's D-Bus session bus, through
+# the dbus wrapper library of the native libdbus-1.
+pkg_check_modules(PC_DBUS REQUIRED dbus-1)
 pkg_check_modules(PC_FONTCONFIG fontconfig)
 
 include_directories(
@@ -73,6 +76,7 @@ include_directories(
 	${X11_Xrandr_INCLUDE_PATH}
 	${X11_Xkb_INCLUDE_PATH}
 	${X11_Xkbfile_INCLUDE_PATH}
+	${PC_DBUS_INCLUDE_DIRS}
 	${FREETYPE_INCLUDE_DIRS}
 	${OPENGL_INCLUDE_DIRS}
 	${PC_CAIRO_INCLUDE_DIRS}
@@ -92,6 +96,7 @@ set(AppKit_sources
 	NSButtonCell.m
 	NSLevelIndicatorCell.m
 	NSPDFImageRep.m
+	NSPICTImageRep.m
 	NSScroller.m
 	NSCustomImageRep.m
 	NSClipView.m
@@ -120,7 +125,6 @@ set(AppKit_sources
 	NSSecureTextField.m
 	NSScreen.m
 	NSPrintOperation.m
-	NSTextList.m
 	NSComboBoxWindow.m
 	NSSlider.m
 	NSTableHeaderView.m
@@ -151,6 +155,7 @@ set(AppKit_sources
 	nib.subproj/NSNib.m
 	nib.subproj/NSNibArchive.m
 	nib.subproj/NSWindowTemplate.m
+	nib.subproj/NSViewTemplate.m
 	nib.subproj/NSMenuTemplate.m
 	nib.subproj/NSIBObjectData.m
 	nib.subproj/NSNibLoading.m
@@ -160,14 +165,11 @@ set(AppKit_sources
 	nib.subproj/NSNibAuxiliaryActionConnector.m
 	nib.subproj/NSNibExternalObjectPlaceholder.m
 	nib.subproj/NSIBHelpConnector.m
-	nib.subproj/UINibCoding.m
 
 	NSTextFieldCell.m
 	NSFormCell.m
 	NSStepperCell.m
-	NSParagraphStyle.m
 	NSDatePicker.m
-	NSGlyphGenerator.m
 
 	CoreData_/_NSManagedProxy.m
 	CoreData_/NSPersistentDocument.m
@@ -184,17 +186,13 @@ set(AppKit_sources
 	NSForm.m
 	NSSheetContext.m
 
-	NSTextTable/NSTextTableBlock.m
-	NSTextTable/NSTextTable.m
-	NSTextTable/NSTextBlock.m
-
-	NSMutableParagraphStyle.m
 	NSBrowser.m
 	NSToolTipWindow.m
 	NSTitlebarAccessoryViewController.m
 	NSScrollEdgeEffectStyle.m
 	NSImageHintSymbolScale.m
 	NSPasteboard.m
+	DarlingFileURIList.m
 	NSSearchFieldCell.m
 	NSOutlineView.m
 	NSDocument.m
@@ -241,6 +239,7 @@ set(AppKit_sources
 	NSMenu.subproj/NSMenuWindow.m
 	NSMenu.subproj/NSMenu.m
 	NSMenu.subproj/NSMenuItem.m
+	NSMenuItemBadge.m
 	NSMenu.subproj/NSCarbonMenuImpl.m
 
 	NSPathControl.m
@@ -253,22 +252,15 @@ set(AppKit_sources
 	NSViewController.m
 
 	NSTextView.subproj/NSTextView.m
-	NSTextView.subproj/NSBidiHelper.m
-	NSTextView.subproj/NSLayoutManager.m
+	NSTextView.subproj/NSTextViewCommands.m
+	NSTextView.subproj/NSLayoutManager+AppKit.m
 	NSTextView.subproj/NSTextViewSharedData.m
-	NSTextView.subproj/NSTextStorage.m
 	NSTextView.subproj/NSTextKit2.m
-	NSTextView.subproj/NSTypesetter_concrete.m
-	NSTextView.subproj/NSTextStorage_concrete.m
 	NSTextView.subproj/NSSubTextStorage.m
-	NSTextView.subproj/NSTypesetter.m
 	NSTextView.subproj/NSRulerMarker+NSTextExtensions.m
-	NSTextView.subproj/NSRangeArray.m
-	NSTextView.subproj/NSTextContainer.m
 	NSTextView.subproj/NSSecureLayoutManager.m
 	NSTextView.subproj/NSUndoTextOperation.m
 	NSTextView.subproj/NSSecureTextView.m
-	NSTextView.subproj/NSTextTab.m
 
 	NSTableColumn.m
 	NSTextField.m
@@ -284,8 +276,8 @@ set(AppKit_sources
 
 	NSButton.m
 	NSPrintPanel.m
-	NSGlyphInfo.m
 	NSWindowController.m
+	NSColorSampler.m
 	NSColorSpace.m
 	DarlingLayout.mm
 	NSView.m
@@ -296,7 +288,6 @@ set(AppKit_sources
 
 	NSDocumentController.m
 	NSStatusItem.m
-	NSShadow.m
 	NSPathComponentCell.m
 	NSCachedImageRep.m
 	NSWindow-Drag.m
@@ -304,15 +295,19 @@ set(AppKit_sources
 	NSPrintProgressPanelController.m
 	NSHelpManager.m
 	NSProgressIndicator.m
+	NSQuickDrawView.m
 	NSFontCollection.m
 	NSFontDescriptor.m
+	UIFontNames.m
 	NSDisplay.m
+	DarlingDisplay.m
 
 	NSOpenGL/NSOpenGLView.m
 	NSOpenGL/NSOpenGLPixelBuffer.m
 	NSOpenGL/NSOpenGLPixelFormat.m
 	# NSOpenGL/NSOpenGLDrawable.m
 	NSOpenGL/NSOpenGLContext.m
+	NSOpenGL/NSOpenGLOptions.m
 
 	NSMenuItemCell.m
 	NSPopUpButtonCell.m
@@ -326,6 +321,7 @@ set(AppKit_sources
 	NSColor.subproj/NSColor_CGColor.m
 	NSColor.subproj/NSColor_assetCatalog.m
 	NSColor.subproj/NSColor_dynamic.m
+	NSAssetCatalog.m
 
 	NSTableCornerView.m
 	NSTabView.m
@@ -341,6 +337,7 @@ set(AppKit_sources
 	NSImageView.m
 	NSActionCell.m
 	NSAttributedString.m
+	NSUIFoundationProvider.m
 	RTF.subproj/NSRichTextReader.m
 	RTF.subproj/NSRichTextWriter.m
 	NSRulerMarker.m
@@ -348,6 +345,9 @@ set(AppKit_sources
 	NSLevelIndicator.m
 	NSDraggingManager.m
 	NSImage.m
+	NSImageDrawingCache.m
+	NSNextStepFrame.m
+	NSPreviewRepresentingActivityItem.m
 
 	NSKeyValueBinding/NSObject+BindingSupport.m
 	NSKeyValueBinding/NSBinder.m
@@ -404,21 +404,21 @@ set(AppKit_sources
 	NSKeyboardBinding/NSKeyboardBinding.m
 
 	NSAdaptiveImageGlyph.m
-	NSTextAttachment.m
 
 	NSCollectionView/NSCollectionViewItem.m
 	NSCollectionView/NSCollectionView.m
 
 	NSStepper.m
+	NSDiffableDataSourceSnapshot.m
 	NSAccessibility.m
 	NSAppearance.m
+	NSAccessibilityCustomAction.m
 	NSAccessibilityElement.m
 	NSAccessibilityRemoteUIElement.m
 	NSKeyValueBinding.m
 	NSCandidateListTouchBarItem.m
-	NSCollectionViewFlowLayout.m
 	NSTouchBarItem.m
-	NSLayoutConstraint.m
+	NSInspectorBarItemIdentifiers.m
 	NSSpeechSynthesizer.m
 	NSCustomTouchBarItem.m
 	NSGestureRecognizer.m
@@ -427,6 +427,7 @@ set(AppKit_sources
 	NSGroupTouchBarItem.m
 	NSKeyBindingManager.m
 	NSPasteboardItem.m
+	NSPasteboardSupport.m
 	NSPopoverTouchBarItem.m
 	NSSpaceTouchBarItem.m
 	NSStackView.m
@@ -435,9 +436,8 @@ set(AppKit_sources
 	NSTouchBar.m
 	NSTreeNode.m
 	NSVisualEffectView.m
-	NSATSTypesetter.m
 	NSOpenGLLayer.m
-	NSCollectionViewLayout.m
+	NSCollectionViewGridLayout.m
 
 	NSSharingService.m
 	MacWorkspace.m
@@ -461,9 +461,8 @@ set(AppKit_sources
 	NSSplitViewItem.m
 	NSTabViewController.m
 	NSTableViewRowAction.m
-	NSCollectionViewLayoutAttributes.m
-	NSCollectionViewLayoutInvalidationContext.m
 	NSLayoutGuide.m
+	NSViewLayoutConstants.m
 	NSPressGestureRecognizer.m
 	NSGridView.m
 	NSHaptics.m
@@ -524,6 +523,11 @@ set(AppKit_resources
 	NSMenuArrow.tiff NSMenu.subproj/NSMenuArrow.tiff
 	NSMenuViewDoubleRightArrowGray.tiff NSMenu.subproj/NSMenuViewDoubleRightArrowGray.tiff
 	NSMenuViewDoubleRightArrow.tiff NSMenu.subproj/NSMenuViewDoubleRightArrow.tiff
+	NSMenuCheckmark.png NSMenu.subproj/NSMenuCheckmark.png
+	NSMenuMixedState.png NSMenu.subproj/NSMenuMixedState.png
+	NSMenuOnState.png NSMenu.subproj/NSMenuOnState.png
+	NSMenuOnStateTemplate.png NSMenu.subproj/NSMenuOnStateTemplate.png
+	NSMenuMixedStateTemplate.png NSMenu.subproj/NSMenuMixedStateTemplate.png
 
 	NSToolbarOverflowArrow.tiff NSToolbar.subproj/NSToolbarOverflowArrow.tiff
 	NSToolbarPrintItem.tiff NSToolbar.subproj/NSToolbarPrintItem.tiff
@@ -575,6 +579,7 @@ add_framework(AppKit
 		system
 		CoreFoundation
 		Foundation
+		CoreAutoLayout
 		Onyx2D
 		CoreText
 		CoreData
@@ -588,10 +593,15 @@ add_framework(AppKit
 		jpeg png tiff
 		CoreServices
 		UniformTypeIdentifiers
+		HIToolbox
 )
 
 reexport(AppKit Foundation ${CMAKE_BINARY_DIR}/src/external/foundation/Foundation)
 reexport(AppKit ApplicationServices ${CMAKE_BINARY_DIR}/src/frameworks/ApplicationServices/ApplicationServices)
+# AppKit re-exports the layout classes too, so that programs built for SDKs that declare them in AppKit bind them
+# with AppKit as the library
+reexport(AppKit CoreAutoLayout ${CMAKE_BINARY_DIR}/src/external/cocotron/CoreAutoLayout/CoreAutoLayout)
+reexport(AppKit UIFoundation ${CMAKE_BINARY_DIR}/src/private-frameworks/UIFoundation/UIFoundation)
 
 # Since macOS 14 the AppKit Swift overlay is part of AppKit.framework, so apps bind symbols such as
 # $sSo6CGRectV6AppKitE4fill5usingySo22NSCompositingOperationV_tF to AppKit. Re-export the overlay from
@@ -607,6 +617,8 @@ endif ()
 
 target_include_directories(AppKit PRIVATE
 	private-include
+	# NSLayoutConstraintInternal.h, the view-facing SPI of CoreAutoLayout's constraint class
+	${CMAKE_CURRENT_SOURCE_DIR}/../CoreAutoLayout
 )
 
 function(add_backend name)
@@ -642,12 +654,13 @@ endfunction(add_backend)
 add_backend(X11
 	SOURCES
 		X11.backend/X11Display.m
+		X11.backend/X11AppMenu.m
+		X11.backend/X11DBusMenu.m
 		X11.backend/X11Window.m
 		X11.backend/X11SubWindow.m
 		X11.backend/X11Event.m
 		X11.backend/X11Pasteboard.m
 		X11.backend/X11Cursor.m
-		X11.backend/X11KeySymToUCS.m
 		X11.backend/X11DropSession.m
 		X11.backend/X11DraggingManager.m
 		X11.backend/X11FileURLs.m
@@ -702,64 +715,30 @@ target_include_directories(Pocket_backend PRIVATE
 	${CMAKE_SOURCE_DIR}/src/startup/mldr/elfcalls
 )
 
-# Wayland backend, selected at run time with DARLING_APPKIT_BACKEND=wayland.
+
+set_source_files_properties(DarlingLayout.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-std=c++14 -fexceptions")
+
+# Wayland backend. It is used when a compositor is advertised unless the backend is chosen
+# explicitly (see WaylandBackendSelected()); otherwise AppKit falls through to X11.
 # libwayland-client and libxkbcommon are loaded with dlopen() only when it is
 # selected, so building it needs just their headers, wayland-scanner and the
-# protocol files. It is skipped when any of them is missing.
-# 1.20 added wl_proxy_marshal_array_flags.
-pkg_check_modules(WAYLAND_CLIENT wayland-client>=1.20)
-pkg_check_modules(WAYLAND_CURSOR wayland-cursor)
-pkg_check_modules(XKBCOMMON xkbcommon)
-pkg_check_modules(WAYLAND_PROTOCOLS wayland-protocols)
-pkg_check_modules(WAYLAND_SCANNER wayland-scanner)
-find_program(WAYLAND_SCANNER_EXECUTABLE wayland-scanner)
+# protocol files (see WaylandProtocols.cmake). It is skipped when any of them is missing.
+include(${CMAKE_CURRENT_SOURCE_DIR}/../CoreGraphics/WaylandSupport/WaylandProtocols.cmake)
 
-if (WAYLAND_SCANNER_FOUND AND WAYLAND_PROTOCOLS_FOUND)
-	pkg_get_variable(WAYLAND_CORE_PROTOCOL_DIR wayland-scanner pkgdatadir)
-	pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
-endif ()
-set(WAYLAND_PROTOCOL_FILES
-	"${WAYLAND_CORE_PROTOCOL_DIR}/wayland.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/stable/viewporter/viewporter.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/staging/fractional-scale/fractional-scale-v1.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-output/xdg-output-unstable-v1.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/unstable/relative-pointer/relative-pointer-unstable-v1.xml"
-	"${WAYLAND_PROTOCOLS_DIR}/unstable/pointer-constraints/pointer-constraints-unstable-v1.xml")
-set(WAYLAND_PROTOCOL_FILES_FOUND TRUE)
-foreach(protocol ${WAYLAND_PROTOCOL_FILES})
-	if (NOT EXISTS "${protocol}")
-		set(WAYLAND_PROTOCOL_FILES_FOUND FALSE)
-	endif ()
-endforeach()
-
-if (WAYLAND_CLIENT_FOUND AND WAYLAND_CURSOR_FOUND AND XKBCOMMON_FOUND
-		AND WAYLAND_SCANNER_EXECUTABLE AND WAYLAND_PROTOCOL_FILES_FOUND)
-	set(WAYLAND_PROTOCOL_SOURCES)
-	foreach(protocol ${WAYLAND_PROTOCOL_FILES})
-		get_filename_component(protocol_name "${protocol}" NAME_WE)
-		# Generated as .m: AppKit's C flags pre-include Foundation.
-		set(protocol_source "${CMAKE_CURRENT_BINARY_DIR}/Wayland.backend/${protocol_name}-protocol.m")
-		add_custom_command(
-			OUTPUT "${protocol_source}"
-			COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/Wayland.backend"
-			COMMAND "${WAYLAND_SCANNER_EXECUTABLE}" private-code "${protocol}" "${protocol_source}"
-			DEPENDS "${protocol}"
-		)
-		list(APPEND WAYLAND_PROTOCOL_SOURCES "${protocol_source}")
-	endforeach()
+if (WAYLAND_PROTOCOLS_USABLE)
+	wayland_protocol_sources(WAYLAND_PROTOCOL_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/Wayland.backend")
 
 	add_backend(Wayland
 		SOURCES
 			Wayland.backend/WaylandCursor.m
 			Wayland.backend/WaylandDisplay.m
+			Wayland.backend/WaylandOutputManager.m
+			# Client glue shared with the CoreGraphics Wayland backend, which sits below AppKit.
+			../CoreGraphics/WaylandSupport/WaylandLibrary.m
 			Wayland.backend/WaylandDropSession.m
 			Wayland.backend/WaylandDraggingManager.m
 			Wayland.backend/WaylandDragIcon.m
 			Wayland.backend/WaylandFileURLs.m
-			Wayland.backend/WaylandLibrary.m
 			Wayland.backend/WaylandPasteboard.m
 			Wayland.backend/WaylandWindow.m
 			Wayland.backend/WaylandSubWindow.m
@@ -780,6 +759,7 @@ if (WAYLAND_CLIENT_FOUND AND WAYLAND_CURSOR_FOUND AND XKBCOMMON_FOUND
 	)
 	target_include_directories(Wayland_backend PRIVATE
 		Wayland.backend
+		../CoreGraphics/WaylandSupport
 		${CMAKE_SOURCE_DIR}/src/startup/mldr/elfcalls
 		${WAYLAND_CLIENT_INCLUDE_DIRS}
 		${WAYLAND_CURSOR_INCLUDE_DIRS}
@@ -789,6 +769,4 @@ else ()
 	message(STATUS "AppKit: not building the Wayland backend (needs wayland-client >= 1.20, "
 		"wayland-cursor, xkbcommon and wayland-protocols headers and wayland-scanner)")
 endif ()
-
-set_source_files_properties(DarlingLayout.mm PROPERTIES LANGUAGE CXX COMPILE_FLAGS "-std=c++14 -fexceptions")
 set_source_files_properties(NSApplication.m PROPERTIES COMPILE_FLAGS "-fobjc-exceptions")

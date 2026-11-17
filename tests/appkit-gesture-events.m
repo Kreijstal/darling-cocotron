@@ -23,12 +23,19 @@ static void expect(BOOL condition, NSString *message)
 }
 
 @interface GestureView : NSView
+{
+    NSInteger _magnifications, _rotations;
+    CGFloat _lastMagnification;
+    float _lastRotation;
+}
 @property NSInteger magnifications, rotations;
 @property CGFloat lastMagnification;
 @property float lastRotation;
 @end
 
 @implementation GestureView
+@synthesize magnifications = _magnifications, rotations = _rotations;
+@synthesize lastMagnification = _lastMagnification, lastRotation = _lastRotation;
 - (void)magnifyWithEvent:(NSEvent *)event
 {
     self.magnifications++;
@@ -49,7 +56,7 @@ int main(void)
         expect(NSEventTypeMagnify == 30 && NSEventTypeRotate == 18 && NSEventPhaseBegan == 1 &&
                    NSEventPhaseChanged == 4 && NSEventPhaseEnded == 8 && NSEventPhaseCancelled == 16,
                @"event type and phase values");
-        expect(NSEventMaskMagnify & NSAnyEventMask, @"magnify events match NSAnyEventMask");
+        expect((NSEventMaskMagnify & NSAnyEventMask) != 0, @"magnify events match NSAnyEventMask");
 
         NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 200, 100)
                                                        styleMask:NSTitledWindowMask
@@ -64,14 +71,14 @@ int main(void)
 
         NSEvent *magnify = [[NSEvent_gesture alloc] initWithType:NSEventTypeMagnify
                                                         location:NSMakePoint(120, 20)
-                                                   modifierFlags:NSEventModifierFlagShift
+                                                   modifierFlags:NSShiftKeyMask
                                                           window:window
                                                            phase:NSEventPhaseChanged
                                                    magnification:0.25
                                                         rotation:0];
         expect(magnify.type == NSEventTypeMagnify && magnify.phase == NSEventPhaseChanged &&
                    magnify.magnification == 0.25 && magnify.momentumPhase == NSEventPhaseNone &&
-                   magnify.modifierFlags == NSEventModifierFlagShift && magnify.window == window,
+                   magnify.modifierFlags == NSShiftKeyMask && magnify.window == window,
                @"magnify event values");
         NSEvent *rotate = [[NSEvent_gesture alloc] initWithType:NSEventTypeRotate
                                                        location:NSMakePoint(120, 20)

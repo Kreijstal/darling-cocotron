@@ -1,6 +1,7 @@
 #import "X11SubWindow.h"
 #import "X11Display.h"
 #import "X11Window.h"
+#import <AppKit/NSWindow.h>
 
 @implementation X11SubWindow
 
@@ -15,16 +16,18 @@
 }
 
 - (id) initWithParentWindow: (X11Window *) parent frame: (CGRect) frame {
-    _parent = parent;
-    // Keep the caller's logical frame before converting: -convertFrame: flips into
-    // the parent's bottom-left space, and -drawablePixelSize wants points.
-    _frame = frame;
-    CGRect parentFrame = [self convertFrame: frame];
+    // Owners such as NSOpenGLContext can keep a subwindow after its NSWindow
+    // has gone, and the subwindow still asks its parent for its geometry.
+    _parent = [parent retain];
+    frame = [self convertFrame: frame];
+    _drawableFrame = frame;
+    _syncsToDisplay = YES;
 
     _display = [(X11Display *) [NSDisplay currentDisplay] display];
 
-    // A child window is positioned in the parent's DEVICE pixels.
-    O2Rect device = [parent deviceRect: parentFrame];
+    // _drawableFrame is in points; a child window is positioned in the parent's
+    // device pixels. X rejects a zero-sized window.
+    O2Rect device = [parent deviceRect: frame];
     device.size.width = fmax(device.size.width, 1.0);
     device.size.height = fmax(device.size.height, 1.0);
     _window = XCreateSimpleWindow(_display, [parent windowHandle],
@@ -32,6 +35,9 @@
                                   device.size.width, device.size.height, 0, 0,
                                   0 /* border_width, border, background */
     );
+    // The application paints every pixel of a subwindow, so the server must not
+    // clear it to a background first.
+    XSetWindowBackgroundPixmap(_display, _window, None);
 
     long mask = KeyPressMask | KeyReleaseMask | ExposureMask |
                 StructureNotifyMask | EnterWindowMask | LeaveWindowMask |
@@ -40,16 +46,16 @@
     XSelectInput(_display, _window, mask);
 
     [(X11Display *) [NSDisplay currentDisplay] setWindow: parent forID: _window];
-    // Suppress X server background clear; app is responsible for all painting.
-    XSetWindowBackgroundPixmap(_display, _window, None);
-
     [self show];
     return self;
 }
 
 - (void) dealloc {
     [(X11Display *) [NSDisplay currentDisplay] setWindow: nil forID: _window];
+    if (_usingParentDrawable)
+        [_parent releaseLayerDrawable: self];
     XDestroyWindow(_display, _window);
+    [_parent release];
     [super dealloc];
 }
 
@@ -57,12 +63,64 @@
     return (void *) _window;
 }
 
+- (void) setAllowsParentDrawable: (BOOL) allowed {
+    _allowsParentDrawable = allowed;
+}
+
+- (void) setSyncsToDisplay: (BOOL) syncs {
+    if (syncs == _syncsToDisplay)
+        return;
+    _syncsToDisplay = syncs;
+    if (_usingParentDrawable)
+        [_parent setLayerDrawable: self syncsToDisplay: syncs];
+}
+
+// A borderless window whose content is a single full-size layer tree, such as
+// a game's Metal view, presents that tree in the window itself rather than in
+// a child window stacked on top. A compositor can then show the application's
+// frames without compositing them (and drive variable refresh by them), which
+// it cannot do for a child window. Any other subwindow keeps its own drawable.
+- (void *) sharedCGLWindow {
+    CGSize parentSize = [_parent frame].size;
+    BOOL coversParent =
+            _allowsParentDrawable && _visible &&
+            !([_parent styleMask] & NSWindowStyleMaskTitled) &&
+            CGRectEqualToRect(_drawableFrame,
+                              CGRectMake(0, 0, parentSize.width, parentSize.height));
+    void *surface = coversParent ? [_parent layerDrawableFor: self] : NULL;
+    BOOL usingParent = surface != NULL;
+
+    if (usingParent != _usingParentDrawable) {
+        _usingParentDrawable = usingParent;
+        if (usingParent)
+            [_parent acquireLayerDrawable: self syncsToDisplay: _syncsToDisplay];
+        else
+            [_parent releaseLayerDrawable: self];
+    }
+    [self updateMapping];
+    return surface;
+}
+
+// The subwindow is shown while it is visible and draws into its own drawable.
+- (void) updateMapping {
+    BOOL mapped = _visible && !_usingParentDrawable;
+    if (mapped == _mapped)
+        return;
+    _mapped = mapped;
+    if (mapped)
+        XMapWindow(_display, _window);
+    else
+        XUnmapWindow(_display, _window);
+}
+
 - (void) show {
-    XMapWindow(_display, _window);
+    _visible = YES;
+    [self updateMapping];
 }
 
 - (void) hide {
-    XUnmapWindow(_display, _window);
+    _visible = NO;
+    [self updateMapping];
 }
 
 - (void) flush {
@@ -70,8 +128,10 @@
 }
 
 - (void) setFrame: (CGRect) frame {
-    _frame = frame;
-    O2Rect device = [_parent deviceRect: [self convertFrame: frame]];
+    frame = [self convertFrame: frame];
+    _drawableFrame = frame;
+
+    O2Rect device = [_parent deviceRect: frame];
     device.size.width = fmax(device.size.width, 1.0);
     device.size.height = fmax(device.size.height, 1.0);
 
@@ -79,22 +139,16 @@
                       device.size.width, device.size.height);
 }
 
+// A subwindow draws at the display's scale, like the window that holds it.
 - (CGFloat) backingScaleFactor {
     return [_parent backingScaleFactor];
 }
 
+// The pixel size of this window's own drawable (not its parent's), whole pixels
+// as the OpenGL view requires.
 - (CGSize) drawablePixelSize {
-    // This window's own size, not the parent's. NSOpenGLView pairs this with
-    // -[self bounds].size and expects pixels == logical * scale, so reporting the
-    // parent's size gives a subwindow that does not fill its parent a viewport that
-    // is too large by the ratio of the two, doubled again at 2x.
-    //
-    // Rounded to whole pixels: NSOpenGLView's -_drawableSize:logicalSize: rejects a
-    // fractional pixel size outright, which would otherwise break every subwindow on a
-    // 1.5x display.
-    CGFloat scale = [self backingScaleFactor];
-    return CGSizeMake(fmax(floor(_frame.size.width * scale + 0.5), 1.0),
-                      fmax(floor(_frame.size.height * scale + 0.5), 1.0));
+    NSSize device = [_parent deviceSize: _drawableFrame.size];
+    return CGSizeMake(device.width, device.height);
 }
 
 @end

@@ -317,6 +317,8 @@ MTL_UNSUPPORTED_CLASS
 	if (self != nil) {
 		_pixelFormat = MTLPixelFormatBGRA8Unorm;
 		_framebufferOnly = YES;
+		// Unlike other layers, Metal layers are opaque by default.
+		_opaque = YES;
 		_drawableSize = _bounds.size; // TODO: multiply by contentsScale, once we add that to CALayer
 		_displaySyncEnabled = YES;
 		_maximumDrawableCount = 3;
@@ -485,17 +487,38 @@ MTL_UNSUPPORTED_CLASS
 				[_drawableCondition lock];
 				[context release];
 				if (rendered && _queuedDrawableCount < queuedBefore) {
+					if (_usableDrawablesBitmap == 0) {
+						// The pass above made the drawable it took the layer's displayed one, and
+						// that one is only recycled when another present replaces it. This thread
+						// is the one that would have to render that present, so it hands the
+						// displayed drawable back itself: its content was copied into the layer's
+						// texture during the pass.
+						[_drawableCondition unlock];
+						[self releaseDisplayedDrawable];
+						[_drawableCondition lock];
+					}
 					continue;
 				}
 			}
 		}
 
+		// While this wait lasts, -queuePresent: wakes it, so that a present queued by another thread
+		// after the check above is rendered here too: the main thread cannot run the block that would do it.
+		BOOL isMainThread = [NSThread isMainThread];
+		BOOL timedOut = NO;
+		if (isMainThread) {
+			_mainThreadWaitingForDrawable = YES;
+		}
 		if (_allowsNextDrawableTimeout) {
-			if (![_drawableCondition waitUntilDate: endTime]) {
-				break;
-			}
+			timedOut = ![_drawableCondition waitUntilDate: endTime];
 		} else {
 			[_drawableCondition wait];
+		}
+		if (isMainThread) {
+			_mainThreadWaitingForDrawable = NO;
+		}
+		if (timedOut) {
+			break;
 		}
 	}
 
@@ -542,6 +565,10 @@ MTL_UNSUPPORTED_CLASS
 	if (_queuedDrawableCount < _drawables.size()) {
 		_queuedDrawables[_queuedDrawableCount] = drawableID;
 		++_queuedDrawableCount;
+		if (_mainThreadWaitingForDrawable) {
+			// Broadcast, because other threads may wait on the same condition.
+			[_drawableCondition broadcast];
+		}
 	} else {
 		overflowed = _drawables[drawableID];
 	}
@@ -561,12 +588,44 @@ MTL_UNSUPPORTED_CLASS
 	[self display];
 }
 
+// Reports the drawable shown by the last composited present as presented, which
+// recycles it. Called without the drawable lock held, since recycling takes it.
+- (void)releaseDisplayedDrawable
+{
+	std::shared_ptr<CAMetalDrawableActual> displayed;
+
+	@synchronized(self) {
+		displayed = std::move(_lastPresentedDrawable);
+		_lastPresentedDrawable = nullptr;
+	}
+
+	if (displayed) {
+		displayed->didPresent();
+	}
+}
+
 - (void)releaseDrawable: (NSUInteger)drawableID
 {
 	[_drawableCondition lock];
 	_usableDrawablesBitmap |= 1u << drawableID;
 	[_drawableCondition signal];
 	[_drawableCondition unlock];
+}
+
+// Creates the texture the compositor draws the layer from, in the current GL
+// context.
+- (void)createRenderTexture
+{
+	reportGLErrors();
+	glCreateTextures(GL_TEXTURE_2D, 1, &_tex);
+	reportGLErrors();
+	glTextureStorage2D(_tex, 1, GL_RGBA8, _drawableSize.width, _drawableSize.height);
+	reportGLErrors();
+	glTextureParameteri(_tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTextureParameteri(_tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTextureParameteri(_tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTextureParameteri(_tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	reportGLErrors();
 }
 
 - (void)recreateDrawables
@@ -594,7 +653,7 @@ MTL_UNSUPPORTED_CLASS
 	}
 	_usableDrawablesBitmap = 0;
 
-	if (!_device || !_context || _drawableSize.width == 0 || _drawableSize.height == 0) {
+	if (!_device || !_context.glContext || _drawableSize.width == 0 || _drawableSize.height == 0) {
 		// can't create new drawables
 		[_drawableCondition unlock];
 		return;
@@ -639,16 +698,9 @@ MTL_UNSUPPORTED_CLASS
 			_tex = 0;
 			reportGLErrors();
 		}
-		reportGLErrors();
-		glCreateTextures(GL_TEXTURE_2D, 1, &_tex);
-		reportGLErrors();
-		glTextureStorage2D(_tex, 1, GL_RGBA8, _drawableSize.width, _drawableSize.height);
-		reportGLErrors();
-		glTextureParameteri(_tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteri(_tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteri(_tex, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTextureParameteri(_tex, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		reportGLErrors();
+		// The drawables' contents are uploaded into this texture on every
+		// present, so it is recreated here whenever the drawables are.
+		[self createRenderTexture];
 	}
 
 	CGLSetCurrentContext(prev);
@@ -721,6 +773,12 @@ MTL_UNSUPPORTED_CLASS
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 	glBindTexture(GL_TEXTURE_2D, _tex);
 
+	// An opaque layer's content has no transparency, whatever alpha the app
+	// rendered into its drawables. Sampling alpha as 1 keeps the compositor's
+	// blending and alpha test from making such pixels see-through or dropping
+	// them.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_A, [self isOpaque] ? GL_ONE : GL_ALPHA);
+
 	// The texture is stored bottom-up like a CGBitmapContext, and the layer's
 	// origin is its bottom-left corner, so the quad is drawn the same way the
 	// contents path draws one.
@@ -773,10 +831,47 @@ MTL_UNSUPPORTED_CLASS
 
 - (void)_setContext: (CALayerContext*)context
 {
+	CALayerContext* previous = _context;
+
 	[super _setContext: context];
 
-	if (context && _device && _drawableSize.width > 0 && _drawableSize.height > 0) {
-		[self recreateDrawables];
+	// Sublayer changes set the same context again; keep the drawables then.
+	if (context == previous) {
+		return;
+	}
+
+	// The render texture and the drawables' GL objects live in the previous
+	// context, so they cannot be used in the new one. Release them with that
+	// context current.
+	CGLContextObj prev = CGLGetCurrentContext();
+	if (previous.glContext) {
+		CGLSetCurrentContext(previous.glContext);
+		if (_tex != 0) {
+			glDeleteTextures(1, &_tex);
+		}
+	}
+	_tex = 0;
+
+	// Drop the old drawables and, once there is a GL context, make new ones in
+	// it (and the render texture with them). A layer is usually configured
+	// (device, drawableSize) before it is put in a window, and then this is the
+	// first point where its drawables can exist.
+	[self recreateDrawables];
+	CGLSetCurrentContext(prev);
+
+	if (!context.glContext) {
+		return;
+	}
+
+	// recreateDrawables makes the render texture once there is a device and a
+	// drawable size; if it could not yet, make it now so that the layer has one
+	// in the context.
+	if (_tex == 0 && _drawableSize.width > 0 && _drawableSize.height > 0) {
+		CGLSetCurrentContext(context.glContext);
+		@synchronized(self) {
+			[self createRenderTexture];
+		}
+		CGLSetCurrentContext(prev);
 	}
 }
 

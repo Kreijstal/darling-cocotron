@@ -1,10 +1,8 @@
 #import <CoreText/CTFontDescriptor.h>
 #import <CoreText/CTFont.h>
-#import <Foundation/NSDictionary.h>
-#import <Foundation/NSArray.h>
-#import <Foundation/NSValue.h>
-
-#include <stdio.h>
+#import "KTFontDescriptor.h"
+#import <Foundation/Foundation.h>
+#import <Onyx2D/O2Font_freetype.h>
 
 const CFStringRef kCTFontURLAttribute = CFSTR("NSCTFontFileURLAttribute");
 const CFStringRef kCTFontNameAttribute = CFSTR("NSFontNameAttribute");
@@ -32,90 +30,258 @@ const CFStringRef kCTFontRegistrationScopeAttribute = CFSTR("NSCTFontRegistratio
 const CFStringRef kCTFontPriorityAttribute = CFSTR("NSCTFontPriorityAttribute");
 const CFStringRef kCTFontDescriptorLanguageAttribute = CFSTR("CocotronFontDescriptorLanguageAttribute");
 
-CFTypeID CTFontDescriptorGetTypeID(void)
-{
-    return CFDictionaryGetTypeID();
+@implementation KTFontDescriptor
+
+- initWithAttributes: (NSDictionary *) attributes fontData: (NSData *) data {
+    self = [super init];
+    if (self == nil)
+        return nil;
+    _attributes = attributes ? [attributes copy] : [[NSDictionary alloc] init];
+    _fontData = [data copy];
+    return self;
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateWithAttributes(CFDictionaryRef attributes)
-{
-    if (!attributes) {
-        return (CTFontDescriptorRef)[[NSDictionary dictionary] retain];
-    }
-    return (CTFontDescriptorRef)[(id)attributes copy];
+- (void) dealloc {
+    [_attributes release];
+    [_fontData release];
+    [super dealloc];
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateWithNameAndSize(CFStringRef name, CGFloat size)
+- (CFTypeID) _cfTypeID {
+    return CTFontDescriptorGetTypeID();
+}
+
+- copyWithZone: (NSZone *) zone {
+    return [self retain];
+}
+
+- (NSDictionary *) attributes {
+    return _attributes;
+}
+
+- (NSData *) fontData {
+    return _fontData;
+}
+
+- (BOOL) isEqual: (id) other {
+    if (other == self)
+        return YES;
+    if (![other isKindOfClass: [KTFontDescriptor class]])
+        return NO;
+    KTFontDescriptor *descriptor = other;
+    if (![_attributes isEqual: descriptor->_attributes])
+        return NO;
+    if (_fontData == nil || descriptor->_fontData == nil)
+        return _fontData == descriptor->_fontData;
+    return [_fontData isEqual: descriptor->_fontData];
+}
+
+- (NSUInteger) hash {
+    return [_attributes hash];
+}
+
+- (NSString *) description {
+    return [NSString stringWithFormat: @"<%@ %p> %@", [self class], self,
+                                       _attributes];
+}
+
+@end
+
+static KTFontDescriptor *descriptorObject(CTFontDescriptorRef descriptor) {
+    return (KTFontDescriptor *) descriptor;
+}
+
+CTFontDescriptorRef KTFontDescriptorCreateWithFontData(CFDictionaryRef attributes,
+                                                       CFDataRef data)
 {
+    return (CTFontDescriptorRef) [[KTFontDescriptor alloc]
+            initWithAttributes: (NSDictionary *) attributes
+                      fontData: (NSData *) data];
+}
+
+CFDataRef KTFontDescriptorGetFontData(CTFontDescriptorRef descriptor) {
+    if (descriptor == NULL)
+        return NULL;
+    return (CFDataRef) [descriptorObject(descriptor) fontData];
+}
+
+CFTypeID CTFontDescriptorGetTypeID(void) {
+    return (CFTypeID) [KTFontDescriptor self];
+}
+
+CTFontDescriptorRef CTFontDescriptorCreateWithAttributes(CFDictionaryRef attributes) {
+    if (attributes == NULL)
+        return NULL;
+    return KTFontDescriptorCreateWithFontData(attributes, NULL);
+}
+
+CTFontDescriptorRef CTFontDescriptorCreateWithNameAndSize(CFStringRef name, CGFloat size) {
+    if (name == NULL)
+        return NULL;
     NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
-    if (name) {
-        attributes[(id)kCTFontNameAttribute] = (id)name;
-    }
-    if (size > 0.0) {
-        attributes[(id)kCTFontSizeAttribute] = [NSNumber numberWithDouble:(double)size];
-    }
-    return CTFontDescriptorCreateWithAttributes((CFDictionaryRef)attributes);
+    [attributes setObject: (NSString *) name forKey: (NSString *) kCTFontNameAttribute];
+    if (size != 0)
+        [attributes setObject: [NSNumber numberWithDouble: size]
+                       forKey: (NSString *) kCTFontSizeAttribute];
+    return CTFontDescriptorCreateWithAttributes((CFDictionaryRef) attributes);
 }
 
-CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef descriptor)
+CTFontDescriptorRef CTFontDescriptorCreateCopyWithAttributes(CTFontDescriptorRef original,
+                                                            CFDictionaryRef attributes)
 {
-    if (!descriptor) return NULL;
-    return (CFDictionaryRef)[(id)descriptor copy];
+    if (original == NULL)
+        return NULL;
+    KTFontDescriptor *descriptor = descriptorObject(original);
+    NSMutableDictionary *merged = [[descriptor attributes] mutableCopy];
+    if (attributes != NULL)
+        [merged addEntriesFromDictionary: (NSDictionary *) attributes];
+    CTFontDescriptorRef result = KTFontDescriptorCreateWithFontData(
+            (CFDictionaryRef) merged, (CFDataRef) [descriptor fontData]);
+    [merged release];
+    return result;
+}
+
+CFDictionaryRef CTFontDescriptorCopyAttributes(CTFontDescriptorRef descriptor) {
+    if (descriptor == NULL)
+        return NULL;
+    return (CFDictionaryRef) [[descriptorObject(descriptor) attributes] copy];
 }
 
 CFTypeRef CTFontDescriptorCopyAttribute(CTFontDescriptorRef descriptor, CFStringRef attribute)
 {
-    if (!descriptor || !attribute) return nil;
-    id val = [(NSDictionary *)descriptor objectForKey:(id)attribute];
-    return (CFTypeRef)[val retain];
+    if (descriptor == NULL || attribute == NULL)
+        return NULL;
+    id value = [[descriptorObject(descriptor) attributes] objectForKey: (NSString *) attribute];
+    return (CFTypeRef) [value retain];
 }
 
-CFArrayRef CTFontDescriptorCreateMatchingFontDescriptors(CTFontDescriptorRef descriptor, CFSetRef mandatoryAttributes)
+CFTypeRef CTFontDescriptorCopyLocalizedAttribute(CTFontDescriptorRef descriptor,
+                                                CFStringRef attribute,
+                                                CFStringRef *language)
 {
-    if (!descriptor) return (CFArrayRef)[[NSArray array] retain];
-    return (CFArrayRef)[[NSArray arrayWithObject:(id)descriptor] retain];
+    // Only the canonical names are known, and their language is not.
+    if (language != NULL)
+        *language = NULL;
+    return CTFontDescriptorCopyAttribute(descriptor, attribute);
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateMatchingFontDescriptor(CTFontDescriptorRef descriptor, CFSetRef mandatoryAttributes)
-{
-    if (!descriptor) return NULL;
-    return (CTFontDescriptorRef)[(id)descriptor retain];
+static NSString *stringAttribute(NSDictionary *attributes, CFStringRef key) {
+    id value = [attributes objectForKey: (NSString *) key];
+    return [value isKindOfClass: [NSString class]] ? value : nil;
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateCopyWithAttributes(CTFontDescriptorRef descriptor, CFDictionaryRef attributes)
+CFArrayRef CTFontDescriptorCreateMatchingFontDescriptors(CTFontDescriptorRef descriptor,
+                                                        CFSetRef mandatoryAttributes)
 {
-    if (!descriptor) return CTFontDescriptorCreateWithAttributes(attributes);
-    NSMutableDictionary *dict = [(NSDictionary *)descriptor mutableCopy];
-    if (attributes) {
-        [dict addEntriesFromDictionary:(NSDictionary *)attributes];
+    if (descriptor == NULL)
+        return NULL;
+    NSDictionary *query = [descriptorObject(descriptor) attributes];
+
+    // Match installed faces on the name attributes of the query. Faces are
+    // listed, not substituted: a family that is not installed matches
+    // nothing.
+    NSArray *faces = O2FontCopyInstalledFaces(
+            stringAttribute(query, kCTFontFamilyNameAttribute),
+            stringAttribute(query, kCTFontNameAttribute),
+            stringAttribute(query, kCTFontStyleNameAttribute),
+            stringAttribute(query, kCTFontDisplayNameAttribute));
+
+    NSMutableArray *matches = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+    for (NSDictionary *face in faces) {
+        NSMutableDictionary *attributes = [NSMutableDictionary dictionary];
+        NSString *value;
+        if ((value = [face objectForKey: @"family"]) != nil)
+            [attributes setObject: value forKey: (NSString *) kCTFontFamilyNameAttribute];
+        if ((value = [face objectForKey: @"postScriptName"]) != nil)
+            [attributes setObject: value forKey: (NSString *) kCTFontNameAttribute];
+        if ((value = [face objectForKey: @"style"]) != nil)
+            [attributes setObject: value forKey: (NSString *) kCTFontStyleNameAttribute];
+        if ((value = [face objectForKey: @"fullName"]) != nil)
+            [attributes setObject: value forKey: (NSString *) kCTFontDisplayNameAttribute];
+        if ((value = [face objectForKey: @"path"]) != nil)
+            [attributes setObject: [NSURL fileURLWithPath: value]
+                           forKey: (NSString *) kCTFontURLAttribute];
+
+        // The point size is part of the request, not of the face.
+        id size = [query objectForKey: (NSString *) kCTFontSizeAttribute];
+        if (size != nil)
+            [attributes setObject: size forKey: (NSString *) kCTFontSizeAttribute];
+
+        BOOL accepted = YES;
+        for (id key in (NSSet *) mandatoryAttributes) {
+            id expected = [query objectForKey: key];
+            if (expected == nil || ![expected isEqual: [attributes objectForKey: key]]) {
+                accepted = NO;
+                break;
+            }
+        }
+        if (!accepted)
+            continue;
+
+        // Faces that differ only in properties not reported here produce
+        // equal descriptors; keep one of them.
+        if ([seen containsObject: attributes])
+            continue;
+        [seen addObject: attributes];
+
+        CTFontDescriptorRef match =
+                CTFontDescriptorCreateWithAttributes((CFDictionaryRef) attributes);
+        [matches addObject: (id) match];
+        CFRelease(match);
     }
-    CTFontDescriptorRef result = CTFontDescriptorCreateWithAttributes((CFDictionaryRef)dict);
-    [dict release];
+    [faces release];
+
+    // No match is reported as NULL, as CTFontCollection does.
+    if ([matches count] == 0)
+        return NULL;
+    return (CFArrayRef) [matches copy];
+}
+
+CTFontDescriptorRef CTFontDescriptorCreateMatchingFontDescriptor(CTFontDescriptorRef descriptor,
+                                                                CFSetRef mandatoryAttributes)
+{
+    CFArrayRef matches =
+            CTFontDescriptorCreateMatchingFontDescriptors(descriptor, mandatoryAttributes);
+    if (matches == NULL)
+        return NULL;
+    CTFontDescriptorRef result =
+            (CTFontDescriptorRef) CFRetain(CFArrayGetValueAtIndex(matches, 0));
+    CFRelease(matches);
     return result;
 }
 
 CTFontSymbolicTraits CTFontDescriptorGetSymbolicTraits(CTFontDescriptorRef descriptor)
 {
-    if (!descriptor) return 0;
-    NSDictionary *traits = [(NSDictionary *)descriptor objectForKey:(id)kCTFontTraitsAttribute];
-    NSNumber *symbolic = [traits objectForKey:(id)kCTFontSymbolicTrait];
-    return symbolic ? (CTFontSymbolicTraits)[symbolic unsignedIntValue] : 0;
+    if (descriptor == NULL)
+        return 0;
+    NSDictionary *traits = [[descriptorObject(descriptor) attributes]
+            objectForKey: (NSString *) kCTFontTraitsAttribute];
+    NSNumber *symbolic = [traits objectForKey: (NSString *) kCTFontSymbolicTrait];
+    return [symbolic isKindOfClass: [NSNumber class]]
+            ? (CTFontSymbolicTraits) [symbolic unsignedIntValue]
+            : 0;
 }
 
 CTFontDescriptorRef CTFontDescriptorCreateCopyWithSymbolicTraits(CTFontDescriptorRef descriptor,
-                                                                  CTFontSymbolicTraits value,
-                                                                  CTFontSymbolicTraits mask)
+                                                                 CTFontSymbolicTraits symTraitValue,
+                                                                 CTFontSymbolicTraits symTraitMask)
 {
-    if (!descriptor) return NULL;
-
-    NSDictionary *oldTraits = [(NSDictionary *)descriptor objectForKey:(id)kCTFontTraitsAttribute];
-    NSMutableDictionary *traits = oldTraits ? [oldTraits mutableCopy] : [[NSMutableDictionary alloc] init];
+    if (descriptor == NULL)
+        return NULL;
+    NSDictionary *oldTraits = [[descriptorObject(descriptor) attributes]
+            objectForKey: (NSString *) kCTFontTraitsAttribute];
+    NSMutableDictionary *traits = oldTraits != nil ? [oldTraits mutableCopy]
+                                                   : [[NSMutableDictionary alloc] init];
     CTFontSymbolicTraits oldValue = CTFontDescriptorGetSymbolicTraits(descriptor);
-    CTFontSymbolicTraits newValue = (oldValue & ~mask) | (value & mask);
-    [traits setObject:[NSNumber numberWithUnsignedInt:newValue] forKey:(id)kCTFontSymbolicTrait];
+    CTFontSymbolicTraits newValue = (oldValue & ~symTraitMask) | (symTraitValue & symTraitMask);
+    [traits setObject: [NSNumber numberWithUnsignedInt: newValue]
+               forKey: (NSString *) kCTFontSymbolicTrait];
 
-    NSDictionary *changes = [NSDictionary dictionaryWithObject:traits forKey:(id)kCTFontTraitsAttribute];
-    CTFontDescriptorRef result = CTFontDescriptorCreateCopyWithAttributes(descriptor, (CFDictionaryRef)changes);
+    NSDictionary *changes = [NSDictionary dictionaryWithObject: traits
+                                                        forKey: (NSString *) kCTFontTraitsAttribute];
+    CTFontDescriptorRef result =
+            CTFontDescriptorCreateCopyWithAttributes(descriptor, (CFDictionaryRef) changes);
     [traits release];
     return result;
 }
@@ -124,40 +290,48 @@ CTFontDescriptorRef CTFontDescriptorCreateCopyWithFeature(CTFontDescriptorRef de
                                                           CFNumberRef featureTypeIdentifier,
                                                           CFNumberRef featureSelectorIdentifier)
 {
-    if (!descriptor || !featureTypeIdentifier || !featureSelectorIdentifier) return NULL;
-
-    NSArray *oldSettings = [(NSDictionary *)descriptor objectForKey:(id)kCTFontFeatureSettingsAttribute];
+    if (descriptor == NULL || featureTypeIdentifier == NULL || featureSelectorIdentifier == NULL)
+        return NULL;
+    NSArray *oldSettings = [[descriptorObject(descriptor) attributes]
+            objectForKey: (NSString *) kCTFontFeatureSettingsAttribute];
+    // A feature type has one selector: a new setting replaces the old one.
     NSMutableArray *settings = [[NSMutableArray alloc] init];
     for (NSDictionary *setting in oldSettings) {
-        NSNumber *type = [setting objectForKey:(id)kCTFontFeatureTypeIdentifierKey];
-        if (![type isEqual:(id)featureTypeIdentifier]) {
-            [settings addObject:setting];
-        }
+        id type = [setting objectForKey: (NSString *) kCTFontFeatureTypeIdentifierKey];
+        if (![type isEqual: (id) featureTypeIdentifier])
+            [settings addObject: setting];
     }
     NSDictionary *newSetting = [NSDictionary dictionaryWithObjectsAndKeys:
-        (id)featureTypeIdentifier, (id)kCTFontFeatureTypeIdentifierKey,
-        (id)featureSelectorIdentifier, (id)kCTFontFeatureSelectorIdentifierKey,
-        nil];
-    [settings addObject:newSetting];
+            (id) featureTypeIdentifier, (NSString *) kCTFontFeatureTypeIdentifierKey,
+            (id) featureSelectorIdentifier, (NSString *) kCTFontFeatureSelectorIdentifierKey,
+            nil];
+    [settings addObject: newSetting];
 
-    NSDictionary *changes = [NSDictionary dictionaryWithObject:settings forKey:(id)kCTFontFeatureSettingsAttribute];
-    CTFontDescriptorRef result = CTFontDescriptorCreateCopyWithAttributes(descriptor, (CFDictionaryRef)changes);
+    NSDictionary *changes = [NSDictionary dictionaryWithObject: settings
+                                                        forKey: (NSString *) kCTFontFeatureSettingsAttribute];
+    CTFontDescriptorRef result =
+            CTFontDescriptorCreateCopyWithAttributes(descriptor, (CFDictionaryRef) changes);
     [settings release];
     return result;
 }
 
-CTFontDescriptorRef CTFontDescriptorCreateCopyWithVariation(CTFontDescriptorRef descriptor,
+CTFontDescriptorRef CTFontDescriptorCreateCopyWithVariation(CTFontDescriptorRef original,
                                                             CFNumberRef variationIdentifier,
                                                             CGFloat variationValue)
 {
-    if (!descriptor || !variationIdentifier) return NULL;
+    if (original == NULL || variationIdentifier == NULL)
+        return NULL;
+    NSDictionary *oldVariations = [[descriptorObject(original) attributes]
+            objectForKey: (NSString *) kCTFontVariationAttribute];
+    NSMutableDictionary *variations = oldVariations != nil ? [oldVariations mutableCopy]
+                                                           : [[NSMutableDictionary alloc] init];
+    [variations setObject: [NSNumber numberWithDouble: variationValue]
+                   forKey: (id) variationIdentifier];
 
-    NSDictionary *oldVariations = [(NSDictionary *)descriptor objectForKey:(id)kCTFontVariationAttribute];
-    NSMutableDictionary *variations = oldVariations ? [oldVariations mutableCopy] : [[NSMutableDictionary alloc] init];
-    [variations setObject:[NSNumber numberWithDouble:variationValue] forKey:(id)variationIdentifier];
-
-    NSDictionary *changes = [NSDictionary dictionaryWithObject:variations forKey:(id)kCTFontVariationAttribute];
-    CTFontDescriptorRef result = CTFontDescriptorCreateCopyWithAttributes(descriptor, (CFDictionaryRef)changes);
+    NSDictionary *changes = [NSDictionary dictionaryWithObject: variations
+                                                        forKey: (NSString *) kCTFontVariationAttribute];
+    CTFontDescriptorRef result =
+            CTFontDescriptorCreateCopyWithAttributes(original, (CFDictionaryRef) changes);
     [variations release];
     return result;
 }

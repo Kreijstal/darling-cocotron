@@ -17,61 +17,60 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
+#import <AppKit/AppKitIvarLayout.h>
 #import <AppKit/NSLayoutManager.h>
 #import <Foundation/Foundation.h>
 
 @class NSTextView;
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSLineSweepDirection) {
     NSLineSweepUp,
     NSLineSweepDown,
     NSLineSweepLeft,
     NSLineSweepRight,
-} NSLineSweepDirection;
+};
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, NSLineMovementDirection) {
     NSLineDoesntMove,
     NSLineMovesUp,
     NSLineMovesDown,
     NSLineMovesLeft,
     NSLineMovesRight,
-} NSLineMovementDirection;
+};
 
+// Legacy ObjC ABI (i386): instance size must stay 0x1c, Apple's; the ivars
+// before the extras keep their position in the original order. Add new state
+// to the extra struct, never as an ivar.
 @interface NSTextContainer : NSObject {
-    NSSize _size;
-    NSTextView *_textView;
     NSLayoutManager *_layoutManager;
+    NSTextView *_textView;
+    NSSize _size;
     CGFloat _lineFragmentPadding;
-    NSUInteger _maximumNumberOfLines;
-    BOOL _widthTracksTextView;
-    BOOL _heightTracksTextView;
+    NS_EXTRA_IVARS_BEGIN(NSTextContainer)
+        NSUInteger _maximumNumberOfLines;
+        BOOL _widthTracksTextView;
+        BOOL _heightTracksTextView;
+    NS_EXTRA_IVARS_END(NSTextContainer)
 }
 
 - initWithContainerSize: (NSSize) size;
 
-- (NSSize) containerSize;
+@property(nonatomic) NSSize containerSize;
 
-- (NSTextView *) textView;
+@property(nonatomic, retain) NSTextView *textView;
 @property(readonly) NSTextLayoutOrientation layoutOrientation;
-- (BOOL) widthTracksTextView;
-- (BOOL) heightTracksTextView;
+@property(nonatomic) BOOL widthTracksTextView;
+@property(nonatomic) BOOL heightTracksTextView;
 
-- (NSLayoutManager *) layoutManager;
+@property(nonatomic, retain) NSLayoutManager *layoutManager;
 
-- (CGFloat) lineFragmentPadding;
-- (NSUInteger) maximumNumberOfLines;
+@property(nonatomic) CGFloat lineFragmentPadding;
+@property(nonatomic) NSUInteger maximumNumberOfLines;
 
-- (void) setContainerSize: (NSSize) size;
 
-- (void) setTextView: (NSTextView *) textView;
-- (void) setWidthTracksTextView: (BOOL) flag;
-- (void) setHeightTracksTextView: (BOOL) flag;
 
-- (void) setLayoutManager: (NSLayoutManager *) layoutManager;
 - (void) replaceLayoutManager: (NSLayoutManager *) layoutManager;
 
-- (void) setLineFragmentPadding: (CGFloat) padding;
-- (void) setMaximumNumberOfLines: (NSUInteger) maximumNumberOfLines;
 
 - (BOOL) isSimpleRectangularTextContainer;
 

@@ -33,7 +33,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         [self release];
         return nil;
     }
-    _inputStream = [[NSInputStream inputStreamWithData: data] retain];
+    // Owned outright: a convenience constructor would also leave the stream (and the data or
+    // file it holds) in the autorelease pool until the pool drains, after the provider is gone.
+    _inputStream = [[NSInputStream alloc] initWithData: data];
     [_inputStream open];
     _data = [data retain];
     _isDirectAccess = YES;
@@ -57,7 +59,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
     _path = [[[NSFileManager defaultManager]
             stringWithFileSystemRepresentation: pathCString
                                         length: len] copy];
-    _inputStream = [[NSInputStream inputStreamWithFileAtPath: _path] retain];
+    if (![[NSFileManager defaultManager] isReadableFileAtPath: _path]) {
+        // A file that cannot be opened for reading gives no provider.
+        [self release];
+        return nil;
+    }
+    _inputStream = [[NSInputStream alloc] initWithFileAtPath: _path];
     [_inputStream open];
     _data = nil;
     _isDirectAccess = NO;
@@ -68,7 +75,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 // A URL that cannot be read gives no provider, as CGDataProviderCreateWithURL does.
 - initWithURL: (NSURL *) url {
-    NSData *data = [[NSData alloc] initWithContentsOfURL: url];
+    NSData *data = (url != nil) ? [[NSData alloc] initWithContentsOfURL: url] : nil;
+
+    if (data == nil) {
+        // Unreadable or missing file: CGDataProviderCreateWithURL returns NULL.
+        [self release];
+        return nil;
+    }
+
     id result = [self initWithData: data];
 
     [data release];
@@ -112,6 +126,7 @@ void O2DataProviderRelease(O2DataProviderRef self) {
 }
 
 CFDataRef O2DataProviderCopyData(O2DataProviderRef self) {
+    // CGDataProviderCopyData returns NULL for a NULL provider.
     if (self == NULL)
         return NULL;
     if (self->_data != nil)

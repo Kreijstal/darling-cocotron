@@ -27,7 +27,9 @@ static const NSTimeInterval NSAnimationContextDefaultDuration = 0.25;
 @implementation NSAnimationContext
 
 - (void) dealloc {
-    [_timingFunction release];
+    if (NS_EXTRA_ALLOCATED(NSAnimationContext, self))
+        [NS_EXTRA(NSAnimationContext, self)->_timingFunction release];
+    NS_EXTRA_FREE(NSAnimationContext, self);
     [super dealloc];
 }
 
@@ -85,21 +87,21 @@ static const NSTimeInterval NSAnimationContextDefaultDuration = 0.25;
 }
 
 - (void) setAllowsImplicitAnimation: (BOOL) flag {
-    _allowsImplicitAnimation = flag;
+    NS_EXTRA(NSAnimationContext, self)->_allowsImplicitAnimation = flag;
 }
 
 - (BOOL) allowsImplicitAnimation {
-    return _allowsImplicitAnimation;
+    return NS_EXTRA(NSAnimationContext, self)->_allowsImplicitAnimation;
 }
 
 - (CAMediaTimingFunction *) timingFunction {
-    return _timingFunction;
+    return NS_EXTRA(NSAnimationContext, self)->_timingFunction;
 }
 
 - (void) setTimingFunction: (CAMediaTimingFunction *) function {
-    if (_timingFunction != function) {
-        [_timingFunction release];
-        _timingFunction = [function retain];
+    if (NS_EXTRA(NSAnimationContext, self)->_timingFunction != function) {
+        [NS_EXTRA(NSAnimationContext, self)->_timingFunction release];
+        NS_EXTRA(NSAnimationContext, self)->_timingFunction = [function retain];
     }
 }
 

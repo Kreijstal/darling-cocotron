@@ -14,6 +14,8 @@
 #include <X11/extensions/Xrandr.h>
 #include <stdbool.h>
 
+#include "../DarlingFullscreenPolicy.h"
+
 typedef struct {
     int x, y; /* root coordinates, device pixels */
     unsigned int width, height;
@@ -25,11 +27,14 @@ typedef struct {
 static inline bool X11FullscreenWanted(bool overrideRedirect, bool styleFullScreen, bool titled, bool coversMonitor) {
     if (overrideRedirect)
         return false;
-    if (styleFullScreen)
-        return true;
-    if (titled)
-        return false;
-    return coversMonitor;
+    return DarlingFullscreenWanted(styleFullScreen, titled, coversMonitor);
+}
+
+/* Whether a style change takes the window out of fullscreen whatever its frame: the application cleared the
+ * fullscreen style bit (-toggleFullScreen:). The window still covers its monitor then, but only because it was
+ * fullscreen, so the monitor test must not hold it there; the window manager restores the frame it had before. */
+static inline bool X11FullscreenStyleLeft(bool wasStyleFullScreen, bool styleFullScreen) {
+    return wasStyleFullScreen && !styleFullScreen;
 }
 
 /* Whether a window that is already fullscreen has to leave fullscreen before setFrame: moves it. It does when it
@@ -44,8 +49,8 @@ static inline bool X11FullscreenLeaveBeforeMove(bool wanted, bool requested, boo
  * root window is the only monitor. */
 static inline bool X11FullscreenRectIsMonitor(Display *display, X11FullscreenRect rect) {
     Window root = DefaultRootWindow(display);
-    int screen = DefaultScreen(display);
     int eventBase, errorBase;
+    int screen = DefaultScreen(display);
     if (!XRRQueryExtension(display, &eventBase, &errorBase)) {
         return rect.x == 0 && rect.y == 0 && rect.width == (unsigned int) DisplayWidth(display, screen) &&
                rect.height == (unsigned int) DisplayHeight(display, screen);

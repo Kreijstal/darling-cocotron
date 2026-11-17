@@ -54,6 +54,12 @@ bool CGPDFDocumentIsEncrypted(CGPDFDocumentRef self) {
     return [(O2PDFDocument *)self encryptDictionary] != nil;
 }
 
+// Onyx2D does not implement PDF decryption (there is no CGPDFDocumentUnlockWithPassword),
+// so an encrypted document can never be unlocked here: only an unencrypted one is.
+bool CGPDFDocumentIsUnlocked(CGPDFDocumentRef self) {
+    return !CGPDFDocumentIsEncrypted(self);
+}
+
 bool CGPDFDocumentAllowsCopying(CGPDFDocumentRef self) {
     O2PDFDictionary *trailer = [[(O2PDFDocument *)self xref] trailer];
     if (!trailer)

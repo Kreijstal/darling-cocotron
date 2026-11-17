@@ -30,7 +30,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSRaise.h>
 #import <AppKit/NSTableCornerView.h>
 #import <Foundation/NSKeyedArchiver.h>
+#import <Foundation/NSProcessInfo.h>
 #import <Foundation/NSURL.h>
+#import <UIFoundation/UIFoundation.h>
+#import <UIFoundation/UINibDecoder.h>
 
 NSString *const NSNibOwner = @"NSOwner";
 NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
@@ -67,6 +70,32 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
     return self;
 }
 
+// Nibs built for newer systems sit next to the plain keyedobjects.nib as keyedobjects-<version>.nib,
+// where the version is the minimum system version written as MMmmpp (101300 for 10.13). Returns
+// the newest one that this system can read, or nil when there is none.
++ (NSString *) _versionedKeyedObjectsPathInDirectory: (NSString *) directory {
+    NSOperatingSystemVersion os = [[NSProcessInfo processInfo] operatingSystemVersion];
+    long current = os.majorVersion * 10000 + os.minorVersion * 100 + os.patchVersion;
+    NSString *best = nil;
+    long bestVersion = 0;
+
+    for (NSString *name in [[NSFileManager defaultManager] contentsOfDirectoryAtPath: directory
+                                                                               error: NULL]) {
+        if (![name hasPrefix: @"keyedobjects-"] || ![name hasSuffix: @".nib"])
+            continue;
+        NSString *digits = [name substringWithRange: NSMakeRange(13, [name length] - 13 - 4)];
+        NSScanner *scanner = [NSScanner scannerWithString: digits];
+        long long version;
+        if (![scanner scanLongLong: &version] || ![scanner isAtEnd] || version <= 0)
+            continue;
+        if (version <= current && version > bestVersion) {
+            best = name;
+            bestVersion = (long) version;
+        }
+    }
+    return best != nil ? [directory stringByAppendingPathComponent: best] : nil;
+}
+
 - initWithContentsOfFile: (NSString *) path {
 
     NIBDEBUG(@"initWithContentsOfFile: %@", path);
@@ -80,8 +109,10 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
         return nil;
     }
     if (isDirectory) {
-        objects = [[path stringByAppendingPathComponent: @"keyedobjects"]
-                stringByAppendingPathExtension: @"nib"];
+        objects = [NSNib _versionedKeyedObjectsPathInDirectory: path];
+        if (objects == nil)
+            objects = [[path stringByAppendingPathComponent: @"keyedobjects"]
+                    stringByAppendingPathExtension: @"nib"];
 
         if ([[NSFileManager defaultManager] fileExistsAtPath: objects])
             _flags._isKeyed = TRUE;
@@ -166,10 +197,7 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
     return object;
 }
 
-- (void) unarchiver: (NSKeyedUnarchiver *) unarchiver
-        willReplaceObject: object
-               withObject: replacement
-{
+- (void) _replaceDecodedObject: object withObject: replacement {
     if (object != nil && replacement != nil) {
         NSUInteger index = [_allObjects indexOfObjectIdenticalTo: object];
         if (index != NSNotFound)
@@ -177,12 +205,18 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
     }
 }
 
+- (void) unarchiver: (NSKeyedUnarchiver *) unarchiver
+        willReplaceObject: object
+               withObject: replacement
+{
+    [self _replaceDecodedObject: object withObject: replacement];
+}
+
 - (NSDictionary *) externalNameTable {
     return _nameTable;
 }
 
 - (BOOL) instantiateNibWithExternalNameTable: (NSDictionary *) nameTable {
-
     NIBDEBUG(@"instantiateNibWithExternalNameTable: %@", nameTable);
 
     _nameTable = [nameTable retain];
@@ -202,10 +236,35 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
         NSMenu *menu;
         NSArray *topLevelObjects;
 
-        if (_flags._isKeyed) {
-            NSKeyedUnarchiver *keyed;
-            unarchiver = keyed = [[[NSKeyedUnarchiver alloc]
-                    initForReadingWithData: _data] autorelease];
+        BOOL isNibArchive = UIDataLooksLikeNibArchive(_data);
+
+        if (isNibArchive) {
+            // The compact binary format ibtool writes for current deployment targets.
+            UINibDecoder *decoder = [[[UINibDecoder alloc] initForReadingWithData: _data] autorelease];
+            unarchiver = decoder;
+            [decoder setDelegate: (id) self];
+            [decoder setClass: [NSTableCornerView class]
+                 forClassName: @"_NSCornerView"];
+            [decoder setClass: [NSNibHelpConnector class]
+                 forClassName: @"NSIBHelpConnector"];
+
+            // Like macOS, a nib that cannot be read fails to instantiate without raising.
+            @try {
+                objectData = [decoder decodeObjectForKey: @"IB.objectdata"];
+            } @catch (NSException *exception) {
+                objectData = nil;
+            }
+        } else if (_flags._isKeyed) {
+            NSKeyedUnarchiver *keyed = nil;
+            @try {
+                keyed = [[[NSKeyedUnarchiver alloc] initForReadingWithData: _data] autorelease];
+            } @catch (NSException *exception) {
+                // Like the NIBArchive path: data that is not an archive (such as an empty file)
+                // fails to instantiate without raising.
+                return NO;
+            }
+            unarchiver = keyed;
+
             [keyed setDelegate: self];
 
             /*
@@ -213,10 +272,11 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
             - utf8 in the multinational panel
             - misaligned objects in boxes everywhere
             */
+
             [keyed setClass: [NSTableCornerView class]
-                    forClassName: @"_NSCornerView"];
+               forClassName: @"_NSCornerView"];
             [keyed setClass: [NSNibHelpConnector class]
-                    forClassName: @"NSIBHelpConnector"];
+               forClassName: @"NSIBHelpConnector"];
 
             objectData = [keyed decodeObjectForKey: @"IB.objectdata"];
         } else {
@@ -232,7 +292,32 @@ NSString *const NSNibTopLevelObjects = @"NSNibTopLevelObjects";
             objectData = [unkeyed decodeObject];
         }
 
+        if (![objectData isKindOfClass: [NSIBObjectData class]])
+            return NO;
+
+        // NSArchiver data has no decoding delegate to collect the objects as they are decoded;
+        // the objects of the object table stand in for them, with the owner taking the place
+        // of its placeholder.
+        NSArray *unkeyedObjects = nil;
+        id formerOwner = nil;
+        if (!isNibArchive && !_flags._isKeyed) {
+            unkeyedObjects = [[objectData allObjects] retain];
+            formerOwner = [[objectData rootObject] retain];
+        }
+
         [objectData buildConnectionsWithNameTable: _nameTable];
+
+        if (unkeyedObjects != nil) {
+            id owner = [objectData rootObject];
+            for (id object in unkeyedObjects)
+                [_allObjects addObject: (object == formerOwner && owner != nil) ? owner : object];
+            // The owner is among the objects that are awakened even when the object table does
+            // not list its placeholder.
+            if (owner != nil && [_allObjects indexOfObjectIdenticalTo: owner] == NSNotFound)
+                [_allObjects addObject: owner];
+            [unkeyedObjects release];
+            [formerOwner release];
+        }
         if ((menu = [objectData mainMenu]) != nil) {
             // Rename the first item to have the application name.
             if ([menu numberOfItems] > 0) {

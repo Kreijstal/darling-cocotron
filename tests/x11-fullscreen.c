@@ -2,7 +2,7 @@
 // geometry, and the EWMH fullscreen request as a window manager receives it. Needs an X server; use
 // tests/x11-fullscreen.sh, which runs it on its own Xvfb. Build: cc x11-fullscreen.c -lX11 -lXrandr -ldl
 #include "../AppKit/X11.backend/X11Fullscreen.h"
-#include "../AppKit/X11.backend/X11Monitors.h"
+#include "../CoreGraphics/X11.backend/X11Monitors.h"
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +33,12 @@ static void decisionTable(void) {
     CHECK(!X11FullscreenWanted(true, true, false, true), "unmanaged windows are left alone, even if asked");
 
     /* wanted, requested, moved */
+    /* wasStyleFullScreen, styleFullScreen */
+    CHECK(X11FullscreenStyleLeft(true, false), "clearing the fullscreen style leaves, though the frame covers a monitor");
+    CHECK(!X11FullscreenStyleLeft(false, false), "an unrelated style change decides by the frame");
+    CHECK(!X11FullscreenStyleLeft(false, true), "setting the style enters");
+    CHECK(!X11FullscreenStyleLeft(true, true), "keeping the style stays");
+
     CHECK(X11FullscreenLeaveBeforeMove(true, true, true), "a fullscreen window moving to another monitor leaves first");
     CHECK(!X11FullscreenLeaveBeforeMove(true, true, false), "a fullscreen window that stays put sends nothing");
     CHECK(X11FullscreenLeaveBeforeMove(false, true, false), "leaving fullscreen on a frame that covers no monitor");

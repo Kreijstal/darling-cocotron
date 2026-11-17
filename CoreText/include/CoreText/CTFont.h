@@ -37,6 +37,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 typedef const struct CF_BRIDGED_TYPE(NSFont) __CTFont *CTFontRef;
 
+// The version of CoreText: 0x000B0000 is the one of macOS 10.14.
+CORETEXT_EXPORT uint32_t CTGetCoreTextVersion(void);
+
 CORETEXT_EXPORT const CFStringRef kCTFontCopyrightNameKey;
 CORETEXT_EXPORT const CFStringRef kCTFontFamilyNameKey;
 CORETEXT_EXPORT const CFStringRef kCTFontSubFamilyNameKey;

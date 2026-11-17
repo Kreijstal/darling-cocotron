@@ -42,9 +42,15 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
         _originalClassName =
                 [[coder decodeObjectForKey: @"NSOriginalClassName"] retain];
     } else {
-        [coder decodeValuesOfObjCTypes: "@@", &_className, &_originalClassName];
-        [_className retain];
-        [_originalClassName retain];
+        // NSArchiver (typedstream) nibs, as written by Interface Builder before
+        // keyed nibs: the custom class name as a string, then the class of the
+        // standard object it stands in for, then that object's own encoding.
+        NSString *className = nil;
+        Class originalClass = Nil;
+
+        [coder decodeValuesOfObjCTypes: "@#", &className, &originalClass];
+        _className = className;
+        _originalClassName = [NSStringFromClass(originalClass) retain];
     }
 
     Class class = _className ? NSClassFromString(_className) : Nil;

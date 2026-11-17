@@ -67,11 +67,11 @@ NSString *_NSTruncatedStringWithAttributesInRect(NSString *string,
     [viewController retain];
     NSViewController *previous = _viewController;
     _viewController = viewController;
-    // Clear the non-owning responder before releasing the retired view tree.
+    // Drop the responder that lies in the retired view tree.
     if (_initialFirstResponder == _view ||
             (_view && [_initialFirstResponder isKindOfClass: [NSView class]] &&
              [(NSView *)_initialFirstResponder isDescendantOf: _view]))
-        _initialFirstResponder = nil;
+        [self setInitialFirstResponder: nil];
     [_view removeFromSuperview];
     [self setView: nil];
     [previous release];
@@ -92,20 +92,15 @@ NSString *_NSTruncatedStringWithAttributesInRect(NSString *string,
         _tabView = [keyed decodeObjectForKey: @"NSTabView"];
         _color = [[keyed decodeObjectForKey: @"NSColor"] retain];
     } else {
-        [coder decodeValueOfObjCType: @encode(id) at: &_identifier];
-        [_identifier retain];
-        [coder decodeValueOfObjCType: @encode(id) at: &_label];
-        [_label retain];
-        [coder decodeValueOfObjCType: @encode(id) at: &_view];
-        [_view retain];
-        [coder decodeValueOfObjCType: @encode(id) at: &_color];
-        [_color retain];
-        int state = 0;
-        [coder decodeValueOfObjCType: @encode(int) at: &state];
-        _state = state;
-        id first_responder = nil;
-        [coder decodeValueOfObjCType: @encode(id) at: &first_responder];
-        [coder decodeValueOfObjCType: @encode(id) at: &_tabView];
+        // Seven objects in one group: identifier, view, label, colour, initial first
+        // responder, last key view and the tab view (a back-reference, not retained). The
+        // last key view has no accessor and is not kept.
+        id lastKeyView = nil, tabView = nil;
+        [coder decodeValuesOfObjCTypes: "@@@@@@@", &_identifier, &_view, &_label, &_color, &_initialFirstResponder,
+                                        &lastKeyView, &tabView];
+        [lastKeyView release];
+        _tabView = tabView;
+        [tabView release];
     }
 
     return self;
@@ -125,6 +120,7 @@ NSString *_NSTruncatedStringWithAttributesInRect(NSString *string,
     [_identifier release];
     [_label release];
     [_view release];
+    [_initialFirstResponder release];
     [_color release];
     [super dealloc];
 }
@@ -192,7 +188,7 @@ NSString *_NSTruncatedStringWithAttributesInRect(NSString *string,
     _view = view;
 
     if (_initialFirstResponder == nil)
-        _initialFirstResponder = view;
+        [self setInitialFirstResponder: view];
     [view removeFromSuperview];
     [_tabView _itemViewDidChange: self];
 }

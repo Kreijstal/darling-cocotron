@@ -22,10 +22,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 #import <AppKit/NSFontFamily.h>
 #import <AppKit/NSFontTypeface.h>
 #import <AppKit/NSGraphicsContext.h>
+#import <CoreText/CoreText.h>
 
 @interface NSFontFamily ()
 + (NSMutableArray *) fontFamilies;
 + (void) buildFontFamilies;
++ (NSArray *) _familyAndStyleForFontName: (NSString *) name;
+- (NSFontTypeface *) _typefaceWithExactName: (NSString *) name;
 @end
 
 @implementation NSFontFamily
@@ -72,6 +75,9 @@ static NSMutableDictionary *sharedByName = nil;
 + (NSFontFamily *) addFontFamilyWithName: (NSString *) familyName {
     if (familyName == nil)
         return nil;
+    // The typefaces are looked up when they are first needed (see
+    // -_ensureTypefacesLoaded): asking the font system about every installed
+    // family up front takes seconds on a system with many fonts.
     NSFontFamily *family = [[self alloc] initWithName: familyName];
     [self addFontFamily: family];
     return [family autorelease];
@@ -80,7 +86,7 @@ static NSMutableDictionary *sharedByName = nil;
 + (void) buildFontFamilies {
     NSSet *initialFamilyNames = [[NSDisplay currentDisplay] allFontFamilyNames];
     for (NSString *familyName in initialFamilyNames) {
-        [self addFontFamilyWithName: familyName];
+        [self addFontFamilyWithName: familyName]->_installed = YES;
     }
 }
 
@@ -98,52 +104,111 @@ static NSMutableDictionary *sharedByName = nil;
     }
 }
 
+// A font can be named by something other than one of the typeface names
+// listed for its family, such as a display name or a name that the font
+// system substitutes. Ask the font system which face the name resolves to,
+// and return that face's family and style names, or nil.
++ (NSArray *) _familyAndStyleForFontName: (NSString *) name {
+    static NSMutableDictionary *resolved = nil;
+    NSArray *result;
+
+    if (name == nil)
+        return nil;
+
+    @synchronized(self) {
+        if (resolved == nil)
+            resolved = [NSMutableDictionary new];
+        result = [[[resolved objectForKey: name] retain] autorelease];
+    }
+
+    if (result == nil) {
+        CTFontRef font = CTFontCreateWithName((CFStringRef) name, 12, NULL);
+        NSString *family = nil, *style = nil;
+
+        if (font != NULL) {
+            family = (NSString *) CTFontCopyFamilyName(font);
+            style = (NSString *) CTFontCopyName(font, kCTFontStyleNameKey);
+            CFRelease(font);
+        }
+
+        if (family != nil && style != nil)
+            result = [NSArray arrayWithObjects: family, style, nil];
+        else
+            result = (NSArray *) [NSNull null];
+        [family release];
+        [style release];
+
+        @synchronized(self) {
+            [resolved setObject: result forKey: name];
+        }
+    }
+
+    return (result == (NSArray *) [NSNull null]) ? nil : result;
+}
+
++ (NSFontFamily *) installedFontFamilyWithName: (NSString *) name {
+    if (name == nil)
+        return nil;
+    @synchronized([NSFontFamily class]) {
+        [self fontFamilies];
+        NSFontFamily *family = [sharedByName objectForKey: name];
+        return family != nil && family->_installed ? family : nil;
+    }
+}
+
 + (NSFontFamily *) fontFamilyWithTypefaceName: (NSString *) name {
     if (name == nil)
         return nil;
 
-    @synchronized([NSFontFamily class]) {
-        [self fontFamilies];
+    NSArray *familyAndStyle = [self _familyAndStyleForFontName: name];
 
-        // Fast path: check if name itself matches a family name
-        NSFontFamily *family = [sharedByName objectForKey: name];
-        if (family != nil)
-            return family;
+    // The family the font system resolves the name to is almost always the
+    // answer; looking there first avoids loading the typefaces of every
+    // family just to find a name.
+    if (familyAndStyle != nil) {
+        NSFontFamily *resolvedFamily;
 
-        // Fast path: hyphen separator e.g. "Helvetica-Bold" -> "Helvetica"
-        NSRange hyphen = [name rangeOfString: @"-" options: NSBackwardsSearch];
-        if (hyphen.location != NSNotFound) {
-            NSString *baseFamily = [name substringToIndex: hyphen.location];
-            family = [sharedByName objectForKey: baseFamily];
-            if (family != nil)
-                return family;
+        @synchronized([NSFontFamily class]) {
+            [self fontFamilies];
+            resolvedFamily = [[[sharedByName objectForKey:
+                    [familyAndStyle objectAtIndex: 0]] retain] autorelease];
         }
-
-        // Fast path: space separator e.g. "Liberation Sans Bold" -> "Liberation Sans"
-        NSRange space = [name rangeOfString: @" " options: NSBackwardsSearch];
-        if (space.location != NSNotFound) {
-            NSString *baseFamily = [name substringToIndex: space.location];
-            family = [sharedByName objectForKey: baseFamily];
-            if (family != nil)
-                return family;
-        }
-
-        // Check only already-loaded families to avoid scanning all unloaded families
-        for (NSFontFamily *check in sharedList) {
-            if (check->_typefacesLoaded) {
-                NSFontTypeface *typeface = [check typefaceWithName: name];
-                if (typeface != nil)
-                    return check;
-            }
-        }
-
-        return nil;
+        if ([resolvedFamily _typefaceWithExactName: name] != nil)
+            return resolvedFamily;
     }
+
+    NSArray *families = [self fontFamilies];
+    int i, count = [families count];
+
+    for (i = 0; i < count; i++) {
+        NSFontFamily *check = [families objectAtIndex: i];
+
+        if ([check _typefaceWithExactName: name] != nil)
+            return check;
+    }
+
+    if (familyAndStyle == nil)
+        return nil;
+
+    NSFontFamily *family =
+            [self fontFamilyWithName: [familyAndStyle objectAtIndex: 0]];
+
+    if ([family typefaceWithName: name] == nil)
+        return nil;
+
+    return family;
+}
+
++ (NSFontFamily *) fontFamilyForFontName: (NSString *) name {
+    NSFontFamily *family = [self fontFamilyWithTypefaceName: name];
+    if (family != nil)
+        return family;
+    return [self installedFontFamilyWithName:
+                         [[NSDisplay currentDisplay] substituteFamilyName: name]];
 }
 
 + (NSFontTypeface *) fontTypefaceWithName: (NSString *) name {
-    NSFontFamily *family = [self fontFamilyWithTypefaceName: name];
-    return [family typefaceWithName: name];
+    return [[self fontFamilyWithTypefaceName: name] typefaceWithName: name];
 }
 
 - initWithName: (NSString *) name {
@@ -163,12 +228,14 @@ static NSMutableDictionary *sharedByName = nil;
     return _name;
 }
 
+// Asks the font system for the family's typefaces the first time they are
+// needed.
 - (void) _ensureTypefacesLoaded {
     if (!_typefacesLoaded) {
         @synchronized(self) {
             if (!_typefacesLoaded) {
-                NSArray *typefaces =
-                        [[NSDisplay currentDisplay] fontTypefacesForFamilyName: _name];
+                NSArray *typefaces = [[NSDisplay currentDisplay]
+                        fontTypefacesForFamilyName: _name];
                 if (typefaces != nil)
                     [_typefaces addObjectsFromArray: typefaces];
                 _typefacesLoaded = YES;
@@ -177,7 +244,7 @@ static NSMutableDictionary *sharedByName = nil;
     }
 }
 
-- (NSFontTypeface *) typefaceWithName: (NSString *) name {
+- (NSFontTypeface *) _typefaceWithExactName: (NSString *) name {
     [self _ensureTypefacesLoaded];
     int i, count = [_typefaces count];
 
@@ -185,6 +252,32 @@ static NSMutableDictionary *sharedByName = nil;
         NSFontTypeface *typeface = [_typefaces objectAtIndex: i];
 
         if ([[typeface name] isEqualToString: name])
+            return typeface;
+    }
+
+    return nil;
+}
+
+- (NSFontTypeface *) typefaceWithName: (NSString *) name {
+    NSFontTypeface *typeface = [self _typefaceWithExactName: name];
+
+    if (typeface != nil)
+        return typeface;
+
+    // Otherwise, take the face the name resolves to, if it is in this family.
+    NSArray *familyAndStyle = [[self class] _familyAndStyleForFontName: name];
+
+    if (![[familyAndStyle objectAtIndex: 0] isEqualToString: _name])
+        return nil;
+
+    NSString *style = [familyAndStyle objectAtIndex: 1];
+    [self _ensureTypefacesLoaded];
+    int i, count = [_typefaces count];
+
+    for (i = 0; i < count; i++) {
+        typeface = [_typefaces objectAtIndex: i];
+
+        if ([[typeface traitName] isEqualToString: style])
             return typeface;
     }
 
@@ -207,14 +300,16 @@ static NSMutableDictionary *sharedByName = nil;
 
 - (void) addTypeface: (NSFontTypeface *) typeface {
     if (typeface != nil) {
-        _typefacesLoaded = YES;
+        // Typefaces added by the caller go after the ones the font system
+        // lists, as when those were looked up when the family was created.
+        [self _ensureTypefacesLoaded];
         [_typefaces addObject: typeface];
     }
 }
 
 - (void) addTypefaces: (NSArray *) typefaces {
     if (typefaces != nil) {
-        _typefacesLoaded = YES;
+        [self _ensureTypefacesLoaded];
         [_typefaces addObjectsFromArray: typefaces];
     }
 }

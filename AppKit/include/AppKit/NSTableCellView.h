@@ -18,16 +18,22 @@
 */
 
 #import <AppKit/NSView.h>
+#import <AppKit/AppKitIvarLayout.h>
+#import <AppKit/NSCell.h>
+#import <AppKit/NSTableView.h>
 
 @class NSTextField, NSImageView;
 
 @interface NSTableCellView : NSView {
     NSTextField *_textField;
-    NSTextField *_secondTextField;
     NSImageView *_imageView;
     id _objectValue;
-    NSInteger _backgroundStyle;
-    NSInteger _rowSizeStyle;
+    NSBackgroundStyle _backgroundStyle;
+    NSTableViewRowSizeStyle _rowSizeStyle;
+    // Apple's footprint ends in one word; it holds the pointer to the extras.
+    NS_EXTRA_IVARS_BEGIN(NSTableCellView)
+    NSTextField *_secondTextField;
+    NS_EXTRA_IVARS_END(NSTableCellView)
 }
 
 @property (assign) IBOutlet NSTextField *textField;
@@ -36,7 +42,7 @@
 @property (assign) IBOutlet NSTextField *secondTextField;
 @property (assign) IBOutlet NSImageView *imageView;
 @property (retain) id objectValue;
-@property NSInteger backgroundStyle;
-@property NSInteger rowSizeStyle;
+@property NSBackgroundStyle backgroundStyle;
+@property NSTableViewRowSizeStyle rowSizeStyle;
 
 @end

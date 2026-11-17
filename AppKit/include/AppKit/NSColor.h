@@ -18,6 +18,8 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 #import <AppKit/AppKitExport.h>
+#import <AppKit/NSGraphics.h>
+#import <AppKit/NSPasteboard.h>
 #import <ApplicationServices/ApplicationServices.h>
 #import <Foundation/Foundation.h>
 
@@ -25,9 +27,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */
 
 APPKIT_EXPORT NSNotificationName const NSSystemColorsDidChangeNotification;
 
-typedef NSString *NSColorListName;
-typedef NSString *NSColorName;
-typedef NSString *NSColorSpaceName;
+typedef NSString *NSColorListName NS_SWIFT_BRIDGED_TYPEDEF;
+typedef NSString *NSColorName NS_SWIFT_BRIDGED_TYPEDEF;
+
 #ifndef _NSCONTROLTINT_DEFINED
 #define _NSCONTROLTINT_DEFINED
 typedef NS_ENUM(NSUInteger, NSControlTint) {
@@ -46,14 +48,28 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 
 @class NSImage;
 @class NSPasteboard;
-
 @class NSColorSpace;
 @class NSAppearance;
 
-@interface NSColor : NSObject <NSCopying, NSCoding> {
+typedef NS_ENUM(NSInteger, NSColorSystemEffect) {
+    NSColorSystemEffectNone,
+    NSColorSystemEffectPressed,
+    NSColorSystemEffectDeepPressed,
+    NSColorSystemEffectDisabled,
+    NSColorSystemEffectRollover,
+};
+
+// Legacy ObjC ABI (i386): instance size must stay 0x4, Apple's (the isa only;
+// NSColor is an abstract class cluster root). The state below belongs to the
+// concrete subclasses (NSColor_CGColor, NSColor_catalog, NSColor_dynamic),
+// which declare their share of it themselves on that ABI. Never add an ivar
+// to NSColor itself.
+@interface NSColor : NSObject <NSCopying, NSCoding, NSPasteboardWriting, NSPasteboardReading> {
+#if __OBJC2__
     NSColorListName _catalogName;
     NSColorName _colorName;
     NSImage *_pattern;
+#endif
 }
 
 + (NSColor *) colorWithCGColor: (CGColorRef) color;
@@ -62,6 +78,15 @@ typedef NS_ENUM(NSInteger, NSColorType) {
                             count: (NSInteger) count;
 
 @property(class, strong, readonly) NSColor *labelColor;
+@property(class, strong, readonly) NSColor *quinaryLabelColor;
+@property(class, strong, readonly) NSColor *placeholderTextColor;
+@property(class, strong, readonly) NSColor *underPageBackgroundColor;
+@property(class, strong, readonly) NSColor *findHighlightColor;
+@property(class, strong, readonly) NSColor *systemFillColor;
+@property(class, strong, readonly) NSColor *secondarySystemFillColor;
+@property(class, strong, readonly) NSColor *tertiarySystemFillColor;
+@property(class, strong, readonly) NSColor *quaternarySystemFillColor;
+@property(class, strong, readonly) NSColor *quinarySystemFillColor;
 @property(class, strong, readonly) NSColor *secondaryLabelColor;
 @property(class, strong, readonly) NSColor *tertiaryLabelColor;
 @property(class, strong, readonly) NSColor *quaternaryLabelColor;
@@ -169,7 +194,6 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 
 @property(class) BOOL ignoresAlpha;
 @property(copy, readonly) NSColorSpaceName colorSpaceName;
-@property(copy, readonly) NSColorSpace *colorSpace;
 - (NSColorSpace *) colorSpace;
 
 + (NSColor *) highlightColor;
@@ -181,6 +205,8 @@ typedef NS_ENUM(NSInteger, NSColorType) {
 + (NSColor *) alternateSelectedControlColor;
 + (NSColor *) alternateSelectedControlTextColor;
 + (NSColor *) controlColor;
++ (NSControlTint) currentControlTint;
++ (NSColor *) colorForControlTint: (NSControlTint) controlTint;
 + (NSColor *) secondarySelectedControlColor;
 + (NSColor *) selectedControlColor;
 + (NSColor *) controlTextColor;
@@ -279,6 +305,11 @@ typedef NS_ENUM(NSInteger, NSColorType) {
                 saturation: (CGFloat) saturation
                 brightness: (CGFloat) brightness
                      alpha: (CGFloat) alpha;
++ (NSColor *) colorWithColorSpace: (NSColorSpace *) space
+                              hue: (CGFloat) hue
+                       saturation: (CGFloat) saturation
+                       brightness: (CGFloat) brightness
+                            alpha: (CGFloat) alpha;
 
 + (NSColor *) colorWithGenericGamma22White:(CGFloat) white 
                                      alpha:(CGFloat) alpha;
@@ -339,9 +370,23 @@ NS_ASSUME_NONNULL_END
 - (NSColor *) colorUsingColorSpaceName: (NSString *) colorSpace;
 - (NSColor *) colorUsingColorSpaceName: (NSString *) colorSpace
                                 device: (NSDictionary *) device;
+- (NSColor *) colorUsingColorSpace: (NSColorSpace *) space;
 
 - (NSColor *) blendedColorWithFraction: (CGFloat) fraction
                                ofColor: (NSColor *) color;
+- (NSColor *) highlightWithLevel: (CGFloat) level;
+- (NSColor *) shadowWithLevel: (CGFloat) level;
+- (NSColor *) colorWithSystemEffect: (NSColorSystemEffect) systemEffect;
+- (NSColor *) colorUsingType: (NSColorType) type;
+
+// The names of a catalog color for display. The name of the catalog is the one of the System list.
+@property(copy, readonly) NSString *localizedCatalogNameComponent;
+@property(copy, readonly) NSString *localizedColorNameComponent;
+
+// Dynamic range (macOS 26): colors here are always standard dynamic range.
+@property(readonly) CGFloat linearExposure;
+@property(copy, readonly) NSColor *standardDynamicRangeColor;
+- (NSColor *) colorByApplyingContentHeadroom: (CGFloat) contentHeadroom;
 
 - (void) set;
 - (void) setStroke;

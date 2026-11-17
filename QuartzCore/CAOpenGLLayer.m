@@ -70,10 +70,20 @@
     return pf ? CGLRetainPixelFormat(pf) : NULL;
 }
 
+// QUIRK: the default context shares objects with the context of the window
+// the layer tree is hosted in, although the documented default is a context
+// without a share context. The layer's frame is drawn into a texture in this
+// context and composited by the hosting context, which can only sample a
+// texture it shares with the drawing context. Evidence: a requirement of this
+// compositor, not an observation of macOS (no tier; maintainer-approved).
+// A subclass that returns its own context has to share with the hosting one
+// too for its output to reach the screen.
+// Test: quartzcore-opengl-layer, "default contexts share objects" (with an
+// unshared context as the control).
 - (CGLContextObj) copyCGLContextForPixelFormat: (CGLPixelFormatObj) pf {
     if (!pf) return NULL;
     CGLContextObj ctx = NULL;
-    CGLCreateContext(pf, NULL, &ctx);
+    CGLCreateContext(pf, [_context glContext], &ctx);
     return ctx;
 }
 
@@ -183,6 +193,17 @@
 
 - (BOOL) hasNewFrame {
     return _hasNewFrame;
+}
+
+// An asynchronous layer redraws with every frame, a synchronous one only
+// after -setNeedsDisplay.
+- (void) displayIfNeeded {
+    if (_asynchronous) {
+        _needsDisplay = NO;
+        [self display];
+    } else {
+        [super displayIfNeeded];
+    }
 }
 
 - (BOOL) _drawLayerContents: (CGRect) bounds opacity: (CGFloat) opacity {
