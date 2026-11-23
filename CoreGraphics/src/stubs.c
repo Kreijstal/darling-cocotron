@@ -78,48 +78,6 @@ CGWindowLevel CGShieldingWindowLevel(void) {
     return 0;
 }
 
-void CGPathAddRelativeArc(void* path, const void *m, CGFloat x, CGFloat y, CGFloat radius, CGFloat startAngle, CGFloat delta) {
-}
-
-void* CGPathCreateCopyByDashingPath(void* path, const void *m, CGFloat phase, const CGFloat *lengths, size_t count) {
-    return NULL;
-}
-
-void CGRectDivide(CGRect rect, CGRect *slice, CGRect *remainder, CGFloat amount, CGRectEdge edge) {
-    if (slice == NULL && remainder == NULL) return;
-    if (amount < 0) amount = 0;
-    CGRect s = rect;
-    CGRect r = rect;
-    switch (edge) {
-        case CGRectMinXEdge:
-            if (amount > rect.size.width) amount = rect.size.width;
-            s.size.width = amount;
-            r.origin.x += amount;
-            r.size.width -= amount;
-            break;
-        case CGRectMaxXEdge:
-            if (amount > rect.size.width) amount = rect.size.width;
-            s.origin.x = rect.origin.x + rect.size.width - amount;
-            s.size.width = amount;
-            r.size.width -= amount;
-            break;
-        case CGRectMinYEdge:
-            if (amount > rect.size.height) amount = rect.size.height;
-            s.size.height = amount;
-            r.origin.y += amount;
-            r.size.height -= amount;
-            break;
-        case CGRectMaxYEdge:
-            if (amount > rect.size.height) amount = rect.size.height;
-            s.origin.y = rect.origin.y + rect.size.height - amount;
-            s.size.height = amount;
-            r.size.height -= amount;
-            break;
-    }
-    if (slice) *slice = s;
-    if (remainder) *remainder = r;
-}
-
 void *CGStyleCreateShadow(void *parameters, void *unused) {
     return calloc(1, 8);
 }

@@ -84,7 +84,6 @@ set(CoreGraphics_sources
 	CGDisplayConfiguration.m
 	CGDisplayStream.m
 	src/CGEvent.c
-	src/CGColorMatching.c
 	src/stubs.c
 	CGFont.m
 	CGFunction.m
